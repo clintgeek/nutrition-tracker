@@ -1,6 +1,6 @@
 # Nutrition Tracker Web Deployment Guide (Simplified)
 
-This guide explains how to deploy the Nutrition Tracker application as a mobile-friendly web application using Docker with direct credentials.
+This guide explains how to deploy the Nutrition Tracker application as a mobile-friendly web application using Docker with environment variables for credentials.
 
 ## Prerequisites
 
@@ -13,27 +13,39 @@ This guide explains how to deploy the Nutrition Tracker application as a mobile-
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/nutrition-tracker.git
+git clone https://github.com/clintgeek/nutrition-tracker.git
 cd nutrition-tracker
 ```
 
-### 2. Customize Your Credentials (Optional)
+### 2. Set Up Environment Variables
 
-If you want to change the default credentials in the docker-compose.web.yml file:
-
-1. Open the file:
+1. Copy the example environment file:
 ```bash
-nano docker-compose.web.yml
+cp .env.example .env
 ```
 
-2. Update the following values with your preferred credentials:
-   - `POSTGRES_USER`: The database username (currently "nutrition_user")
-   - `POSTGRES_PASSWORD`: The database password (currently a secure generated password)
-   - `JWT_SECRET`: The secret key for JWT token generation (currently a secure random string)
+2. Edit the `.env` file with your secure credentials:
+```bash
+nano .env
+```
 
-Make sure to update both the database environment variables AND the backend DATABASE_URL to match.
+3. Update the following values:
+   - `POSTGRES_USER`: The database username
+   - `POSTGRES_PASSWORD`: A strong database password
+   - `POSTGRES_DB`: The database name
+   - `JWT_SECRET`: A secure random string for JWT token generation
+   - Port settings if needed (`FRONTEND_PORT`, `BACKEND_PORT`, `DATABASE_PORT`)
 
-### 3. Deploy with Docker Compose
+### 3. Create Docker Compose File
+
+1. Copy the example Docker Compose file:
+```bash
+cp docker-compose.web.example.yml docker-compose.web.yml
+```
+
+2. The file is already configured to use environment variables from your `.env` file, so no additional changes are needed unless you want to customize the configuration.
+
+### 4. Deploy with Docker Compose
 
 ```bash
 docker-compose -f docker-compose.web.yml up -d
@@ -45,7 +57,7 @@ This will:
 - Set up the PostgreSQL database
 - Start all services in detached mode
 
-### 4. Access Your Application
+### 5. Access Your Application
 
 Your application will be available at:
 - http://your-server-ip:4080 (or your domain if configured)
@@ -55,11 +67,11 @@ The backend API will be available at:
 
 The PostgreSQL database will be available at:
 - Port: 4082
-- Username: nutrition_user
-- Password: jK8p$2xL9#Qr7ZvT5yE3bN6*mW4dF
-- Database: nutrition_tracker
+- Username: nutrition_user (or as configured in .env)
+- Password: As configured in your .env file
+- Database: nutrition_tracker (or as configured in .env)
 
-### 5. Setting Up a Domain (Optional)
+### 6. Setting Up a Domain (Optional)
 
 For a production deployment, you should set up a domain name with HTTPS:
 
@@ -101,19 +113,17 @@ server {
 
 ## Security Information
 
-### Credentials Summary
+### Environment Variables
 
-Your application is configured with the following secure credentials:
+Your application uses environment variables to manage sensitive information:
 
-1. **Database Password**: `jK8p$2xL9#Qr7ZvT5yE3bN6*mW4dF`
-   - Used for PostgreSQL authentication
-   - 28 characters with mixed case, numbers, and special characters
+1. **Database Credentials**: Stored in .env file
+   - Never commit your .env file to version control
+   - Use strong, unique passwords in production
 
-2. **JWT Secret**: `eT7pM3kR8sL2gF9dH5jN6bV1cX4zQ0yU`
-   - Used for signing authentication tokens
-   - 32 characters of random alphanumeric characters
-
-Keep these credentials secure and do not share them with unauthorized individuals.
+2. **JWT Secret**: Used for signing authentication tokens
+   - Generate a secure random string (e.g., using `openssl rand -base64 32`)
+   - Store only in your .env file
 
 ## Maintenance
 
@@ -134,9 +144,10 @@ docker-compose -f docker-compose.web.yml up -d --build
 To back up your PostgreSQL database:
 
 ```bash
-# Use the credentials from your docker-compose file
-docker exec -t nutrition-tracker_db_1 pg_dump -U nutrition_user -W nutrition_tracker > backup.sql
-# When prompted, enter the password: jK8p$2xL9#Qr7ZvT5yE3bN6*mW4dF
+# Use the credentials from your .env file
+source .env
+docker exec -t nutrition-tracker_db_1 pg_dump -U $POSTGRES_USER -W $POSTGRES_DB > backup.sql
+# When prompted, enter the password from your .env file
 ```
 
 ### Connecting to the Database Directly
@@ -144,16 +155,12 @@ docker exec -t nutrition-tracker_db_1 pg_dump -U nutrition_user -W nutrition_tra
 To connect to the PostgreSQL database from your local machine:
 
 ```bash
-# Using psql client
-psql -h your-server-ip -p 4082 -U nutrition_user -d nutrition_tracker
-# When prompted, enter the password: jK8p$2xL9#Qr7ZvT5yE3bN6*mW4dF
+# Load environment variables
+source .env
 
-# Using a database management tool
-# Host: your-server-ip
-# Port: 4082
-# Username: nutrition_user
-# Password: jK8p$2xL9#Qr7ZvT5yE3bN6*mW4dF
-# Database: nutrition_tracker
+# Using psql client
+psql -h your-server-ip -p $DATABASE_PORT -U $POSTGRES_USER -d $POSTGRES_DB
+# When prompted, enter the password from your .env file
 ```
 
 ### Monitoring Logs
@@ -206,27 +213,14 @@ docker-compose -f docker-compose.web.yml logs db
 docker ps | grep nutrition-tracker_db
 ```
 
-### Password Issues
+### Environment Variable Issues
 
-If you need to change the database password:
+If your environment variables aren't being applied:
 
-1. Update both occurrences in docker-compose.web.yml:
-   - The `POSTGRES_PASSWORD` environment variable in the db service
-   - The `DATABASE_URL` environment variable in the backend service
-
-2. Restart the services:
 ```bash
-docker-compose -f docker-compose.web.yml down
-docker-compose -f docker-compose.web.yml up -d
+# Check if your .env file is being loaded
+docker-compose -f docker-compose.web.yml config
+
+# Verify the environment variables in a running container
+docker exec nutrition-tracker_backend_1 env | grep POSTGRES
 ```
-
-## Setup
-
-1. Copy the example configuration:
-   ```
-   cp docker-compose.web.example.yml docker-compose.web.yml
-   ```
-
-2. Edit docker-compose.web.yml to add your secure credentials:
-   - Replace `your_secure_password_here` with a strong password
-   - Replace `your_jwt_secret_here` with a secure random string

@@ -1,8 +1,11 @@
 # Environment variables and credentials
 .env
-*.env
-docker-compose.web.yml
-docker-compose.*.yml
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*
+!.env.example
 
 # Dependency directories
 node_modules/
@@ -13,10 +16,13 @@ backend/node_modules/
 dist/
 build/
 web-build/
+.expo/
 
 # Logs
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # OS files
 .DS_Store
@@ -27,3 +33,8 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Docker compose files with real credentials
+docker-compose.web.yml
+docker-compose.*.yml
+!docker-compose.web.example.yml
