@@ -219,3 +219,14 @@ If you need to change the database password:
 docker-compose -f docker-compose.web.yml down
 docker-compose -f docker-compose.web.yml up -d
 ```
+
+## Setup
+
+1. Copy the example configuration:
+   ```
+   cp docker-compose.web.example.yml docker-compose.web.yml
+   ```
+
+2. Edit docker-compose.web.yml to add your secure credentials:
+   - Replace `your_secure_password_here` with a strong password
+   - Replace `your_jwt_secret_here` with a secure random string
