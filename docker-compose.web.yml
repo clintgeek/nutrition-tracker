@@ -8,6 +8,10 @@ services:
       dockerfile: Dockerfile.web
       args:
         - NODE_OPTIONS=--max_old_space_size=4096
+    environment:
+      - NODE_ENV=production
+      - EXPO_NO_DOCTOR=1
+      - EXPO_DEBUG=true
     ports:
       - "${FRONTEND_PORT:-4080}:80"
     restart: always

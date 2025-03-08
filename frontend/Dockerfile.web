@@ -1,14 +1,17 @@
 # Build stage
-FROM node:16-alpine as build
+FROM node:18-alpine as build
 
 WORKDIR /app
 
 # Copy package files and install dependencies
 COPY package*.json ./
-RUN npm install
 
-# Install Expo CLI globally
-RUN npm install -g expo-cli
+# Install dependencies with clean npm cache
+RUN npm cache clean --force && \
+    npm install
+
+# Install specific version of Expo CLI globally
+RUN npm install -g expo-cli@6.3.10
 
 # Copy the rest of the application code
 COPY . .
@@ -16,11 +19,12 @@ COPY . .
 # Add web-specific configuration
 RUN echo '{ "name": "Nutrition Tracker", "display": "standalone", "orientation": "portrait", "scope": "/", "start_url": "/", "icons": [{ "src": "/assets/icon.png", "type": "image/png", "sizes": "512x512" }] }' > web-manifest.json
 
-# Update the web:build script in package.json
-RUN sed -i 's/"web:build": "expo build:web"/"web:build": "expo export:web"/' package.json
+# Create a custom build script that uses the correct command
+RUN echo '#!/bin/sh\nset -e\necho "Building web app..."\nnpx expo export:web\n' > build-web.sh && \
+    chmod +x build-web.sh
 
-# Build the web version with verbose output
-RUN npm run web:build -- --verbose
+# Run the custom build script
+RUN ./build-web.sh
 
 # Production stage
 FROM nginx:alpine
