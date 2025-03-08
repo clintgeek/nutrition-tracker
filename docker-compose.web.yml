@@ -6,6 +6,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.web
+      args:
+        - NODE_OPTIONS=--max_old_space_size=4096
     ports:
       - "${FRONTEND_PORT:-4080}:80"
     restart: always
@@ -24,6 +26,7 @@ services:
       - NODE_ENV=${NODE_ENV:-production}
       - DATABASE_URL=postgres://${POSTGRES_USER:-nutrition_user}:${POSTGRES_PASSWORD:-your_secure_password_here}@db:5432/${POSTGRES_DB:-nutrition_tracker}
       - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_key_here}
+      - USDA_API_KEY=${USDA_API_KEY:-}
       - PORT=3000
     depends_on:
       - db

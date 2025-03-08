@@ -7,14 +7,20 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
+# Install Expo CLI globally
+RUN npm install -g expo-cli
+
 # Copy the rest of the application code
 COPY . .
 
 # Add web-specific configuration
 RUN echo '{ "name": "Nutrition Tracker", "display": "standalone", "orientation": "portrait", "scope": "/", "start_url": "/", "icons": [{ "src": "/assets/icon.png", "type": "image/png", "sizes": "512x512" }] }' > web-manifest.json
 
-# Build the web version
-RUN npm run web:build
+# Update the web:build script in package.json
+RUN sed -i 's/"web:build": "expo build:web"/"web:build": "expo export:web"/' package.json
+
+# Build the web version with verbose output
+RUN npm run web:build -- --verbose
 
 # Production stage
 FROM nginx:alpine
