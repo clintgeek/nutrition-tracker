@@ -1,0 +1,78 @@
+# Use nginx as base image
+FROM nginx:alpine
+
+# Create app directory
+WORKDIR /usr/share/nginx/html
+
+# Create a static HTML file
+RUN echo '<!DOCTYPE html>\n\
+<html lang="en">\n\
+<head>\n\
+    <meta charset="UTF-8">\n\
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n\
+    <title>Nutrition Tracker</title>\n\
+    <style>\n\
+        body {\n\
+            font-family: Arial, sans-serif;\n\
+            margin: 0;\n\
+            padding: 20px;\n\
+            background-color: #f5f5f5;\n\
+            color: #333;\n\
+        }\n\
+        .container {\n\
+            max-width: 800px;\n\
+            margin: 0 auto;\n\
+            background-color: white;\n\
+            padding: 20px;\n\
+            border-radius: 8px;\n\
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);\n\
+        }\n\
+        h1 {\n\
+            color: #2c3e50;\n\
+            text-align: center;\n\
+        }\n\
+        .message {\n\
+            text-align: center;\n\
+            padding: 20px;\n\
+            background-color: #f8f9fa;\n\
+            border-radius: 4px;\n\
+            margin: 20px 0;\n\
+        }\n\
+        .footer {\n\
+            text-align: center;\n\
+            margin-top: 30px;\n\
+            font-size: 0.8em;\n\
+            color: #7f8c8d;\n\
+        }\n\
+    </style>\n\
+</head>\n\
+<body>\n\
+    <div class="container">\n\
+        <h1>Nutrition Tracker</h1>\n\
+        <div class="message">\n\
+            <p>The application is currently in maintenance mode.</p>\n\
+            <p>We are working to resolve build issues and will be back online shortly.</p>\n\
+        </div>\n\
+        <div class="footer">\n\
+            <p>© 2025 Nutrition Tracker App</p>\n\
+        </div>\n\
+    </div>\n\
+</body>\n\
+</html>' > index.html
+
+# Create a basic nginx configuration for SPA routing
+RUN echo 'server {\n\
+    listen 80;\n\
+    server_name localhost;\n\
+    root /usr/share/nginx/html;\n\
+    index index.html;\n\
+    location / {\n\
+        try_files $uri $uri/ /index.html;\n\
+    }\n\
+}' > /etc/nginx/conf.d/default.conf
+
+# Expose port 80
+EXPOSE 80
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]
