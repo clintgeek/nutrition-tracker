@@ -69,11 +69,10 @@ const GoalsScreen: React.FC = () => {
           // This is a calorie-only goal
           setGoalType('calories');
           setCalorieGoal(currentGoal.daily_calorie_target.toString());
-        } else if ((!currentGoal.daily_calorie_target || currentGoal.daily_calorie_target === 0) &&
-                  (currentGoal.protein_target_grams > 0 ||
+        } else if ((currentGoal.protein_target_grams > 0 ||
                    currentGoal.carbs_target_grams > 0 ||
                    currentGoal.fat_target_grams > 0)) {
-          // This is a macro-only goal
+          // This is a macro-based goal
           setGoalType('macros');
           setMacroGoals({
             protein: currentGoal.protein_target_grams || 0,
@@ -81,8 +80,12 @@ const GoalsScreen: React.FC = () => {
             fat: currentGoal.fat_target_grams || 0
           });
 
-          // Set a default calorie goal for calculations
-          setCalorieGoal('2000');
+          // Set calorie goal if available, otherwise use default
+          if (currentGoal.daily_calorie_target) {
+            setCalorieGoal(currentGoal.daily_calorie_target.toString());
+          } else {
+            setCalorieGoal('2000');
+          }
         }
       }
     } catch (error) {
@@ -98,17 +101,33 @@ const GoalsScreen: React.FC = () => {
     try {
       setSaving(true);
 
-      // Calculate macros in grams if using macros goal type
-      const macrosInGrams = calculateCaloriesFromMacros();
-
       // Prepare goal data based on goal type
-      const goalData = {
-        daily_calorie_target: parseInt(calorieGoal),
-        protein_target_grams: goalType === 'macros' ? macrosInGrams.protein : Math.round(parseInt(calorieGoal) * 0.3 / 4),
-        carbs_target_grams: goalType === 'macros' ? macrosInGrams.carbs : Math.round(parseInt(calorieGoal) * 0.4 / 4),
-        fat_target_grams: goalType === 'macros' ? macrosInGrams.fat : Math.round(parseInt(calorieGoal) * 0.3 / 9),
+      let goalData: any = {
         start_date: new Date().toISOString().split('T')[0], // Today's date
       };
+
+      if (goalType === 'calories') {
+        // For calorie goals, set macro values to 0 (not null)
+        goalData = {
+          ...goalData,
+          daily_calorie_target: parseInt(calorieGoal) || 0,
+          protein_target_grams: 0,
+          carbs_target_grams: 0,
+          fat_target_grams: 0,
+        };
+      } else {
+        // For macro goals, calculate macros in grams
+        const macrosInGrams = calculateCaloriesFromMacros();
+
+        // For macro goals, calorie value is optional but must be a number
+        goalData = {
+          ...goalData,
+          daily_calorie_target: calorieGoal.trim() !== '' ? parseInt(calorieGoal) : 0,
+          protein_target_grams: macrosInGrams.protein,
+          carbs_target_grams: macrosInGrams.carbs,
+          fat_target_grams: macrosInGrams.fat,
+        };
+      }
 
       console.log('Saving goal data:', goalData);
 
@@ -144,9 +163,10 @@ const GoalsScreen: React.FC = () => {
 
   // Calculate calories from macros
   const calculateCaloriesFromMacros = () => {
-    const proteinCalories = (parseInt(calorieGoal) * macroGoals.protein / 100);
-    const carbCalories = (parseInt(calorieGoal) * macroGoals.carbs / 100);
-    const fatCalories = (parseInt(calorieGoal) * macroGoals.fat / 100);
+    const calorieValue = parseInt(calorieGoal) || 2000; // Default to 2000 if empty
+    const proteinCalories = (calorieValue * macroGoals.protein / 100);
+    const carbCalories = (calorieValue * macroGoals.carbs / 100);
+    const fatCalories = (calorieValue * macroGoals.fat / 100);
 
     return {
       protein: Math.round(proteinCalories / 4), // 4 calories per gram of protein
@@ -228,7 +248,7 @@ const GoalsScreen: React.FC = () => {
                 value={calorieGoal}
                 onChangeText={setCalorieGoal}
                 keyboardType="numeric"
-                placeholder="Enter daily calorie target"
+                placeholder={goalType === 'macros' ? "Optional calorie target" : "Enter daily calorie target"}
               />
               <Text style={styles.inputLabel}>calories</Text>
             </View>
@@ -304,7 +324,7 @@ const GoalsScreen: React.FC = () => {
               mode="contained"
               onPress={saveGoals}
               style={styles.saveButton}
-              disabled={saving || (goalType === 'macros' && totalPercentage !== 100)}
+              disabled={saving || (goalType === 'macros' && totalPercentage !== 100) || (goalType === 'calories' && !calorieGoal)}
               loading={saving}
             >
               Save Goals
