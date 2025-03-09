@@ -166,7 +166,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (result.server_changes) {
         // Process food log changes
         if (result.server_changes.food_logs && result.server_changes.food_logs.length > 0) {
-          await foodLogService.processSyncedFoodLogs(result.server_changes.food_logs);
+          await foodLogService.processSyncedLogs(result.server_changes.food_logs);
         }
 
         // Process goal changes
