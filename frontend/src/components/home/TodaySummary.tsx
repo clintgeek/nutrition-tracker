@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Card, Title, Text, ProgressBar, useTheme } from 'react-native-paper';
 import { goalService, Goal } from '../../services/goalService';
+import { summaryService, DailySummary } from '../../services/summaryService';
 
 // Mock data for now - in a real app, this would come from an API
 interface NutritionSummary {
@@ -10,9 +11,9 @@ interface NutritionSummary {
     goal: number;
   };
   macros: {
-    protein: { consumed: number; goal: number };
-    carbs: { consumed: number; goal: number };
-    fat: { consumed: number; goal: number };
+    protein: { consumed: number; goal: number; isSet: boolean };
+    carbs: { consumed: number; goal: number; isSet: boolean };
+    fat: { consumed: number; goal: number; isSet: boolean };
   };
 }
 
@@ -20,23 +21,72 @@ const TodaySummary: React.FC = () => {
   const theme = useTheme();
   const [summary, setSummary] = useState<NutritionSummary>({
     calories: {
-      consumed: 1250,
+      consumed: 0,
       goal: 2000,
     },
     macros: {
-      protein: { consumed: 75, goal: 120 },
-      carbs: { consumed: 120, goal: 200 },
-      fat: { consumed: 45, goal: 65 },
+      protein: { consumed: 0, goal: 0, isSet: false },
+      carbs: { consumed: 0, goal: 0, isSet: false },
+      fat: { consumed: 0, goal: 0, isSet: false },
     },
   });
-  const [hasCalorieGoal, setHasCalorieGoal] = useState(true);
-  const [hasMacroGoal, setHasMacroGoal] = useState(true);
+  const [hasCalorieGoal, setHasCalorieGoal] = useState<boolean | null>(null);
+  const [hasMacroGoal, setHasMacroGoal] = useState<boolean | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // In a real app, you would fetch the data here
   useEffect(() => {
-    // fetchTodaySummary();
-    fetchUserGoals();
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        await Promise.all([
+          fetchTodaySummary(),
+          fetchUserGoals()
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
+
+  const fetchTodaySummary = async () => {
+    try {
+      // Get today's date
+      const today = new Date();
+
+      // Fetch the summary for today
+      const dailySummary = await summaryService.getDailySummary(today);
+
+      // Update the summary state with the fetched data
+      setSummary(prev => ({
+        calories: {
+          consumed: dailySummary.total_calories || 0,
+          goal: prev.calories.goal,
+        },
+        macros: {
+          protein: {
+            consumed: dailySummary.total_protein || 0,
+            goal: prev.macros.protein.goal,
+            isSet: prev.macros.protein.isSet
+          },
+          carbs: {
+            consumed: dailySummary.total_carbs || 0,
+            goal: prev.macros.carbs.goal,
+            isSet: prev.macros.carbs.isSet
+          },
+          fat: {
+            consumed: dailySummary.total_fat || 0,
+            goal: prev.macros.fat.goal,
+            isSet: prev.macros.fat.isSet
+          },
+        }
+      }));
+    } catch (error) {
+      console.error('Error fetching today\'s summary:', error);
+    }
+  };
 
   const fetchUserGoals = async () => {
     try {
@@ -65,20 +115,25 @@ const TodaySummary: React.FC = () => {
           macros: {
             protein: {
               consumed: prev.macros.protein.consumed,
-              goal: currentGoal.protein_target_grams || 120
+              goal: currentGoal.protein_target_grams || 0,
+              isSet: hasProtein
             },
             carbs: {
               consumed: prev.macros.carbs.consumed,
-              goal: currentGoal.carbs_target_grams || 200
+              goal: currentGoal.carbs_target_grams || 0,
+              isSet: hasCarbs
             },
             fat: {
               consumed: prev.macros.fat.consumed,
-              goal: currentGoal.fat_target_grams || 65
+              goal: currentGoal.fat_target_grams || 0,
+              isSet: hasFat
             },
           }
         }));
       } else {
         console.log('No current goal found');
+        setHasCalorieGoal(false);
+        setHasMacroGoal(false);
       }
     } catch (error) {
       console.error('Error fetching goals:', error);
@@ -89,8 +144,20 @@ const TodaySummary: React.FC = () => {
   };
 
   const calculatePercentage = (consumed: number, goal: number) => {
+    if (!goal) return 0;
     return Math.min(consumed / goal, 1);
   };
+
+  if (isLoading) {
+    return (
+      <Card style={styles.card}>
+        <Card.Content>
+          <Title style={styles.title}>Today's Summary</Title>
+          <Text>Loading...</Text>
+        </Card.Content>
+      </Card>
+    );
+  }
 
   return (
     <Card style={styles.card}>
@@ -117,51 +184,57 @@ const TodaySummary: React.FC = () => {
           <View style={styles.macrosSection}>
             <Text style={styles.macrosTitle}>Macronutrients</Text>
 
-            <View style={styles.macroItem}>
-              <View style={styles.macroHeader}>
-                <Text style={styles.macroLabel}>Protein</Text>
-                <Text style={styles.macroValue}>
-                  {summary.macros.protein.consumed}g / {summary.macros.protein.goal}g
-                </Text>
+            {summary.macros.protein.isSet && (
+              <View style={styles.macroItem}>
+                <View style={styles.macroHeader}>
+                  <Text style={styles.macroLabel}>Protein</Text>
+                  <Text style={styles.macroValue}>
+                    {summary.macros.protein.consumed}g / {summary.macros.protein.goal}g
+                  </Text>
+                </View>
+                <ProgressBar
+                  progress={calculatePercentage(summary.macros.protein.consumed, summary.macros.protein.goal)}
+                  color="#4CAF50"
+                  style={styles.progressBar}
+                />
               </View>
-              <ProgressBar
-                progress={calculatePercentage(summary.macros.protein.consumed, summary.macros.protein.goal)}
-                color="#4CAF50"
-                style={styles.progressBar}
-              />
-            </View>
+            )}
 
-            <View style={styles.macroItem}>
-              <View style={styles.macroHeader}>
-                <Text style={styles.macroLabel}>Carbs</Text>
-                <Text style={styles.macroValue}>
-                  {summary.macros.carbs.consumed}g / {summary.macros.carbs.goal}g
-                </Text>
+            {summary.macros.carbs.isSet && (
+              <View style={styles.macroItem}>
+                <View style={styles.macroHeader}>
+                  <Text style={styles.macroLabel}>Carbs</Text>
+                  <Text style={styles.macroValue}>
+                    {summary.macros.carbs.consumed}g / {summary.macros.carbs.goal}g
+                  </Text>
+                </View>
+                <ProgressBar
+                  progress={calculatePercentage(summary.macros.carbs.consumed, summary.macros.carbs.goal)}
+                  color="#FF9800"
+                  style={styles.progressBar}
+                />
               </View>
-              <ProgressBar
-                progress={calculatePercentage(summary.macros.carbs.consumed, summary.macros.carbs.goal)}
-                color="#FF9800"
-                style={styles.progressBar}
-              />
-            </View>
+            )}
 
-            <View style={styles.macroItem}>
-              <View style={styles.macroHeader}>
-                <Text style={styles.macroLabel}>Fat</Text>
-                <Text style={styles.macroValue}>
-                  {summary.macros.fat.consumed}g / {summary.macros.fat.goal}g
-                </Text>
+            {summary.macros.fat.isSet && (
+              <View style={styles.macroItem}>
+                <View style={styles.macroHeader}>
+                  <Text style={styles.macroLabel}>Fat</Text>
+                  <Text style={styles.macroValue}>
+                    {summary.macros.fat.consumed}g / {summary.macros.fat.goal}g
+                  </Text>
+                </View>
+                <ProgressBar
+                  progress={calculatePercentage(summary.macros.fat.consumed, summary.macros.fat.goal)}
+                  color="#E91E63"
+                  style={styles.progressBar}
+                />
               </View>
-              <ProgressBar
-                progress={calculatePercentage(summary.macros.fat.consumed, summary.macros.fat.goal)}
-                color="#E91E63"
-                style={styles.progressBar}
-              />
-            </View>
+            )}
           </View>
         )}
 
-        {!hasCalorieGoal && !hasMacroGoal && (
+        {hasCalorieGoal === false && hasMacroGoal === false && (
           <View style={styles.noGoalsMessage}>
             <Text>No nutrition goals set. Visit the Goals section to set your targets.</Text>
           </View>

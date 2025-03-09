@@ -65,11 +65,50 @@ We are currently fixing the Goal API functionality. Here's what we've done and w
 ### Docker Setup
 - The application runs in Docker containers on the server
 - Use `docker compose` (without the hyphen) for Docker Compose commands
-  ```bash
-  # Example: Restart the backend container
-  ssh server "cd /mnt/Media/Docker/nutrition-tracker && docker compose restart backend"
-  ```
-- Docker Compose project directory: `/mnt/Media/Docker/nutrition-tracker`
+
+### Preferred Method for Backend Updates: Complete Rebuild
+
+When updating backend files, it's important to do a complete rebuild of the backend container to ensure all changes are properly applied. This is especially important for changes to database models, controllers, and other core functionality.
+
+#### Steps for Backend Updates:
+
+1. Copy the updated backend files to the server:
+   ```bash
+   scp backend/src/path/to/file.js server:/mnt/Media/Docker/nutrition-tracker/backend/src/path/to/
+   ```
+
+2. Stop, remove, and rebuild the backend container:
+   ```bash
+   ssh server "cd /mnt/Media/Docker/nutrition-tracker && docker compose stop backend && docker compose rm -f backend && docker compose up -d --build backend"
+   ```
+
+3. Check the logs to verify successful startup:
+   ```bash
+   ssh server "cd /mnt/Media/Docker/nutrition-tracker && docker compose logs --tail=50 backend"
+   ```
+
+#### Benefits of Complete Rebuild:
+
+- Ensures all changes are properly incorporated into the container
+- Prevents issues with cached files or dependencies
+- Provides a clean environment for the updated code
+- Allows for proper initialization of database connections and other resources
+- Reduces the risk of runtime errors due to partial updates
+
+### Preferred Method for Frontend Updates: Using the update_frontend.sh Script
+
+The most reliable and efficient way to deploy frontend changes to the server is using the `update_frontend.sh` script. This script handles all the necessary steps:
+
+1. Creating temporary directories on the server
+2. Copying updated frontend files to the server
+3. Rebuilding and restarting the frontend container
+4. Checking logs to ensure successful deployment
+
+#### Usage:
+
+```bash
+./update_frontend.sh
+```
 
 ### Database Access
 - **Database Name**: nutrition_tracker

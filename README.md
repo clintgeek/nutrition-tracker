@@ -120,9 +120,121 @@ npm install
 npm run dev
 ```
 
-## Deployment
+## Deployment Process
 
-See [DEPLOYMENT-SIMPLE.md](DEPLOYMENT-SIMPLE.md) for detailed deployment instructions.
+### Preferred Method for Frontend Updates: Using the update_frontend.sh Script
+
+The most reliable and efficient way to deploy frontend changes to the server is using the `update_frontend.sh` script. This script handles all the necessary steps:
+
+1. Creating temporary directories on the server
+2. Copying updated frontend files to the server
+3. Rebuilding and restarting the frontend container
+4. Checking logs to ensure successful deployment
+
+#### Usage:
+
+```bash
+./update_frontend.sh
+```
+
+#### What the Script Does:
+
+1. Creates temporary directories on the server
+2. Copies updated frontend files to the server using `scp`
+3. Stops and removes the existing frontend container
+4. Rebuilds the Docker images for both backend and frontend
+5. Starts the containers with the updated code
+6. Checks the logs to verify successful startup
+
+### Preferred Method for Backend Updates: Complete Rebuild
+
+When updating backend files, it's important to do a complete rebuild of the backend container to ensure all changes are properly applied. This is especially important for changes to database models, controllers, and other core functionality.
+
+#### Steps for Backend Updates:
+
+1. Copy the updated backend files to the server:
+   ```bash
+   scp backend/src/path/to/file.js server:/mnt/Media/Docker/nutrition-tracker/backend/src/path/to/
+   ```
+
+2. Stop, remove, and rebuild the backend container:
+   ```bash
+   ssh server "cd /mnt/Media/Docker/nutrition-tracker && docker compose stop backend && docker compose rm -f backend && docker compose up -d --build backend"
+   ```
+
+3. Check the logs to verify successful startup:
+   ```bash
+   ssh server "cd /mnt/Media/Docker/nutrition-tracker && docker compose logs --tail=50 backend"
+   ```
+
+#### Benefits of Complete Rebuild:
+
+- Ensures all changes are properly incorporated into the container
+- Prevents issues with cached files or dependencies
+- Provides a clean environment for the updated code
+- Allows for proper initialization of database connections and other resources
+- Reduces the risk of runtime errors due to partial updates
+
+### Alternative Method: Manual Deployment
+
+If you need to deploy specific files or make targeted changes, you can use the following manual process:
+
+#### 1. Copy specific files to the server:
+
+```bash
+# For frontend files
+scp frontend/src/path/to/file.ts server:/mnt/Media/Docker/nutrition-tracker/frontend/src/path/to/
+
+# For backend files
+scp backend/src/path/to/file.js server:/mnt/Media/Docker/nutrition-tracker/backend/src/path/to/
+```
+
+#### 2. Rebuild and restart containers on the server:
+
+```bash
+# SSH into the server
+ssh server
+
+# Navigate to the project directory
+cd /mnt/Media/Docker/nutrition-tracker
+
+# For frontend changes:
+docker compose stop frontend-web
+docker compose rm -f frontend-web
+docker compose up -d --build frontend-web
+
+# For backend changes:
+docker compose stop backend
+docker compose rm -f backend
+docker compose up -d --build backend
+```
+
+#### 3. Check logs to verify successful deployment:
+
+```bash
+# Check frontend logs
+docker compose logs --tail=50 frontend-web
+
+# Check backend logs
+docker compose logs --tail=50 backend
+```
+
+## Troubleshooting
+
+If you encounter issues during deployment:
+
+1. Check the Docker logs for error messages
+2. Verify that all required files were copied correctly
+3. Ensure all dependencies are installed
+4. Check for syntax errors in your code
+5. Verify network connectivity to the server
+
+For persistent issues, you may need to:
+
+```bash
+# Remove all containers and rebuild from scratch
+ssh server "cd /mnt/Media/Docker/nutrition-tracker && docker compose down && docker compose up -d --build"
+```
 
 ## Security
 

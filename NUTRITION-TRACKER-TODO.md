@@ -13,6 +13,7 @@
 - [x] Add Home button beside logout button in header
 - [ ] Add Custom food is not working
 - [x] Implement food search functionality
+- [ ] Break up food log into Breakfast, Lunch, Dinner, Snacks
 - [ ] Implement Today's Summary page with calories and macros, maybe using some sort of chart rather than just a line graph
 - [ ] use OpenFoodFacts as primary API, fail to USDA
 - [ ] implement handling of recipies in the food database
@@ -25,6 +26,9 @@
 - [ ] recommend recent foods/meals
 - [ ] track weight and weight goals
 - [ ] show weight loss progress
+- [ ] Rework home to be more of a dashboard
+- [ ] allow setting of default page in user profile settings
+- [ ] implement "milestones" as badges for various things like each 5 pounds lost or every 30 days logged
 
 ### User Experience
 - [x] Today's summary tile on the home screen should only show calories if your using a calorie goal and only show macros if you're using a macro goal
