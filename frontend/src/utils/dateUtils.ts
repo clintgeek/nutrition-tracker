@@ -11,6 +11,18 @@ export const formatDate = (dateString: string): string => {
 };
 
 /**
+ * Format a date string (YYYY-MM-DD) to a readable format (e.g., "Monday, January 1")
+ */
+export const getReadableDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+};
+
+/**
  * Format a date string (YYYY-MM-DD) to display the day of week (e.g., "Monday")
  */
 export const formatDayOfWeek = (dateString: string): string => {

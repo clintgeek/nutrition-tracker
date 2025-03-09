@@ -10,7 +10,6 @@ export interface Goal {
   carbs_target_grams?: number;
   fat_target_grams?: number;
   start_date?: string;
-  end_date?: string;
   sync_id: string;
   is_deleted?: boolean;
   created_at?: string;
@@ -144,9 +143,7 @@ export const goalService = {
       // Find goal that applies to current date
       const currentGoal = offlineGoals.find((goal) => {
         const startDate = goal.start_date ? goal.start_date : '0000-00-00';
-        const endDate = goal.end_date ? goal.end_date : '9999-99-99';
-
-        return startDate <= currentDate && endDate >= currentDate;
+        return startDate <= currentDate;
       });
 
       // If no goal applies to current date, return most recent goal
@@ -179,17 +176,14 @@ export const goalService = {
       // Find goal that applies to the specified date
       const goal = offlineGoals.find((g) => {
         const startDate = g.start_date ? g.start_date : '0000-00-00';
-        const endDate = g.end_date ? g.end_date : '9999-99-99';
-
-        return startDate <= date && endDate >= date;
+        return startDate <= date;
       });
 
       // If no goal applies to the specified date, return most recent goal before that date
       if (!goal) {
         const goalsBeforeDate = offlineGoals.filter((g) => {
-          const endDate = g.end_date ? g.end_date : '9999-99-99';
-
-          return endDate < date;
+          const startDate = g.start_date ? g.start_date : '0000-00-00';
+          return startDate <= date;
         });
 
         if (goalsBeforeDate.length === 0) {
@@ -197,8 +191,8 @@ export const goalService = {
         }
 
         return goalsBeforeDate.sort((a, b) => {
-          const aDate = a.end_date || '0000-00-00';
-          const bDate = b.end_date || '0000-00-00';
+          const aDate = a.start_date || '0000-00-00';
+          const bDate = b.start_date || '0000-00-00';
 
           return bDate.localeCompare(aDate);
         })[0];
@@ -268,7 +262,7 @@ export const goalService = {
 
       if (goalIndex !== -1) {
         // Mark goal as deleted
-        offlineGoals[goalIndex].is_deleted = true;
+        offlineGoals[goalIndex] = { ...offlineGoals[goalIndex], is_deleted: true };
 
         // Save updated goals
         await AsyncStorage.setItem(OFFLINE_GOALS_KEY, JSON.stringify(offlineGoals));
@@ -281,105 +275,59 @@ export const goalService = {
     }
   },
 
-  // Add to pending changes
+  // Add goal to pending changes
   addToPendingChanges: async (goal: Goal): Promise<void> => {
     try {
       // Get existing pending changes
-      const pendingGoalsJson = await AsyncStorage.getItem(PENDING_GOALS_KEY);
-      const pendingGoals: Goal[] = pendingGoalsJson ? JSON.parse(pendingGoalsJson) : [];
+      const pendingChangesJson = await AsyncStorage.getItem(PENDING_GOALS_KEY);
+      const pendingChanges: Goal[] = pendingChangesJson ? JSON.parse(pendingChangesJson) : [];
 
-      // Check if goal already exists in pending changes
-      const goalIndex = pendingGoals.findIndex((pendingGoal) =>
-        (pendingGoal.id && pendingGoal.id === goal.id) ||
-        (pendingGoal.sync_id && pendingGoal.sync_id === goal.sync_id)
-      );
-
-      if (goalIndex !== -1) {
-        // Update existing goal
-        pendingGoals[goalIndex] = { ...pendingGoals[goalIndex], ...goal };
-      } else {
-        // Add new goal
-        pendingGoals.push(goal);
-      }
+      // Add goal to pending changes
+      pendingChanges.push(goal);
 
       // Save updated pending changes
-      await AsyncStorage.setItem(PENDING_GOALS_KEY, JSON.stringify(pendingGoals));
+      await AsyncStorage.setItem(PENDING_GOALS_KEY, JSON.stringify(pendingChanges));
     } catch (error) {
-      console.error('Error adding to pending changes:', error);
+      console.error('Error adding goal to pending changes:', error);
     }
   },
 
-  // Get pending changes
-  getPendingChanges: async (): Promise<Goal[]> => {
+  // Sync pending changes with server
+  syncPendingChanges: async (): Promise<void> => {
     try {
-      // Get pending changes from storage
-      const pendingGoalsJson = await AsyncStorage.getItem(PENDING_GOALS_KEY);
+      // Get pending changes
+      const pendingChangesJson = await AsyncStorage.getItem(PENDING_GOALS_KEY);
 
-      if (!pendingGoalsJson) {
-        return [];
+      if (!pendingChangesJson) {
+        return;
       }
 
-      return JSON.parse(pendingGoalsJson);
-    } catch (error) {
-      console.error('Error getting pending changes:', error);
-      return [];
-    }
-  },
+      const pendingChanges: Goal[] = JSON.parse(pendingChangesJson);
 
-  // Process synced goals
-  processSyncedGoals: async (goals: Goal[]): Promise<void> => {
-    try {
-      // Get existing offline goals
-      const offlineGoalsJson = await AsyncStorage.getItem(OFFLINE_GOALS_KEY);
-      const offlineGoals: Goal[] = offlineGoalsJson ? JSON.parse(offlineGoalsJson) : [];
+      if (pendingChanges.length === 0) {
+        return;
+      }
 
-      // Process each synced goal
-      for (const goal of goals) {
-        // Find goal by sync ID
-        const goalIndex = offlineGoals.findIndex((offlineGoal) => offlineGoal.sync_id === goal.sync_id);
-
-        if (goalIndex !== -1) {
-          // Update existing goal
-          offlineGoals[goalIndex] = { ...offlineGoals[goalIndex], ...goal };
+      // Process each pending change
+      for (const change of pendingChanges) {
+        if (change.is_deleted) {
+          // Delete goal
+          if (change.id) {
+            await apiService.delete<{ message: string }>(`/goals/${change.id}`);
+          }
+        } else if (change.id) {
+          // Update goal
+          await apiService.put<{ message: string; goal: Goal }>(`/goals/${change.id}`, change);
         } else {
-          // Add new goal
-          offlineGoals.push(goal);
+          // Create goal
+          await apiService.post<{ message: string; goal: Goal }>('/goals', change);
         }
       }
 
-      // Save updated goals
-      await AsyncStorage.setItem(OFFLINE_GOALS_KEY, JSON.stringify(offlineGoals));
+      // Clear pending changes
+      await AsyncStorage.removeItem(PENDING_GOALS_KEY);
     } catch (error) {
-      console.error('Error processing synced goals:', error);
-    }
-  },
-
-  // Mark goals as synced
-  markAsSynced: async (syncedGoals: Goal[], deletedIds: number[]): Promise<void> => {
-    try {
-      // Get pending changes
-      const pendingGoalsJson = await AsyncStorage.getItem(PENDING_GOALS_KEY);
-      let pendingGoals: Goal[] = pendingGoalsJson ? JSON.parse(pendingGoalsJson) : [];
-
-      // Remove synced goals from pending changes
-      pendingGoals = pendingGoals.filter((pendingGoal) => {
-        // Check if goal is in synced goals
-        const isSynced = syncedGoals.some((syncedGoal) =>
-          (syncedGoal.id && syncedGoal.id === pendingGoal.id) ||
-          (syncedGoal.sync_id && syncedGoal.sync_id === pendingGoal.sync_id)
-        );
-
-        // Check if goal is in deleted IDs
-        const isDeleted = pendingGoal.id && deletedIds.includes(pendingGoal.id);
-
-        // Keep goal if not synced and not deleted
-        return !isSynced && !isDeleted;
-      });
-
-      // Save updated pending changes
-      await AsyncStorage.setItem(PENDING_GOALS_KEY, JSON.stringify(pendingGoals));
-    } catch (error) {
-      console.error('Error marking goals as synced:', error);
+      console.error('Error syncing pending changes:', error);
     }
   },
 };

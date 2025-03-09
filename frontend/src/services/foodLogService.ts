@@ -37,6 +37,15 @@ export interface DailySummary {
 const PENDING_LOGS_KEY = '@NutritionTracker:pendingLogs';
 const OFFLINE_LOGS_KEY = '@NutritionTracker:offlineLogs';
 
+// Export individual functions for direct imports
+export const getFoodLogsByDate = async (date: string): Promise<FoodLog[]> => {
+  return foodLogService.getLogs(date);
+};
+
+export const deleteFoodLog = async (id: number): Promise<void> => {
+  return foodLogService.deleteLog(id);
+};
+
 // Food log service
 export const foodLogService = {
   // Get logs for a specific date
@@ -285,8 +294,8 @@ export const foodLogService = {
     }
   },
 
-  // Process synced food logs
-  processSyncedFoodLogs: async (logs: FoodLog[]): Promise<void> => {
+  // Process synced logs
+  processSyncedLogs: async (logs: FoodLog[]): Promise<void> => {
     try {
       // Get existing offline logs
       const offlineLogsJson = await AsyncStorage.getItem(OFFLINE_LOGS_KEY);
@@ -309,7 +318,7 @@ export const foodLogService = {
       // Save updated logs
       await AsyncStorage.setItem(OFFLINE_LOGS_KEY, JSON.stringify(offlineLogs));
     } catch (error) {
-      console.error('Error processing synced food logs:', error);
+      console.error('Error processing synced logs:', error);
     }
   },
 

@@ -94,7 +94,6 @@ const GoalsScreen: React.FC = () => {
   };
 
   // Save goals to backend
-  // Save goals to backend
   const saveGoals = async () => {
     try {
       setSaving(true);
@@ -109,31 +108,9 @@ const GoalsScreen: React.FC = () => {
         carbs_target_grams: goalType === 'macros' ? macrosInGrams.carbs : Math.round(parseInt(calorieGoal) * 0.4 / 4),
         fat_target_grams: goalType === 'macros' ? macrosInGrams.fat : Math.round(parseInt(calorieGoal) * 0.3 / 9),
         start_date: new Date().toISOString().split('T')[0], // Today's date
-        end_date: null, // No end date
       };
 
       console.log('Saving goal data:', goalData);
-
-      // If we have an existing goal, update it
-      if (currentGoalId) {
-        await goalService.updateGoal(currentGoalId, goalData);
-      } else {
-        // Otherwise create a new goal
-        const newGoal = await goalService.createGoal(goalData);
-        if (newGoal && newGoal.id) {
-          setCurrentGoalId(newGoal.id);
-        }
-      }
-
-      // Show success message
-      Alert.alert('Success', 'Goals saved successfully!');
-    } catch (error) {
-      console.error('Error saving goals:', error);
-      Alert.alert('Error', 'Failed to save goals. Please try again.');
-    } finally {
-      setSaving(false);
-    }
-  };
 
       // If we have an existing goal, update it
       if (currentGoalId) {
@@ -251,154 +228,87 @@ const GoalsScreen: React.FC = () => {
                 value={calorieGoal}
                 onChangeText={setCalorieGoal}
                 keyboardType="numeric"
-                placeholder="Enter calories"
+                placeholder="Enter daily calorie target"
               />
-              <Text style={styles.inputSuffix}>kcal</Text>
+              <Text style={styles.inputLabel}>calories</Text>
             </View>
 
             {goalType === 'macros' && (
               <>
                 <Divider style={{ marginVertical: 16 }} />
 
-                <Text style={styles.sectionTitle}>Macronutrient Distribution</Text>
-                <Text style={[styles.totalPercentage,
-                  totalPercentage !== 100 ? { color: 'red' } : { color: 'green' }]}>
-                  Total: {totalPercentage}% {totalPercentage !== 100 ? '(Should equal 100%)' : '✓'}
+                <Text style={styles.sectionTitle}>Macro Nutrient Targets</Text>
+                <Text style={styles.description}>
+                  Set your macronutrient targets as percentages of your daily calorie goal.
                 </Text>
 
-                <View style={styles.macroInputContainer}>
-                  <View style={styles.macroInput}>
-                    <View style={styles.inputContainer}>
+                <View style={styles.macroContainer}>
+                  <View style={styles.macroItem}>
+                    <Text style={styles.macroLabel}>Protein</Text>
+                    <View style={styles.macroInputContainer}>
                       <RNTextInput
-                        style={styles.input}
+                        style={styles.macroInput}
                         value={macroGoals.protein.toString()}
                         onChangeText={(value) => updateMacroGoal('protein', value)}
                         keyboardType="numeric"
-                        placeholder="Protein"
                       />
-                      <Text style={styles.inputSuffix}>%</Text>
+                      <Text style={styles.macroUnit}>%</Text>
                     </View>
                     <Text style={styles.macroGrams}>{macrosInGrams.protein}g</Text>
                   </View>
 
-                  <View style={styles.macroInput}>
-                    <View style={styles.inputContainer}>
+                  <View style={styles.macroItem}>
+                    <Text style={styles.macroLabel}>Carbs</Text>
+                    <View style={styles.macroInputContainer}>
                       <RNTextInput
-                        style={styles.input}
+                        style={styles.macroInput}
                         value={macroGoals.carbs.toString()}
                         onChangeText={(value) => updateMacroGoal('carbs', value)}
                         keyboardType="numeric"
-                        placeholder="Carbs"
                       />
-                      <Text style={styles.inputSuffix}>%</Text>
+                      <Text style={styles.macroUnit}>%</Text>
                     </View>
                     <Text style={styles.macroGrams}>{macrosInGrams.carbs}g</Text>
                   </View>
 
-                  <View style={styles.macroInput}>
-                    <View style={styles.inputContainer}>
+                  <View style={styles.macroItem}>
+                    <Text style={styles.macroLabel}>Fat</Text>
+                    <View style={styles.macroInputContainer}>
                       <RNTextInput
-                        style={styles.input}
+                        style={styles.macroInput}
                         value={macroGoals.fat.toString()}
                         onChangeText={(value) => updateMacroGoal('fat', value)}
                         keyboardType="numeric"
-                        placeholder="Fat"
                       />
-                      <Text style={styles.inputSuffix}>%</Text>
+                      <Text style={styles.macroUnit}>%</Text>
                     </View>
                     <Text style={styles.macroGrams}>{macrosInGrams.fat}g</Text>
                   </View>
                 </View>
 
-                <Card style={styles.infoCard}>
-                  <Card.Content>
-                    <Text style={styles.infoText}>
-                      <MaterialCommunityIcons name="information-outline" size={16} />
-                      {' '}Protein and carbs contain 4 calories per gram, while fat contains 9 calories per gram.
-                    </Text>
-                  </Card.Content>
-                </Card>
+                {totalPercentage !== 100 && (
+                  <Text style={[styles.totalPercentage, { color: theme.colors.error }]}>
+                    Total: {totalPercentage}% (should be 100%)
+                  </Text>
+                )}
+
+                {totalPercentage === 100 && (
+                  <Text style={styles.totalPercentage}>
+                    Total: {totalPercentage}%
+                  </Text>
+                )}
               </>
             )}
 
             <Button
               mode="contained"
               onPress={saveGoals}
-              style={{ marginTop: 24 }}
-              disabled={goalType === 'macros' && totalPercentage !== 100 || saving}
+              style={styles.saveButton}
+              disabled={saving || (goalType === 'macros' && totalPercentage !== 100)}
               loading={saving}
             >
-              {saving ? 'Saving...' : 'Save Goals'}
+              Save Goals
             </Button>
-          </Card.Content>
-        </Card>
-
-        <Card style={styles.card}>
-          <Card.Content>
-            <Title>Preset Diets</Title>
-            <Text style={{ marginBottom: 16 }}>Quick start with popular diet macros</Text>
-
-            <TouchableOpacity
-              style={styles.presetItem}
-              onPress={() => {
-                setGoalType('macros');
-                setMacroGoals({ protein: 20, carbs: 50, fat: 30 });
-              }}
-            >
-              <View style={styles.presetContent}>
-                <Text style={styles.presetTitle}>Balanced</Text>
-                <Text>20% Protein, 50% Carbs, 30% Fat</Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={24} color={theme.colors.primary} />
-            </TouchableOpacity>
-
-            <Divider style={{ marginVertical: 8 }} />
-
-            <TouchableOpacity
-              style={styles.presetItem}
-              onPress={() => {
-                setGoalType('macros');
-                setMacroGoals({ protein: 30, carbs: 40, fat: 30 });
-              }}
-            >
-              <View style={styles.presetContent}>
-                <Text style={styles.presetTitle}>High Protein</Text>
-                <Text>30% Protein, 40% Carbs, 30% Fat</Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={24} color={theme.colors.primary} />
-            </TouchableOpacity>
-
-            <Divider style={{ marginVertical: 8 }} />
-
-            <TouchableOpacity
-              style={styles.presetItem}
-              onPress={() => {
-                setGoalType('macros');
-                setMacroGoals({ protein: 20, carbs: 5, fat: 75 });
-              }}
-            >
-              <View style={styles.presetContent}>
-                <Text style={styles.presetTitle}>Keto</Text>
-                <Text>20% Protein, 5% Carbs, 75% Fat</Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={24} color={theme.colors.primary} />
-            </TouchableOpacity>
-
-            <Divider style={{ marginVertical: 8 }} />
-
-            <TouchableOpacity
-              style={styles.presetItem}
-              onPress={() => {
-                setGoalType('macros');
-                setMacroGoals({ protein: 25, carbs: 60, fat: 15 });
-              }}
-            >
-              <View style={styles.presetContent}>
-                <Text style={styles.presetTitle}>Low Fat</Text>
-                <Text>25% Protein, 60% Carbs, 15% Fat</Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={24} color={theme.colors.primary} />
-            </TouchableOpacity>
           </Card.Content>
         </Card>
       </View>
@@ -409,109 +319,101 @@ const GoalsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   content: {
     padding: 16,
   },
   card: {
     marginBottom: 16,
-    borderRadius: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  goalTypeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  goalTypeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    flex: 1,
-    marginHorizontal: 4,
-    gap: 8,
-  },
-  goalTypeText: {
-    fontWeight: 'bold',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 4,
-    marginBottom: 16,
-    paddingHorizontal: 8,
-  },
-  input: {
-    flex: 1,
-    height: 40,
-    padding: 8,
-  },
-  inputSuffix: {
-    marginLeft: 8,
-    fontWeight: 'bold',
-  },
-  totalPercentage: {
-    marginTop: 8,
-    marginBottom: 16,
-    fontWeight: 'bold',
-  },
-  macroInputContainer: {
-    flexDirection: 'column',
-    gap: 12,
-  },
-  macroInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  macroGrams: {
-    marginLeft: 12,
-    fontSize: 16,
-    fontWeight: 'bold',
-    width: 50,
-  },
-  infoCard: {
-    backgroundColor: '#f0f8ff',
-    marginTop: 16,
-  },
-  infoText: {
-    fontSize: 14,
-  },
-  presetItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-  },
-  presetContent: {
-    flex: 1,
-  },
-  presetTitle: {
-    fontWeight: 'bold',
-    fontSize: 16,
-    marginBottom: 4,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    height: '100%',
-    width: '100%',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    zIndex: 999,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  description: {
+    marginBottom: 16,
+    opacity: 0.7,
+  },
+  goalTypeContainer: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  goalTypeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#ccc',
+  },
+  goalTypeText: {
+    marginLeft: 8,
+    fontWeight: '500',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginRight: 8,
+  },
+  inputLabel: {
+    width: 80,
+  },
+  macroContainer: {
+    marginTop: 8,
+  },
+  macroItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  macroLabel: {
+    width: 80,
+  },
+  macroInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  macroInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    width: 60,
+  },
+  macroUnit: {
+    marginLeft: 4,
+    width: 20,
+  },
+  macroGrams: {
+    width: 60,
+    textAlign: 'right',
+  },
+  totalPercentage: {
+    marginTop: 8,
+    fontWeight: 'bold',
+    textAlign: 'right',
+  },
+  saveButton: {
+    marginTop: 24,
   },
 });
 

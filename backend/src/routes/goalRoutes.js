@@ -49,7 +49,6 @@ router.post(
     check('carbs_target_grams', 'Carbs target must be a number').optional().isNumeric(),
     check('fat_target_grams', 'Fat target must be a number').optional().isNumeric(),
     check('start_date', 'Start date must be a valid date').optional().isDate(),
-    check('end_date', 'End date must be a valid date').optional().isDate(),
   ],
   createGoal
 );
@@ -67,7 +66,6 @@ router.put(
     check('carbs_target_grams', 'Carbs target must be a number').optional().isNumeric(),
     check('fat_target_grams', 'Fat target must be a number').optional().isNumeric(),
     check('start_date', 'Start date must be a valid date').optional().isDate(),
-    check('end_date', 'End date must be a valid date').optional().isDate(),
   ],
   updateGoal
 );

@@ -64,7 +64,6 @@ const createGoal = asyncHandler(async (req, res) => {
     carbs_target_grams,
     fat_target_grams,
     start_date,
-    end_date,
     sync_id,
   } = req.body;
 
@@ -76,7 +75,6 @@ const createGoal = asyncHandler(async (req, res) => {
     carbs_target_grams,
     fat_target_grams,
     start_date,
-    end_date,
     sync_id,
   });
 

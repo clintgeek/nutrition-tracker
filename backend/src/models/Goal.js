@@ -20,15 +20,14 @@ class Goal {
         carbs_target_grams,
         fat_target_grams,
         start_date,
-        end_date,
         sync_id = uuidv4(),
       } = goalData;
 
       const result = await db.query(
         `INSERT INTO nutrition_goals
          (user_id, daily_calorie_target, protein_target_grams, carbs_target_grams,
-          fat_target_grams, start_date, end_date, sync_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          fat_target_grams, start_date, sync_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
         [
           user_id,
@@ -37,7 +36,6 @@ class Goal {
           carbs_target_grams,
           fat_target_grams,
           start_date,
-          end_date,
           sync_id,
         ]
       );
@@ -51,7 +49,6 @@ class Goal {
         carbs_target_grams: dbGoal.carbs_target_grams,
         fat_target_grams: dbGoal.fat_target_grams,
         start_date: dbGoal.start_date,
-        end_date: dbGoal.end_date,
         sync_id: dbGoal.sync_id,
         is_deleted: dbGoal.is_deleted,
         created_at: dbGoal.created_at,
@@ -87,7 +84,6 @@ class Goal {
         carbs_target_grams: dbGoal.carbs_target_grams,
         fat_target_grams: dbGoal.fat_target_grams,
         start_date: dbGoal.start_date,
-        end_date: dbGoal.end_date,
         sync_id: dbGoal.sync_id,
         is_deleted: dbGoal.is_deleted,
         created_at: dbGoal.created_at,
@@ -109,7 +105,6 @@ class Goal {
       const result = await db.query(
         `SELECT * FROM nutrition_goals
          WHERE user_id = $1 AND is_deleted = false
-         AND (end_date IS NULL OR end_date >= CURRENT_DATE)
          ORDER BY start_date DESC
          LIMIT 1`,
         [userId]
@@ -126,7 +121,6 @@ class Goal {
         carbs_target_grams: dbGoal.carbs_target_grams,
         fat_target_grams: dbGoal.fat_target_grams,
         start_date: dbGoal.start_date,
-        end_date: dbGoal.end_date,
         sync_id: dbGoal.sync_id,
         is_deleted: dbGoal.is_deleted,
         created_at: dbGoal.created_at,
@@ -150,7 +144,6 @@ class Goal {
         `SELECT * FROM nutrition_goals
          WHERE user_id = $1 AND is_deleted = false
          AND (start_date IS NULL OR start_date <= $2)
-         AND (end_date IS NULL OR end_date >= $2)
          ORDER BY start_date DESC
          LIMIT 1`,
         [userId, date]
@@ -167,7 +160,6 @@ class Goal {
         carbs_target_grams: dbGoal.carbs_target_grams,
         fat_target_grams: dbGoal.fat_target_grams,
         start_date: dbGoal.start_date,
-        end_date: dbGoal.end_date,
         sync_id: dbGoal.sync_id,
         is_deleted: dbGoal.is_deleted,
         created_at: dbGoal.created_at,
@@ -201,7 +193,6 @@ class Goal {
         carbs_target_grams: dbGoal.carbs_target_grams,
         fat_target_grams: dbGoal.fat_target_grams,
         start_date: dbGoal.start_date,
-        end_date: dbGoal.end_date,
         sync_id: dbGoal.sync_id,
         is_deleted: dbGoal.is_deleted,
         created_at: dbGoal.created_at,
@@ -228,7 +219,6 @@ class Goal {
         carbs_target_grams,
         fat_target_grams,
         start_date,
-        end_date,
       } = goalData;
 
       const result = await db.query(
@@ -238,9 +228,8 @@ class Goal {
              carbs_target_grams = $3,
              fat_target_grams = $4,
              start_date = $5,
-             end_date = $6,
              updated_at = NOW()
-         WHERE id = $7 AND user_id = $8 AND is_deleted = false
+         WHERE id = $6 AND user_id = $7 AND is_deleted = false
          RETURNING *`,
         [
           daily_calorie_target,
@@ -248,7 +237,6 @@ class Goal {
           carbs_target_grams,
           fat_target_grams,
           start_date,
-          end_date,
           id,
           userId,
         ]
@@ -265,7 +253,6 @@ class Goal {
         carbs_target_grams: dbGoal.carbs_target_grams,
         fat_target_grams: dbGoal.fat_target_grams,
         start_date: dbGoal.start_date,
-        end_date: dbGoal.end_date,
         sync_id: dbGoal.sync_id,
         is_deleted: dbGoal.is_deleted,
         created_at: dbGoal.created_at,
@@ -278,21 +265,22 @@ class Goal {
   }
 
   /**
-   * Delete goal (soft delete)
+   * Delete goal
    * @param {number} id - Goal ID
    * @param {number} userId - User ID (for authorization)
-   * @returns {Promise<boolean>} Success status
+   * @returns {Promise<boolean>} Success
    */
   static async delete(id, userId) {
     try {
       const result = await db.query(
         `UPDATE nutrition_goals
          SET is_deleted = true, updated_at = NOW()
-         WHERE id = $1 AND user_id = $2`,
+         WHERE id = $1 AND user_id = $2 AND is_deleted = false
+         RETURNING id`,
         [id, userId]
       );
 
-      return result.rowCount > 0;
+      return !!result.rows[0];
     } catch (error) {
       logger.error(`Error deleting goal: ${error.message}`);
       throw error;
@@ -322,7 +310,6 @@ class Goal {
         carbs_target_grams: dbGoal.carbs_target_grams,
         fat_target_grams: dbGoal.fat_target_grams,
         start_date: dbGoal.start_date,
-        end_date: dbGoal.end_date,
         sync_id: dbGoal.sync_id,
         is_deleted: dbGoal.is_deleted,
         created_at: dbGoal.created_at,
@@ -359,7 +346,6 @@ class Goal {
         carbs_target_grams: dbGoal.carbs_target_grams,
         fat_target_grams: dbGoal.fat_target_grams,
         start_date: dbGoal.start_date,
-        end_date: dbGoal.end_date,
         sync_id: dbGoal.sync_id,
         is_deleted: dbGoal.is_deleted,
         created_at: dbGoal.created_at,

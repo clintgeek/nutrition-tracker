@@ -340,3 +340,6 @@ cd ..
 docker compose cp frontend/web-build/ frontend-web:/usr/share/nginx/html/
 docker compose restart frontend-web
 ```
+
+First Thing:
+We need to consolidate down to the goalScreen and its related support files and remove the goalsScreen. We need to look at the database schema. Let's remove end date from the goals, these are open ended goals. We need to modify the rest of all the goal files in the front end and backend to use the column names from the database to avoid confusion.

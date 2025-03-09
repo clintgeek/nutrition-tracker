@@ -4,17 +4,19 @@ FROM node:16-alpine as build
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
-RUN npm install @react-navigation/stack@6.3.20 react-native-gesture-handler@~2.9.0 --legacy-peer-deps
+# Install dependencies with legacy-peer-deps
+RUN npm install --legacy-peer-deps
 
-# Copy the rest of the application code
+# Copy the rest of the app
 COPY . .
 
-# Build the Expo web app
+# Install specific dependencies that might be missing, using legacy-peer-deps
+RUN npm install --save --legacy-peer-deps @react-native-picker/picker@^2.4.10 @react-native-community/datetimepicker@^7.0.0 @react-navigation/stack@^6.3.16 @react-navigation/native@^6.1.6 @react-navigation/bottom-tabs@^6.5.7 react-native-gesture-handler@^2.9.0 react-native-safe-area-context@^4.5.0 react-native-screens@^3.20.0 expo-status-bar@^1.4.4 react-native-web@^0.18.12
+
+# Build the web app
 RUN npx expo export:web
 
 # Production stage
