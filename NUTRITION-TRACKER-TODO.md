@@ -3,32 +3,39 @@
 ## Additional Enhancements
 
 ## Bugs
-- [ ] HTML title is broken again
+- [x] HTML title is broken again
 - [x] Food search isn't working
-- [ ] Food search is complaining that you have to type at least two characters and resulting in a Failed to fetch foods. Please try again. error message on screen
+- [x] Food search is complaining that you have to type at least two characters and resulting in a Failed to fetch foods. Please try again. error message on screen
 
 ### Feature Additions
 - [x] Use favicon.png instead
 - [x] Today's summary tile on home page is using dummy information. It should use your goal and actual nutrition counts from your log
 - [x] Add Home button beside logout button in header
 - [ ] Add Custom food is not working
+- [x] API results should be automatically searched and added to the search list with the other foods
 - [x] Implement food search functionality
-- [ ] Break up food log into Breakfast, Lunch, Dinner, Snacks
-- [ ] Implement Today's Summary page with calories and macros, maybe using some sort of chart rather than just a line graph
-- [ ] use OpenFoodFacts as primary API, fail to USDA
+- [ ] Break up food log into Breakfast, Lunch, Dinner, Snacks each with an add food button that adds food to that category
+- [x] Implement Today's Summary page with calories and macros, maybe using some sort of chart rather than just a line graph
+- [x] use OpenFoodFacts as primary API, fail to USDA
 - [ ] implement handling of recipies in the food database
 - [ ] make the food database available to all users
 - [ ] Add barcode scanning with food lookup
+- [ ] Add barcode scanning for food log
 - [ ] Create data visualization for nutrition trends
 - [ ] Add user profile management
 - [ ] Implement OAUTH through google account
 - [ ] Implement user avatars
-- [ ] recommend recent foods/meals
+- [ ] recommend recent foods/meals on log page
 - [ ] track weight and weight goals
 - [ ] show weight loss progress
 - [ ] Rework home to be more of a dashboard
 - [ ] allow setting of default page in user profile settings
 - [ ] implement "milestones" as badges for various things like each 5 pounds lost or every 30 days logged
+- [ ] Make the web page "installable" in the chrome browser
+- [ ] insights that highlight most logged foods or recipies and total logged calories, total logged days and a avg calories per day. Maybe make this page a tabbed interface to show a bunch of information without overwhelming the user
+- [ ] create an admin login for an admin page that would allow user management, turning on maintenance mode, and future configuration changes
+- [ ] see what data could be imported from Garmin
+- [ ] meal planning and scheduling
 
 ### User Experience
 - [x] Today's summary tile on the home screen should only show calories if your using a calorie goal and only show macros if you're using a macro goal
@@ -67,7 +74,7 @@
   - [ ] Compress API responses to reduce payload size
   - [ ] Implement field filtering to return only needed data
 - [ ] Optimize database queries
-  - [x] Add appropriate indexes for common query patterns
+  - [ ] Add appropriate indexes for common query patterns
   - [ ] Use query optimization techniques like SELECT only needed fields
 - [ ] Reduce unnecessary re-renders in the UI
   - [ ] Implement React.memo for pure components

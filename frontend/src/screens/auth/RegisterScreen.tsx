@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { TextInput, Button, Text, useTheme } from 'react-native-paper';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../navigation/AppNavigator';
 
 const RegisterScreen: React.FC = () => {
   const [name, setName] = useState('');
@@ -9,6 +12,7 @@ const RegisterScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const { register, error, loading, clearError } = useAuth();
   const theme = useTheme();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   const handleRegister = async () => {
     if (name.trim() === '' || email.trim() === '' || password === '') {
@@ -25,11 +29,11 @@ const RegisterScreen: React.FC = () => {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.formContainer}>
           <Text style={styles.title}>Register</Text>
-          
+
           {error && (
             <Text style={styles.errorText}>{error}</Text>
           )}
-          
+
           <TextInput
             label="Name"
             value={name}
@@ -40,7 +44,7 @@ const RegisterScreen: React.FC = () => {
             mode="outlined"
             style={styles.input}
           />
-          
+
           <TextInput
             label="Email"
             value={email}
@@ -53,7 +57,7 @@ const RegisterScreen: React.FC = () => {
             autoCapitalize="none"
             style={styles.input}
           />
-          
+
           <TextInput
             label="Password"
             value={password}
@@ -65,7 +69,7 @@ const RegisterScreen: React.FC = () => {
             secureTextEntry
             style={styles.input}
           />
-          
+
           <Button
             mode="contained"
             onPress={handleRegister}
@@ -75,14 +79,12 @@ const RegisterScreen: React.FC = () => {
           >
             Register
           </Button>
-          
+
           <View style={styles.linkContainer}>
             <Text>Already have an account? </Text>
             <Text
               style={{ color: theme.colors.primary }}
-              onPress={() => {
-                // Navigate to login screen
-              }}
+              onPress={() => navigation.navigate('Login')}
             >
               Login
             </Text>

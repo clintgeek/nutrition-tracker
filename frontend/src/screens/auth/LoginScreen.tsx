@@ -2,12 +2,16 @@ import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { TextInput, Button, Text, useTheme } from 'react-native-paper';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../navigation/AppNavigator';
 
 const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { login, error, loading, clearError } = useAuth();
   const theme = useTheme();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   const handleLogin = async () => {
     if (email.trim() === '' || password === '') {
@@ -24,11 +28,11 @@ const LoginScreen: React.FC = () => {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.formContainer}>
           <Text style={styles.title}>Login</Text>
-          
+
           {error && (
             <Text style={styles.errorText}>{error}</Text>
           )}
-          
+
           <TextInput
             label="Email"
             value={email}
@@ -41,7 +45,7 @@ const LoginScreen: React.FC = () => {
             autoCapitalize="none"
             style={styles.input}
           />
-          
+
           <TextInput
             label="Password"
             value={password}
@@ -53,7 +57,7 @@ const LoginScreen: React.FC = () => {
             secureTextEntry
             style={styles.input}
           />
-          
+
           <Button
             mode="contained"
             onPress={handleLogin}
@@ -63,14 +67,12 @@ const LoginScreen: React.FC = () => {
           >
             Login
           </Button>
-          
+
           <View style={styles.linkContainer}>
             <Text>Don't have an account? </Text>
             <Text
               style={{ color: theme.colors.primary }}
-              onPress={() => {
-                // Navigate to register screen
-              }}
+              onPress={() => navigation.navigate('Register')}
             >
               Register
             </Text>

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Card, Title, Text, ProgressBar, useTheme } from 'react-native-paper';
+import { Card, Title, Text, ProgressBar, useTheme, Button } from 'react-native-paper';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { goalService, Goal } from '../../services/goalService';
 import { summaryService, DailySummary } from '../../services/summaryService';
 
@@ -19,6 +21,7 @@ interface NutritionSummary {
 
 const TodaySummary: React.FC = () => {
   const theme = useTheme();
+  const navigation = useNavigation<StackNavigationProp<any>>();
   const [summary, setSummary] = useState<NutritionSummary>({
     calories: {
       consumed: 0,
@@ -148,6 +151,10 @@ const TodaySummary: React.FC = () => {
     return Math.min(consumed / goal, 1);
   };
 
+  const navigateToGoals = () => {
+    navigation.navigate('GoalsStack');
+  };
+
   if (isLoading) {
     return (
       <Card style={styles.card}>
@@ -236,7 +243,14 @@ const TodaySummary: React.FC = () => {
 
         {hasCalorieGoal === false && hasMacroGoal === false && (
           <View style={styles.noGoalsMessage}>
-            <Text>No nutrition goals set. Visit the Goals section to set your targets.</Text>
+            <Text style={styles.noGoalsText}>No nutrition goals have been set yet. Set your daily targets to track your progress!</Text>
+            <Button
+              mode="contained"
+              onPress={navigateToGoals}
+              style={styles.goalsButton}
+            >
+              Set Goals
+            </Button>
           </View>
         )}
       </Card.Content>
@@ -296,6 +310,15 @@ const styles = StyleSheet.create({
   noGoalsMessage: {
     padding: 16,
     alignItems: 'center',
+  },
+  noGoalsText: {
+    textAlign: 'center',
+    marginBottom: 16,
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  goalsButton: {
+    marginTop: 8,
   },
 });
 

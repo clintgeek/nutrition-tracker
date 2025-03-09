@@ -12,7 +12,7 @@ export type FoodStackParamList = {
   FoodList: undefined;
   FoodDetails: { foodId: string };
   AddFood: undefined;
-  FoodSearch: undefined;
+  FoodSearch: { searchQuery?: string };
   BarcodeScanner: undefined;
 };
 

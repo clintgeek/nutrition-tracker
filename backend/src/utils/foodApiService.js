@@ -157,50 +157,17 @@ class FoodApiService {
     try {
       logger.info(`Searching for food with query: ${query}`);
 
-      // Mock data for now - in a real implementation, you would call an external API
-      const mockResults = [
-        {
-          name: 'Apple',
-          calories_per_serving: 52,
-          protein_grams: 0.3,
-          carbs_grams: 14,
-          fat_grams: 0.2,
-          serving_size: '100',
-          serving_unit: 'g',
-          source: 'mock',
-          source_id: 'apple-1',
-        },
-        {
-          name: 'Apple, Fuji',
-          calories_per_serving: 63,
-          protein_grams: 0.2,
-          carbs_grams: 16,
-          fat_grams: 0.2,
-          serving_size: '100',
-          serving_unit: 'g',
-          source: 'mock',
-          source_id: 'apple-fuji-1',
-        },
-        {
-          name: 'Apple Juice',
-          calories_per_serving: 46,
-          protein_grams: 0.1,
-          carbs_grams: 11.3,
-          fat_grams: 0.1,
-          serving_size: '100',
-          serving_unit: 'ml',
-          source: 'mock',
-          source_id: 'apple-juice-1',
-        }
-      ];
+      // Search both APIs in parallel
+      const [usdaResults, offResults] = await Promise.all([
+        this.searchUSDAByName(query, true),
+        this.searchOpenFoodFacts(query)
+      ]);
 
-      // Filter mock results based on query
-      const filteredResults = mockResults.filter(item =>
-        item.name.toLowerCase().includes(query.toLowerCase())
-      );
+      // Combine results
+      const combinedResults = [...usdaResults, ...offResults];
 
-      logger.info(`Found ${filteredResults.length} results for query: ${query}`);
-      return filteredResults;
+      logger.info(`Found ${combinedResults.length} results for query: ${query}`);
+      return combinedResults;
     } catch (error) {
       logger.error(`Error searching food: ${error.message}`);
       return [];

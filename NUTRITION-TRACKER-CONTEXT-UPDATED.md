@@ -366,6 +366,25 @@ docker compose cp frontend/web-build/ frontend-web:/usr/share/nginx/html/
 docker compose restart frontend-web
 ```
 
+### "Update and Rebuild" Standard Procedure
+When you see the phrase "update and rebuild", follow these exact steps:
+
+1. Copy all necessary files to the server:
+```bash
+scp frontend/Dockerfile.web frontend/nginx.conf frontend/src/services/apiService.ts frontend/package.json docker-compose.web.yml server:/mnt/Media/Docker/nutrition-tracker/frontend/
+```
+
+2. Rebuild the containers with force-recreate:
+```bash
+ssh server "cd /mnt/Media/Docker/nutrition-tracker && docker compose -f docker-compose.web.yml up -d --build --force-recreate frontend-web"
+```
+
+This procedure ensures that:
+- All necessary configuration files are updated
+- The containers are completely rebuilt from scratch
+- No cached layers are used
+- Changes are properly applied
+
 ### Direct File Editing
 For quick fixes, you can edit files directly using the network path:
 ```bash

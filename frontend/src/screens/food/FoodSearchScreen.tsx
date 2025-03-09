@@ -20,10 +20,29 @@ import {
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import axios from 'axios';
+import { apiService, setAuthToken } from '../../services/apiService';
+import { useAuth } from '../../contexts/AuthContext';
 
 // USDA API configuration
 const USDA_API_KEY = 'jrHM0qobnLkHbRdSATHkU7sBaEqqXcB85R7rTPM7'; // Using the key from .env
 const USDA_API_URL = 'https://api.nal.usda.gov/fdc/v1';
+
+// API response interface
+interface FoodApiResponse {
+  message: string;
+  food: {
+    id: number;
+    name: string;
+    calories_per_serving: number;
+    protein_grams: number;
+    carbs_grams: number;
+    fat_grams: number;
+    serving_size: string;
+    serving_unit: string;
+    source: string;
+    source_id: string;
+  };
+}
 
 // Food item interface
 interface FoodItem {
@@ -54,17 +73,37 @@ interface SimplifiedFoodItem {
   servingSizeUnit?: string;
 }
 
-const FoodSearchScreen: React.FC = ({ navigation }: any) => {
+const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
   const theme = useTheme();
-  const [searchQuery, setSearchQuery] = useState('');
+  const { token } = useAuth();
+  const initialQuery = route.params?.searchQuery || '';
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<SimplifiedFoodItem[]>([]);
   const [selectedFood, setSelectedFood] = useState<SimplifiedFoodItem | null>(null);
   const [dataSource, setDataSource] = useState<'usda' | 'nutritionix' | 'openfoodfacts'>('usda');
 
+  // Set token in apiService when it changes
+  useEffect(() => {
+    if (token) {
+      setAuthToken(token);
+    }
+  }, [token]);
+
+  // Search automatically when screen loads with a search query
+  useEffect(() => {
+    if (initialQuery) {
+      searchFoods();
+    }
+  }, []);
+
   // Function to search for foods
   const searchFoods = async () => {
-    if (!searchQuery.trim()) return;
+    // Require at least 2 characters for search
+    if (!searchQuery.trim() || searchQuery.trim().length < 2) {
+      alert('Please enter at least 2 characters to search');
+      return;
+    }
 
     setLoading(true);
     setSearchResults([]);
@@ -139,17 +178,52 @@ const FoodSearchScreen: React.FC = ({ navigation }: any) => {
   // Function to import a food to the local database
   const importFood = async (food: SimplifiedFoodItem) => {
     try {
-      // In a real app, you would make an API call to your backend to save the food
-      // For now, we'll just simulate success
-      console.log('Importing food:', food);
+      // Ensure we have a token
+      if (!token) {
+        alert('Please log in to import foods');
+        return;
+      }
 
-      // Show success message
-      alert(`${food.name} has been added to your food database!`);
+      // Set the token in apiService
+      setAuthToken(token);
 
-      // Navigate back to the food list
-      navigation.goBack();
+      // Convert the food item to our database format
+      const foodData = {
+        name: food.name,
+        calories_per_serving: food.calories,
+        protein_grams: food.protein,
+        carbs_grams: food.carbs,
+        fat_grams: food.fat,
+        serving_size: food.servingSize?.toString() || '100',
+        serving_unit: food.servingSizeUnit || 'g',
+        source: 'usda',
+        source_id: `usda-${food.id}`
+      };
+
+      // Make API call to save the food using apiService
+      const response = await apiService.post<FoodApiResponse>('/foods/custom', foodData);
+
+      if (response?.food && response.food.id) {
+        // Show success message
+        alert(`${food.name} has been added to your food database!`);
+
+        // Navigate back to the food list
+        navigation.goBack();
+      } else {
+        console.error('Invalid response format:', response);
+        throw new Error('Failed to save food item: Invalid response format');
+      }
     } catch (error) {
       console.error('Error importing food:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('Import error details:', error.response?.data);
+        console.error('Import error status:', error.response?.status);
+        if (error.response?.status === 401) {
+          alert('Your session has expired. Please log in again.');
+          // You might want to navigate to the login screen here
+          return;
+        }
+      }
       alert('Failed to import food. Please try again.');
     }
   };
@@ -199,7 +273,7 @@ const FoodSearchScreen: React.FC = ({ navigation }: any) => {
           mode="contained"
           onPress={searchFoods}
           style={styles.searchButton}
-          disabled={loading || !searchQuery.trim()}
+          disabled={loading || !searchQuery.trim() || searchQuery.trim().length < 2}
         >
           Search
         </Button>

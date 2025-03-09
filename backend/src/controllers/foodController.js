@@ -107,6 +107,8 @@ const createCustomFood = asyncHandler(async (req, res) => {
     fat_grams,
     serving_size,
     serving_unit,
+    source,
+    source_id
   } = req.body;
 
   // Create food item
@@ -119,13 +121,28 @@ const createCustomFood = asyncHandler(async (req, res) => {
     fat_grams,
     serving_size,
     serving_unit,
-    source: 'custom',
-    source_id: `custom-${req.user.id}-${Date.now()}`,
+    source: source || 'custom',
+    source_id: source_id || `custom-${req.user.id}-${Date.now()}`,
+    user_id: req.user.id,
   });
+
+  // Ensure we have all required fields in the response
+  const responseFood = {
+    id: foodItem.id,
+    name: foodItem.name,
+    calories_per_serving: foodItem.calories_per_serving,
+    protein_grams: foodItem.protein_grams,
+    carbs_grams: foodItem.carbs_grams,
+    fat_grams: foodItem.fat_grams,
+    serving_size: foodItem.serving_size,
+    serving_unit: foodItem.serving_unit,
+    source: foodItem.source,
+    source_id: foodItem.source_id
+  };
 
   res.status(201).json({
     message: 'Custom food item created',
-    food: foodItem,
+    food: responseFood,
   });
 });
 

@@ -23,13 +23,14 @@ class FoodItem {
         serving_unit,
         source,
         source_id,
+        user_id = null,
       } = foodData;
 
       const result = await db.query(
         `INSERT INTO food_items
          (name, barcode, calories_per_serving, protein_grams, carbs_grams,
-          fat_grams, serving_size, serving_unit, source, source_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          fat_grams, serving_size, serving_unit, source, source_id, user_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
         [
           name,
@@ -42,6 +43,7 @@ class FoodItem {
           serving_unit,
           source,
           source_id,
+          user_id,
         ]
       );
 
@@ -214,12 +216,10 @@ class FoodItem {
       const result = await db.query(
         `SELECT fi.*
          FROM food_items fi
-         JOIN food_logs fl ON fi.id = fl.food_item_id
-         WHERE fl.user_id = $1 AND fi.source = 'custom'
-         GROUP BY fi.id
+         WHERE fi.source = 'custom'
          ORDER BY fi.name ASC
-         LIMIT $2 OFFSET $3`,
-        [userId, limit, offset]
+         LIMIT $1 OFFSET $2`,
+        [limit, offset]
       );
 
       return result.rows;

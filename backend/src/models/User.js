@@ -7,7 +7,7 @@ class User {
     this.id = data.id;
     this.name = data.name;
     this.email = data.email;
-    this.password = data.password;
+    this.password = data.password_hash;
     this.created_at = data.created_at;
     this.updated_at = data.updated_at;
   }
@@ -15,66 +15,58 @@ class User {
   // Create a new user
   static async create(userData) {
     const { name, email, password } = userData;
-    let pool;
-    
+    const pool = getPool();
+    const client = await pool.connect();
+
     try {
       // Hash password
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(password, saltRounds);
-      
+
       // Insert user into database
-      pool = getPool();
-      const result = await pool.query(
-        'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *',
+      const result = await client.query(
+        'INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING *',
         [name, email, hashedPassword]
       );
-      
+
       return new User(result.rows[0]);
     } catch (err) {
       logger.error(`Error creating user: ${err.message}`);
       throw err;
     } finally {
-      if (pool) {
-        await pool.end();
-      }
+      client.release();
     }
   }
 
   // Find user by email
   static async findByEmail(email) {
-    let pool;
-    
+    const pool = getPool();
+    const client = await pool.connect();
+
     try {
-      pool = getPool();
-      const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-      
+      const result = await client.query('SELECT * FROM users WHERE email = $1', [email]);
       return result.rows.length ? new User(result.rows[0]) : null;
     } catch (err) {
       logger.error(`Error finding user by email: ${err.message}`);
       throw err;
     } finally {
-      if (pool) {
-        await pool.end();
-      }
+      client.release();
     }
   }
 
   // Find user by ID
   static async findById(id) {
-    let pool;
-    
+    const pool = getPool();
+    const client = await pool.connect();
+
     try {
-      pool = getPool();
-      const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
-      
+      const result = await client.query('SELECT * FROM users WHERE id = $1', [id]);
       return result.rows.length ? new User(result.rows[0]) : null;
     } catch (err) {
       logger.error(`Error finding user by ID: ${err.message}`);
       throw err;
     } finally {
-      if (pool) {
-        await pool.end();
-      }
+      client.release();
     }
   }
 
