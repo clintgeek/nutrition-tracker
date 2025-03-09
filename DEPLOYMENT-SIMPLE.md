@@ -34,6 +34,7 @@ nano .env
    - `POSTGRES_PASSWORD`: A strong database password
    - `POSTGRES_DB`: The database name
    - `JWT_SECRET`: A secure random string for JWT token generation
+     - Generate with: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
    - Port settings if needed (`FRONTEND_PORT`, `BACKEND_PORT`, `DATABASE_PORT`)
 
 ### 3. Create Docker Compose File
@@ -111,6 +112,39 @@ server {
 }
 ```
 
+## Authentication System
+
+The Nutrition Tracker application uses JWT (JSON Web Tokens) for authentication. Here's what you need to know:
+
+### How It Works
+
+1. **User Registration**: Users create accounts with email and password
+2. **User Login**: Users authenticate and receive a JWT token
+3. **Protected Routes**: API endpoints require valid JWT tokens
+4. **Token Storage**: Tokens are stored in the browser's localStorage
+
+### Security Considerations
+
+- **JWT Secret**: The `JWT_SECRET` environment variable is critical for security
+  - Use a strong, random value (32+ characters)
+  - Keep this secret secure and never expose it
+  - If compromised, change it immediately (this will invalidate all existing tokens)
+
+- **Token Expiration**: Tokens expire after a set period (default: 24 hours)
+  - Users will need to log in again after expiration
+  - This limits the damage if a token is compromised
+
+- **HTTPS**: Always use HTTPS in production to protect tokens in transit
+
+### Creating the First Admin User
+
+After deployment, you'll need to create your first user:
+
+1. Access the frontend application
+2. Click on the "Login" tab in the navigation
+3. Select "Register" and create your account
+4. This first account can be used to access all features
+
 ## Security Information
 
 ### Environment Variables
@@ -122,8 +156,9 @@ Your application uses environment variables to manage sensitive information:
    - Use strong, unique passwords in production
 
 2. **JWT Secret**: Used for signing authentication tokens
-   - Generate a secure random string (e.g., using `openssl rand -base64 32`)
+   - Generate a secure random string: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
    - Store only in your .env file
+   - If this is compromised, all user sessions can be hijacked
 
 ## Maintenance
 
@@ -176,6 +211,18 @@ docker-compose -f docker-compose.web.yml logs frontend-web
 ```
 
 ## Troubleshooting
+
+### Authentication Issues
+
+If users are having trouble logging in:
+
+1. **Check JWT Secret**: Verify the JWT_SECRET is set correctly in your .env file
+2. **Check Backend Logs**: Look for authentication errors
+   ```bash
+   docker-compose -f docker-compose.web.yml logs backend | grep auth
+   ```
+3. **Clear Browser Data**: Have users clear their localStorage and cookies
+4. **Check Network Requests**: Use browser dev tools to check for 401 errors
 
 ### Frontend Issues
 

@@ -1,0 +1,95 @@
+// Check if there's a hardcoded 'postgres' hostname and replace it with 'db'
+const { Pool } = require('pg');
+const bcrypt = require('bcrypt');
+const logger = require('../config/logger');
+
+class User {
+  constructor(data) {
+    this.id = data.id;
+    this.name = data.name;
+    this.email = data.email;
+    this.password = data.password;
+    this.created_at = data.created_at;
+    this.updated_at = data.updated_at;
+  }
+
+  // Database connection
+  static getPool() {
+    return new Pool({
+      connectionString: process.env.DATABASE_URL
+    });
+  }
+
+  // Create a new user
+  static async create(userData) {
+    const { name, email, password } = userData;
+    
+    try {
+      // Hash password
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
+      
+      // Insert user into database
+      const pool = this.getPool();
+      const result = await pool.query(
+        'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *',
+        [name, email, hashedPassword]
+      );
+      
+      await pool.end();
+      
+      return new User(result.rows[0]);
+    } catch (err) {
+      logger.error(`Error creating user: ${err.message}`);
+      throw err;
+    }
+  }
+
+  // Find user by email
+  static async findByEmail(email) {
+    try {
+      const pool = this.getPool();
+      const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+      
+      await pool.end();
+      
+      return result.rows.length ? new User(result.rows[0]) : null;
+    } catch (err) {
+      logger.error(`Error finding user by email: ${err.message}`);
+      throw err;
+    }
+  }
+
+  // Find user by ID
+  static async findById(id) {
+    try {
+      const pool = this.getPool();
+      const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+      
+      await pool.end();
+      
+      return result.rows.length ? new User(result.rows[0]) : null;
+    } catch (err) {
+      logger.error(`Error finding user by ID: ${err.message}`);
+      throw err;
+    }
+  }
+
+  // Verify password
+  async verifyPassword(password) {
+    try {
+      return await bcrypt.compare(password, this.password);
+    } catch (err) {
+      logger.error(`Error verifying password: ${err.message}`);
+      throw err;
+    }
+  }
+
+  // Return user data without password
+  toJSON() {
+    const { password, ...userWithoutPassword } = this;
+    return userWithoutPassword;
+  }
+}
+
+module.exports = User;

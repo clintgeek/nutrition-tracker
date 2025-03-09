@@ -5,7 +5,7 @@ const logger = require('./logger');
 const {
   DB_USER = 'nutrition_user',
   DB_PASSWORD = 'nutrition_password',
-  DB_HOST = 'postgres',
+  DB_HOST = 'db',
   DB_PORT = 5432,
   DB_NAME = 'nutrition_tracker'
 } = process.env;

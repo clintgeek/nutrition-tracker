@@ -3,24 +3,24 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
 
-// Import screens
+// Import screens and navigators
 import HomeScreen from '../screens/HomeScreen';
-import FoodScreen from '../screens/food/FoodScreen';
-import LogScreen from '../screens/log/LogScreen';
-import GoalScreen from '../screens/goal/GoalScreen';
-import SettingsScreen from '../screens/SettingsScreen';
+import FoodStackNavigator from './FoodStackNavigator';
+import LogStackNavigator from './LogStackNavigator';
+import GoalsStackNavigator from './GoalsStackNavigator';
+import CustomHeader from '../components/CustomHeader';
 
 // Define the tab navigator param list
 export type MainTabParamList = {
   Home: undefined;
-  Food: undefined;
-  Log: undefined;
-  Goal: undefined;
+  LogStack: undefined;
+  FoodStack: undefined;
+  GoalsStack: undefined;
   Settings: undefined;
 };
 
 // Create the tab navigator
-const Tab = createBottomTabNavigator<MainTabParamList>();
+const Tab = createBottomTabNavigator();
 
 // Main tab navigator component
 const MainTabNavigator: React.FC = () => {
@@ -36,7 +36,7 @@ const MainTabNavigator: React.FC = () => {
           paddingTop: 5,
           height: 60,
         },
-        headerShown: true,
+        headerShown: false, // Hide the header in the tab navigator
       }}
     >
       <Tab.Screen
@@ -46,41 +46,37 @@ const MainTabNavigator: React.FC = () => {
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="home" color={color} size={size} />
           ),
+          headerShown: true, // Show header for the Home screen
+          header: () => <CustomHeader title="Nutrition Tracker" />
         }}
       />
       <Tab.Screen
-        name="Food"
-        component={FoodScreen}
+        name="LogStack"
+        component={LogStackNavigator}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="food-apple" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Log"
-        component={LogScreen}
-        options={{
+          tabBarLabel: 'Log',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="notebook" color={color} size={size} />
           ),
         }}
       />
       <Tab.Screen
-        name="Goal"
-        component={GoalScreen}
+        name="FoodStack"
+        component={FoodStackNavigator}
         options={{
+          tabBarLabel: 'Food',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="target" color={color} size={size} />
+            <MaterialCommunityIcons name="food-apple" color={color} size={size} />
           ),
         }}
       />
       <Tab.Screen
-        name="Settings"
-        component={SettingsScreen}
+        name="GoalsStack"
+        component={GoalsStackNavigator}
         options={{
+          tabBarLabel: 'Goals',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="cog" color={color} size={size} />
+            <MaterialCommunityIcons name="flag" color={color} size={size} />
           ),
         }}
       />

@@ -25,7 +25,7 @@ class Goal {
       } = goalData;
 
       const result = await db.query(
-        `INSERT INTO goals
+        `INSERT INTO nutrition_goals
          (user_id, daily_calorie_target, protein_target_grams, carbs_target_grams,
           fat_target_grams, start_date, end_date, sync_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -42,7 +42,21 @@ class Goal {
         ]
       );
 
-      return result.rows[0];
+      const dbGoal = result.rows[0];
+      return {
+        id: dbGoal.id,
+        user_id: dbGoal.user_id,
+        daily_calorie_target: dbGoal.daily_calorie_target,
+        protein_target_grams: dbGoal.protein_target_grams,
+        carbs_target_grams: dbGoal.carbs_target_grams,
+        fat_target_grams: dbGoal.fat_target_grams,
+        start_date: dbGoal.start_date,
+        end_date: dbGoal.end_date,
+        sync_id: dbGoal.sync_id,
+        is_deleted: dbGoal.is_deleted,
+        created_at: dbGoal.created_at,
+        updated_at: dbGoal.updated_at
+      };
     } catch (error) {
       logger.error(`Error creating goal: ${error.message}`);
       throw error;
@@ -58,11 +72,27 @@ class Goal {
   static async findById(id, userId) {
     try {
       const result = await db.query(
-        'SELECT * FROM goals WHERE id = $1 AND user_id = $2 AND is_deleted = false',
+        'SELECT * FROM nutrition_goals WHERE id = $1 AND user_id = $2 AND is_deleted = false',
         [id, userId]
       );
 
-      return result.rows[0] || null;
+      if (!result.rows[0]) return null;
+
+      const dbGoal = result.rows[0];
+      return {
+        id: dbGoal.id,
+        user_id: dbGoal.user_id,
+        daily_calorie_target: dbGoal.daily_calorie_target,
+        protein_target_grams: dbGoal.protein_target_grams,
+        carbs_target_grams: dbGoal.carbs_target_grams,
+        fat_target_grams: dbGoal.fat_target_grams,
+        start_date: dbGoal.start_date,
+        end_date: dbGoal.end_date,
+        sync_id: dbGoal.sync_id,
+        is_deleted: dbGoal.is_deleted,
+        created_at: dbGoal.created_at,
+        updated_at: dbGoal.updated_at
+      };
     } catch (error) {
       logger.error(`Error finding goal by ID: ${error.message}`);
       throw error;
@@ -77,7 +107,7 @@ class Goal {
   static async getCurrent(userId) {
     try {
       const result = await db.query(
-        `SELECT * FROM goals
+        `SELECT * FROM nutrition_goals
          WHERE user_id = $1 AND is_deleted = false
          AND (end_date IS NULL OR end_date >= CURRENT_DATE)
          ORDER BY start_date DESC
@@ -85,7 +115,23 @@ class Goal {
         [userId]
       );
 
-      return result.rows[0] || null;
+      if (!result.rows[0]) return null;
+
+      const dbGoal = result.rows[0];
+      return {
+        id: dbGoal.id,
+        user_id: dbGoal.user_id,
+        daily_calorie_target: dbGoal.daily_calorie_target,
+        protein_target_grams: dbGoal.protein_target_grams,
+        carbs_target_grams: dbGoal.carbs_target_grams,
+        fat_target_grams: dbGoal.fat_target_grams,
+        start_date: dbGoal.start_date,
+        end_date: dbGoal.end_date,
+        sync_id: dbGoal.sync_id,
+        is_deleted: dbGoal.is_deleted,
+        created_at: dbGoal.created_at,
+        updated_at: dbGoal.updated_at
+      };
     } catch (error) {
       logger.error(`Error getting current goal: ${error.message}`);
       throw error;
@@ -101,7 +147,7 @@ class Goal {
   static async getForDate(userId, date) {
     try {
       const result = await db.query(
-        `SELECT * FROM goals
+        `SELECT * FROM nutrition_goals
          WHERE user_id = $1 AND is_deleted = false
          AND (start_date IS NULL OR start_date <= $2)
          AND (end_date IS NULL OR end_date >= $2)
@@ -110,7 +156,23 @@ class Goal {
         [userId, date]
       );
 
-      return result.rows[0] || null;
+      if (!result.rows[0]) return null;
+
+      const dbGoal = result.rows[0];
+      return {
+        id: dbGoal.id,
+        user_id: dbGoal.user_id,
+        daily_calorie_target: dbGoal.daily_calorie_target,
+        protein_target_grams: dbGoal.protein_target_grams,
+        carbs_target_grams: dbGoal.carbs_target_grams,
+        fat_target_grams: dbGoal.fat_target_grams,
+        start_date: dbGoal.start_date,
+        end_date: dbGoal.end_date,
+        sync_id: dbGoal.sync_id,
+        is_deleted: dbGoal.is_deleted,
+        created_at: dbGoal.created_at,
+        updated_at: dbGoal.updated_at
+      };
     } catch (error) {
       logger.error(`Error getting goal for date: ${error.message}`);
       throw error;
@@ -125,13 +187,26 @@ class Goal {
   static async getAll(userId) {
     try {
       const result = await db.query(
-        `SELECT * FROM goals
+        `SELECT * FROM nutrition_goals
          WHERE user_id = $1 AND is_deleted = false
          ORDER BY start_date DESC`,
         [userId]
       );
 
-      return result.rows;
+      return result.rows.map(dbGoal => ({
+        id: dbGoal.id,
+        user_id: dbGoal.user_id,
+        daily_calorie_target: dbGoal.daily_calorie_target,
+        protein_target_grams: dbGoal.protein_target_grams,
+        carbs_target_grams: dbGoal.carbs_target_grams,
+        fat_target_grams: dbGoal.fat_target_grams,
+        start_date: dbGoal.start_date,
+        end_date: dbGoal.end_date,
+        sync_id: dbGoal.sync_id,
+        is_deleted: dbGoal.is_deleted,
+        created_at: dbGoal.created_at,
+        updated_at: dbGoal.updated_at
+      }));
     } catch (error) {
       logger.error(`Error getting all goals: ${error.message}`);
       throw error;
@@ -157,7 +232,7 @@ class Goal {
       } = goalData;
 
       const result = await db.query(
-        `UPDATE goals
+        `UPDATE nutrition_goals
          SET daily_calorie_target = $1,
              protein_target_grams = $2,
              carbs_target_grams = $3,
@@ -179,7 +254,23 @@ class Goal {
         ]
       );
 
-      return result.rows[0] || null;
+      if (!result.rows[0]) return null;
+
+      const dbGoal = result.rows[0];
+      return {
+        id: dbGoal.id,
+        user_id: dbGoal.user_id,
+        daily_calorie_target: dbGoal.daily_calorie_target,
+        protein_target_grams: dbGoal.protein_target_grams,
+        carbs_target_grams: dbGoal.carbs_target_grams,
+        fat_target_grams: dbGoal.fat_target_grams,
+        start_date: dbGoal.start_date,
+        end_date: dbGoal.end_date,
+        sync_id: dbGoal.sync_id,
+        is_deleted: dbGoal.is_deleted,
+        created_at: dbGoal.created_at,
+        updated_at: dbGoal.updated_at
+      };
     } catch (error) {
       logger.error(`Error updating goal: ${error.message}`);
       throw error;
@@ -195,7 +286,7 @@ class Goal {
   static async delete(id, userId) {
     try {
       const result = await db.query(
-        `UPDATE goals
+        `UPDATE nutrition_goals
          SET is_deleted = true, updated_at = NOW()
          WHERE id = $1 AND user_id = $2`,
         [id, userId]
@@ -217,13 +308,26 @@ class Goal {
   static async getChangedSince(userId, timestamp) {
     try {
       const result = await db.query(
-        `SELECT * FROM goals
+        `SELECT * FROM nutrition_goals
          WHERE user_id = $1 AND updated_at > $2
          ORDER BY updated_at`,
         [userId, timestamp]
       );
 
-      return result.rows;
+      return result.rows.map(dbGoal => ({
+        id: dbGoal.id,
+        user_id: dbGoal.user_id,
+        daily_calorie_target: dbGoal.daily_calorie_target,
+        protein_target_grams: dbGoal.protein_target_grams,
+        carbs_target_grams: dbGoal.carbs_target_grams,
+        fat_target_grams: dbGoal.fat_target_grams,
+        start_date: dbGoal.start_date,
+        end_date: dbGoal.end_date,
+        sync_id: dbGoal.sync_id,
+        is_deleted: dbGoal.is_deleted,
+        created_at: dbGoal.created_at,
+        updated_at: dbGoal.updated_at
+      }));
     } catch (error) {
       logger.error(`Error getting changed goals: ${error.message}`);
       throw error;
@@ -239,12 +343,28 @@ class Goal {
   static async findBySyncId(syncId, userId) {
     try {
       const result = await db.query(
-        `SELECT * FROM goals
+        `SELECT * FROM nutrition_goals
          WHERE sync_id = $1 AND user_id = $2`,
         [syncId, userId]
       );
 
-      return result.rows[0] || null;
+      if (!result.rows[0]) return null;
+
+      const dbGoal = result.rows[0];
+      return {
+        id: dbGoal.id,
+        user_id: dbGoal.user_id,
+        daily_calorie_target: dbGoal.daily_calorie_target,
+        protein_target_grams: dbGoal.protein_target_grams,
+        carbs_target_grams: dbGoal.carbs_target_grams,
+        fat_target_grams: dbGoal.fat_target_grams,
+        start_date: dbGoal.start_date,
+        end_date: dbGoal.end_date,
+        sync_id: dbGoal.sync_id,
+        is_deleted: dbGoal.is_deleted,
+        created_at: dbGoal.created_at,
+        updated_at: dbGoal.updated_at
+      };
     } catch (error) {
       logger.error(`Error finding goal by sync ID: ${error.message}`);
       throw error;

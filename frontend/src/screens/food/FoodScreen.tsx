@@ -16,10 +16,11 @@ import {
 } from 'react-native-paper';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import axios from 'axios';
 
 import { foodService } from '../../services/foodService';
-import { Food, FoodSearchParams } from '../../types/Food';
+import { Food, FoodSearchParams, FoodSearchResult } from '../../types/Food';
 import EmptyState from '../../components/common/EmptyState';
 
 const FoodScreen: React.FC = () => {
@@ -46,26 +47,49 @@ const FoodScreen: React.FC = () => {
         setIsLoading(true);
       }
 
-      const searchParams: FoodSearchParams = {
-        query: searchQuery,
-        page: refresh ? 1 : page,
-        limit: 20,
-        sortBy,
-        sortOrder,
-        includeCustom
-      };
+      console.log('Fetching foods with query:', searchQuery);
 
-      const result = await foodService.searchFoods(searchParams);
+      const result = await foodService.searchFood(searchQuery, refresh ? 1 : page, 20);
+      console.log('Search result:', result);
+
+      const mappedFoods = result.foods.map(item => ({
+        id: item.id.toString(),
+        name: item.name,
+        calories: item.calories_per_serving,
+        protein: item.protein_grams,
+        carbs: item.carbs_grams,
+        fat: item.fat_grams,
+        servingSize: parseFloat(item.serving_size),
+        servingUnit: item.serving_unit,
+        isCustom: item.source === 'custom',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }));
+
+      console.log('Mapped foods count:', mappedFoods.length);
 
       if (refresh || page === 1) {
-        setFoods(result.foods);
+        setFoods(mappedFoods);
       } else {
-        setFoods([...foods, ...result.foods]);
+        setFoods([...foods, ...mappedFoods]);
       }
 
-      setTotalPages(result.totalPages);
+      setTotalPages(1);
     } catch (error) {
       console.error('Error fetching foods:', error);
+
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        if (status === 500) {
+          console.error('Server error. The backend might be down or misconfigured.');
+        } else if (!error.response) {
+          console.error('Network error. Check your connection or backend server status.');
+        }
+      }
+
+      if (refresh) {
+        setFoods([]);
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -103,6 +127,11 @@ const FoodScreen: React.FC = () => {
 
   const navigateToScanBarcode = () => {
     navigation.navigate('BarcodeScanner');
+  };
+
+  const navigateToFoodSearch = () => {
+    console.log('Navigating to FoodSearch screen');
+    navigation.navigate('FoodSearch');
   };
 
   const renderFoodItem = ({ item }: { item: Food }) => {
@@ -180,6 +209,19 @@ const FoodScreen: React.FC = () => {
         >
           <Ionicons name="barcode-outline" size={24} color={theme.colors.primary} />
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.actionsContainer}>
+        <Button
+          mode="outlined"
+          onPress={navigateToFoodSearch}
+          icon={({ size, color }) => (
+            <MaterialCommunityIcons name="database-search" size={size} color={color} />
+          )}
+          style={styles.actionButton}
+        >
+          Search Food Database
+        </Button>
       </View>
 
       {isLoading && foods.length === 0 ? (
@@ -302,6 +344,15 @@ const styles = StyleSheet.create({
   footerLoader: {
     marginVertical: 16,
     alignItems: 'center',
+  },
+  actionsContainer: {
+    padding: 8,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  actionButton: {
+    marginVertical: 4,
   },
 });
 

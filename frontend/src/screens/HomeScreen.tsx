@@ -1,124 +1,93 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { Text, Card, Title, Paragraph, useTheme, ActivityIndicator } from 'react-native-paper';
-import { useIsFocused } from '@react-navigation/native';
+import React from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Text, Card, Title, Paragraph, useTheme, Avatar } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 
-import { foodLogService } from '../services/foodLogService';
-import { goalService } from '../services/goalService';
-import { FoodLog } from '../types/FoodLog';
-import { Goal } from '../types/Goal';
-import NutritionSummaryCard from '../components/home/NutritionSummaryCard';
-import RecentLogsCard from '../components/home/RecentLogsCard';
-import GoalProgressCard from '../components/home/GoalProgressCard';
+// Import the TodaySummary component
+import TodaySummary from '../components/home/TodaySummary';
 
 const HomeScreen: React.FC = () => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [todayLogs, setTodayLogs] = useState<FoodLog[]>([]);
-  const [recentLogs, setRecentLogs] = useState<FoodLog[]>([]);
-  const [goals, setGoals] = useState<Goal | null>(null);
-  const [nutritionSummary, setNutritionSummary] = useState({
-    calories: 0,
-    protein: 0,
-    carbs: 0,
-    fat: 0,
-  });
-
   const theme = useTheme();
-  const isFocused = useIsFocused();
+  const navigation = useNavigation<StackNavigationProp<any>>();
 
-  const fetchData = async () => {
-    try {
-      setIsLoading(true);
-
-      // Get today's date in YYYY-MM-DD format
-      const today = new Date().toISOString().split('T')[0];
-
-      // Fetch today's logs
-      const todayLogsData = await foodLogService.getFoodLogsByDate(today);
-      setTodayLogs(todayLogsData);
-
-      // Fetch recent logs (last 7 days)
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const recentLogsData = await foodLogService.getFoodLogsByDateRange(
-        sevenDaysAgo.toISOString().split('T')[0],
-        today
-      );
-      setRecentLogs(recentLogsData);
-
-      // Fetch user goals
-      const userGoals = await goalService.getCurrentGoal();
-      setGoals(userGoals);
-
-      // Calculate nutrition summary from today's logs
-      const summary = todayLogsData.reduce((acc, log) => {
-        return {
-          calories: acc.calories + (log.food.calories * log.servingSize),
-          protein: acc.protein + (log.food.protein * log.servingSize),
-          carbs: acc.carbs + (log.food.carbs * log.servingSize),
-          fat: acc.fat + (log.food.fat * log.servingSize),
-        };
-      }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
-
-      setNutritionSummary(summary);
-    } catch (error) {
-      console.error('Error fetching home data:', error);
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
+  const navigateToSummary = () => {
+    // For now, this will just stay on the home screen
+    // In the future, you could create a dedicated summary screen
   };
 
-  useEffect(() => {
-    if (isFocused) {
-      fetchData();
-    }
-  }, [isFocused]);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchData();
+  const navigateToFoodLog = () => {
+    navigation.navigate('LogStack');
   };
 
-  if (isLoading && !refreshing) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.loadingText}>Loading your nutrition data...</Text>
-      </View>
-    );
-  }
+  const navigateToFoodDatabase = () => {
+    navigation.navigate('FoodStack');
+  };
+
+  const navigateToGoals = () => {
+    navigation.navigate('GoalsStack');
+  };
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      <Text style={styles.greeting}>Hello! Here's your nutrition summary</Text>
+    <ScrollView style={styles.container}>
+      <View style={styles.content}>
+        {/* Today's Summary */}
+        <TouchableOpacity onPress={navigateToSummary}>
+          <TodaySummary />
+        </TouchableOpacity>
 
-      <NutritionSummaryCard
-        nutritionSummary={nutritionSummary}
-        goals={goals}
-      />
+        {/* Food Log */}
+        <TouchableOpacity onPress={navigateToFoodLog}>
+          <Card style={styles.card}>
+            <Card.Content style={styles.cardContent}>
+              <Avatar.Icon
+                size={50}
+                icon="notebook"
+                style={{ backgroundColor: '#4CAF50' }}
+              />
+              <View style={styles.cardTextContent}>
+                <Title style={{ color: '#4CAF50' }}>Food Log</Title>
+                <Paragraph>Log your meals and track your nutrition.</Paragraph>
+              </View>
+            </Card.Content>
+          </Card>
+        </TouchableOpacity>
 
-      <GoalProgressCard
-        nutritionSummary={nutritionSummary}
-        goals={goals}
-      />
+        {/* Food Database */}
+        <TouchableOpacity onPress={navigateToFoodDatabase}>
+          <Card style={styles.card}>
+            <Card.Content style={styles.cardContent}>
+              <Avatar.Icon
+                size={50}
+                icon="food-apple"
+                style={{ backgroundColor: '#FF9800' }}
+              />
+              <View style={styles.cardTextContent}>
+                <Title style={{ color: '#FF9800' }}>Food Database</Title>
+                <Paragraph>Browse and add foods to your database.</Paragraph>
+              </View>
+            </Card.Content>
+          </Card>
+        </TouchableOpacity>
 
-      <RecentLogsCard recentLogs={recentLogs} />
-
-      <Card style={styles.tipsCard}>
-        <Card.Content>
-          <Title>Nutrition Tip</Title>
-          <Paragraph>
-            Try to include a variety of colorful vegetables in your meals to ensure you're getting a wide range of nutrients.
-          </Paragraph>
-        </Card.Content>
-      </Card>
+        {/* Goals */}
+        <TouchableOpacity onPress={navigateToGoals}>
+          <Card style={styles.card}>
+            <Card.Content style={styles.cardContent}>
+              <Avatar.Icon
+                size={50}
+                icon="flag"
+                style={{ backgroundColor: '#E91E63' }}
+              />
+              <View style={styles.cardTextContent}>
+                <Title style={{ color: '#E91E63' }}>Goals</Title>
+                <Paragraph>Set and track your nutrition goals.</Paragraph>
+              </View>
+            </Card.Content>
+          </Card>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 };
@@ -126,26 +95,24 @@ const HomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: '#f5f5f5',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  content: {
+    padding: 16,
+    paddingTop: 20,
   },
-  loadingText: {
-    marginTop: 10,
-  },
-  greeting: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  tipsCard: {
-    marginTop: 16,
+  card: {
     marginBottom: 16,
     elevation: 2,
+    borderRadius: 8,
+  },
+  cardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardTextContent: {
+    marginLeft: 16,
+    flex: 1,
   },
 });
 

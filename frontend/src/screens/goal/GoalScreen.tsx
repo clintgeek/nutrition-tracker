@@ -67,14 +67,14 @@ const GoalScreen: React.FC = () => {
             proteinConsumed: daySummary.protein,
             carbsConsumed: daySummary.carbs,
             fatConsumed: daySummary.fat,
-            caloriesGoal: goal.calories,
-            proteinGoal: goal.protein,
-            carbsGoal: goal.carbs,
-            fatGoal: goal.fat,
-            caloriesPercentage: Math.min(daySummary.calories / goal.calories, 1) * 100,
-            proteinPercentage: Math.min(daySummary.protein / goal.protein, 1) * 100,
-            carbsPercentage: Math.min(daySummary.carbs / goal.carbs, 1) * 100,
-            fatPercentage: Math.min(daySummary.fat / goal.fat, 1) * 100
+            caloriesGoal: goal.daily_calorie_target,
+            proteinGoal: goal.protein_target_grams,
+            carbsGoal: goal.carbs_target_grams,
+            fatGoal: goal.fat_target_grams,
+            caloriesPercentage: Math.min(daySummary.calories / goal.daily_calorie_target, 1) * 100,
+            proteinPercentage: Math.min(daySummary.protein / goal.protein_target_grams, 1) * 100,
+            carbsPercentage: Math.min(daySummary.carbs / goal.carbs_target_grams, 1) * 100,
+            fatPercentage: Math.min(daySummary.fat / goal.fat_target_grams, 1) * 100
           };
         });
 
@@ -138,14 +138,24 @@ const GoalScreen: React.FC = () => {
   if (!currentGoal) {
     return (
       <EmptyState
-        icon="target"
-        title="No Goals Set"
-        message="Set your nutrition goals to track your progress"
-        actionLabel="Set Goals"
+        icon="flag-outline"
+        title="No Goal Set"
+        message="You haven't set any nutrition goals yet. Set a goal to track your progress."
+        actionLabel="Set Goal"
         onAction={navigateToSetGoal}
       />
     );
   }
+
+  // Calculate progress percentages
+  const caloriePercentage = todayProgress ? todayProgress.caloriesPercentage : 0;
+  const proteinPercentage = todayProgress ? todayProgress.proteinPercentage : 0;
+  const carbsPercentage = todayProgress ? todayProgress.carbsPercentage : 0;
+  const fatPercentage = todayProgress ? todayProgress.fatPercentage : 0;
+
+  // Format dates for display
+  const startDate = currentGoal.start_date ? formatDate(new Date(currentGoal.start_date)) : 'Not set';
+  const endDate = currentGoal.end_date ? formatDate(new Date(currentGoal.end_date)) : 'Not set';
 
   return (
     <ScrollView style={styles.container}>
@@ -153,7 +163,7 @@ const GoalScreen: React.FC = () => {
         <Card.Content>
           <Title style={styles.cardTitle}>Current Nutrition Goals</Title>
           <Paragraph style={styles.goalDate}>
-            Started on {formatDate(currentGoal.startDate)}
+            Started on {startDate}
           </Paragraph>
 
           <View style={styles.goalValues}>

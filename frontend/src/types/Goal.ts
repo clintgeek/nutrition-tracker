@@ -1,16 +1,16 @@
 export interface Goal {
-  id: string;
-  userId: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  startDate: string;
-  endDate?: string; // If null, it's the current active goal
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-  syncStatus?: 'synced' | 'pending' | 'failed';
+  id?: number;
+  user_id?: number;
+  daily_calorie_target: number;
+  protein_target_grams?: number;
+  carbs_target_grams?: number;
+  fat_target_grams?: number;
+  start_date?: string;
+  end_date?: string;
+  is_deleted?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  sync_id?: string;
 }
 
 export interface GoalProgress {

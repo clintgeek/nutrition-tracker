@@ -1,0 +1,223 @@
+[03:03:42] Changed directory to /mnt/Media/Docker/nutrition-tracker
+[03:03:42] Checking for compose files...
+[03:03:42] SUCCESS: Found docker-compose.web.yml
+[03:03:42] Using compose file: docker-compose.web.yml with frontend service: frontend-web
+[03:03:42] Stopping the frontend container...
+[03:03:43] SUCCESS: Successfully stopped frontend container
+[03:03:43] Removing the frontend container...
+Going to remove nutrition-tracker-frontend-web-1
+[03:03:43] SUCCESS: Successfully removed frontend container
+[03:03:43] Rebuilding and starting the frontend container...
+#0 building with "default" instance using docker driver
+
+#1 [backend internal] load build definition from Dockerfile
+#1 DONE 0.0s
+
+#1 [backend internal] load build definition from Dockerfile
+#1 transferring dockerfile:
+#1 transferring dockerfile: 444B done
+#1 DONE 0.2s
+
+#2 [backend internal] load metadata for docker.io/library/node:16-alpine
+#2 DONE 0.7s
+
+#3 [backend internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.1s
+
+#4 [backend 1/8] FROM docker.io/library/node:16-alpine@sha256:a1f9d027912b58a7c75be7716c97cfbc6d3099f3a97ed84aa490be9dee20e787
+#4 DONE 0.0s
+
+#5 [backend internal] load build context
+#5 transferring context: 2.03kB done
+#5 DONE 0.2s
+
+#6 [backend 6/8] RUN npm install bcrypt
+#6 CACHED
+
+#7 [backend 7/8] RUN apk del .gyp
+#7 CACHED
+
+#8 [backend 2/8] WORKDIR /app
+#8 CACHED
+
+#9 [backend 3/8] RUN apk add --no-cache --virtual .gyp python3 make g++
+#9 CACHED
+
+#10 [backend 4/8] COPY package*.json ./
+#10 CACHED
+
+#11 [backend 5/8] RUN npm install
+#11 CACHED
+
+#12 [backend 8/8] COPY . .
+#12 CACHED
+
+#13 [backend] exporting to image
+#13 exporting layers done
+#13 writing image sha256:36f18e792eb7980f26c17bb59c96197099970cd3852ab1150b22fa5aad49f959 0.1s done
+#13 naming to docker.io/library/nutrition-tracker-backend 0.1s done
+#13 DONE 0.2s
+
+#14 [backend] resolving provenance for metadata file
+#14 DONE 1.5s
+
+#15 [frontend-web internal] load build definition from Dockerfile.web
+#15 transferring dockerfile: 703B done
+#15 WARN: FromAsCasing: 'as' and 'FROM' keywords' casing do not match (line 2)
+#15 DONE 0.1s
+
+#2 [frontend-web internal] load metadata for docker.io/library/node:16-alpine
+#2 DONE 1.2s
+
+#16 [frontend-web internal] load metadata for docker.io/library/nginx:alpine
+#16 DONE 0.8s
+
+#17 [frontend-web internal] load .dockerignore
+#17 transferring context: 2B done
+#17 DONE 0.2s
+
+#4 [frontend-web build 1/7] FROM docker.io/library/node:16-alpine@sha256:a1f9d027912b58a7c75be7716c97cfbc6d3099f3a97ed84aa490be9dee20e787
+#4 DONE 0.0s
+
+#18 [frontend-web stage-1 1/3] FROM docker.io/library/nginx:alpine@sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591
+#18 DONE 0.0s
+
+#19 [frontend-web internal] load build context
+#19 transferring context: 8.49kB done
+#19 DONE 0.3s
+
+#20 [frontend-web build 3/7] COPY package*.json ./
+#20 CACHED
+
+#21 [frontend-web build 4/7] RUN npm install
+#21 CACHED
+
+#8 [frontend-web build 2/7] WORKDIR /app
+#8 CACHED
+
+#22 [frontend-web build 5/7] RUN npm install @react-navigation/stack@6.3.20 react-native-gesture-handler@~2.9.0 --legacy-peer-deps
+#22 CACHED
+
+#23 [frontend-web build 6/7] COPY . .
+#23 DONE 0.5s
+
+#24 [frontend-web build 7/7] RUN npx expo export:web
+#24 2.823 Exporting with Webpack...
+#24 42.29 Compiled with warnings
+#24 42.29 
+#24 42.29 ./src/screens/goals/GoalsScreen.tsx:130:30
+#24 42.29 Attempted import error: 'createGoal' is not exported from '../../services/goalService' (imported as 'goalService').
+#24 42.29 [0m [90m 128 | [39m      } [36melse[39m {[0m
+#24 42.29 [0m [90m 129 | [39m        [90m// Otherwise create a new goal[39m[0m
+#24 42.29 [0m[31m[1m>[22m[39m[90m 130 | [39m        [36mconst[39m newGoal [33m=[39m [36mawait[39m goalService[33m.[39mcreateGoal(goalData)[33m;[39m[0m
+#24 42.29 [0m [90m     | [39m                             [31m[1m^[22m[39m[0m
+#24 42.29 [0m [90m 131 | [39m        [36mif[39m (newGoal [33m&&[39m newGoal[33m.[39mid) {[0m
+#24 42.29 [0m [90m 132 | [39m          setCurrentGoalId(newGoal[33m.[39mid)[33m;[39m[0m
+#24 42.29 [0m [90m 133 | [39m        }[0m
+#24 42.29 
+#24 42.29 ./src/screens/log/LogScreen.tsx:73:12
+#24 42.29 Attempted import error: 'deleteFoodLog' is not exported from '../../services/foodLogService' (imported as 'foodLogService').
+#24 42.29 [0m [90m 71 | [39m  [36mconst[39m handleDeleteLog [33m=[39m [36masync[39m (logId[33m:[39m number) [33m=>[39m {[0m
+#24 42.29 [0m [90m 72 | [39m    [36mtry[39m {[0m
+#24 42.29 [0m[31m[1m>[22m[39m[90m 73 | [39m      [36mawait[39m foodLogService[33m.[39mdeleteFoodLog(logId)[33m;[39m[0m
+#24 42.29 [0m [90m    | [39m           [31m[1m^[22m[39m[0m
+#24 42.29 [0m [90m 74 | [39m      [90m// Refresh the list[39m[0m
+#24 42.29 [0m [90m 75 | [39m      loadFoodLogs()[33m;[39m[0m
+#24 42.29 [0m [90m 76 | [39m      [33mAlert[39m[33m.[39malert([32m'Success'[39m[33m,[39m [32m'Food log deleted successfully!'[39m)[33m;[39m[0m
+#24 42.29 
+#24 42.29 ./src/screens/goals/GoalsScreen.tsx:57:32
+#24 42.29 Attempted import error: 'getCurrentGoal' is not exported from '../../services/goalService' (imported as 'goalService').
+#24 42.29 [0m [90m 55 | [39m    [36mtry[39m {[0m
+#24 42.29 [0m [90m 56 | [39m      setLoading([36mtrue[39m)[33m;[39m[0m
+#24 42.29 [0m[31m[1m>[22m[39m[90m 57 | [39m      [36mconst[39m currentGoal [33m=[39m [36mawait[39m goalService[33m.[39mgetCurrentGoal()[33m;[39m[0m
+#24 42.29 [0m [90m    | [39m                               [31m[1m^[22m[39m[0m
+#24 42.29 [0m [90m 58 | [39m[0m
+#24 42.29 [0m [90m 59 | [39m      [36mif[39m (currentGoal) {[0m
+#24 42.29 [0m [90m 60 | [39m        setCurrentGoalId(currentGoal[33m.[39mid)[33m;[39m[0m
+#24 42.29 
+#24 42.29 ./src/screens/log/LogScreen.tsx:34:29
+#24 42.29 Attempted import error: 'getFoodLogsByDate' is not exported from '../../services/foodLogService' (imported as 'foodLogService').
+#24 42.29 [0m [90m 32 | [39m    [36mtry[39m {[0m
+#24 42.29 [0m [90m 33 | [39m      setIsLoading([36mtrue[39m)[33m;[39m[0m
+#24 42.29 [0m[31m[1m>[22m[39m[90m 34 | [39m      [36mconst[39m logsData [33m=[39m [36mawait[39m foodLogService[33m.[39mgetFoodLogsByDate(selectedDate)[33m;[39m[0m
+#24 42.29 [0m [90m    | [39m                            [31m[1m^[22m[39m[0m
+#24 42.29 [0m [90m 35 | [39m      setLogs(logsData)[33m;[39m[0m
+#24 42.29 [0m [90m 36 | [39m[0m
+#24 42.29 [0m [90m 37 | [39m      [90m// Calculate totals[39m[0m
+#24 42.29 
+#24 42.29 ./src/screens/log/LogScreen.tsx:114:41
+#24 42.29 Attempted import error: 'getReadableDate' is not exported from '../../utils/dateUtils' (imported as 'dateUtils').
+#24 42.29 [0m [90m 112 | [39m          onPress[33m=[39m{() [33m=>[39m setShowDatePicker([36mtrue[39m)}[0m
+#24 42.29 [0m [90m 113 | [39m        [33m>[39m[0m
+#24 42.29 [0m[31m[1m>[22m[39m[90m 114 | [39m          [33m<[39m[33mText[39m style[33m=[39m{styles[33m.[39mdateText}[33m>[39m{dateUtils[33m.[39mgetReadableDate(selectedDate)}[33m<[39m[33m/[39m[33mText[39m[33m>[39m[0m
+#24 42.29 [0m [90m     | [39m                                        [31m[1m^[22m[39m[0m
+#24 42.29 [0m [90m 115 | [39m          [33m<[39m[33mIonicons[39m name[33m=[39m[32m"calendar"[39m size[33m=[39m{[35m20[39m} color[33m=[39m{[33mCOLORS[39m[33m.[39mprimary} style[33m=[39m{styles[33m.[39mcalendarIcon} [33m/[39m[33m>[39m[0m
+#24 42.29 [0m [90m 116 | [39m        [33m<[39m[33m/[39m[33mTouchableOpacity[39m[33m>[39m[0m
+#24 42.29 [0m [90m 117 | [39m[0m
+#24 42.29 
+#24 42.29 ./src/screens/log/LogScreen.tsx:14:51
+#24 42.29 Attempted import error: 'getTodayDate' is not exported from '../../utils/dateUtils' (imported as 'dateUtils').
+#24 42.29 [0m [90m 12 | [39m[0m
+#24 42.29 [0m [90m 13 | [39m[36mconst[39m [33mLogScreen[39m[33m:[39m [33mReact[39m[33m.[39m[33mFC[39m [33m=[39m () [33m=>[39m {[0m
+#24 42.29 [0m[31m[1m>[22m[39m[90m 14 | [39m  [36mconst[39m [selectedDate[33m,[39m setSelectedDate] [33m=[39m useState(dateUtils[33m.[39mgetTodayDate())[33m;[39m[0m
+#24 42.29 [0m [90m    | [39m                                                  [31m[1m^[22m[39m[0m
+#24 42.29 [0m [90m 15 | [39m  [36mconst[39m [showDatePicker[33m,[39m setShowDatePicker] [33m=[39m useState([36mfalse[39m)[33m;[39m[0m
+#24 42.29 [0m [90m 16 | [39m  [36mconst[39m [logs[33m,[39m setLogs] [33m=[39m useState[33m<[39m[33mFoodLog[39m[][33m>[39m([])[33m;[39m[0m
+#24 42.29 [0m [90m 17 | [39m  [36mconst[39m [isLoading[33m,[39m setIsLoading] [33m=[39m useState([36mtrue[39m)[33m;[39m[0m
+#24 42.29 
+#24 42.29 ./src/screens/goals/GoalsScreen.tsx:127:14
+#24 42.29 Attempted import error: 'updateGoal' is not exported from '../../services/goalService' (imported as 'goalService').
+#24 42.29 [0m [90m 125 | [39m      [90m// If we have an existing goal, update it[39m[0m
+#24 42.29 [0m [90m 126 | [39m      [36mif[39m (currentGoalId) {[0m
+#24 42.29 [0m[31m[1m>[22m[39m[90m 127 | [39m        [36mawait[39m goalService[33m.[39mupdateGoal(currentGoalId[33m,[39m goalData)[33m;[39m[0m
+#24 42.29 [0m [90m     | [39m             [31m[1m^[22m[39m[0m
+#24 42.29 [0m [90m 128 | [39m      } [36melse[39m {[0m
+#24 42.29 [0m [90m 129 | [39m        [90m// Otherwise create a new goal[39m[0m
+#24 42.29 [0m [90m 130 | [39m        [36mconst[39m newGoal [33m=[39m [36mawait[39m goalService[33m.[39mcreateGoal(goalData)[33m;[39m[0m
+#24 42.29 
+#24 42.29 asset size limit: The following asset(s) exceed the recommended size limit (586 KiB).
+#24 42.29 This can impact web performance.
+#24 42.29 Assets: 
+#24 42.29   ./fonts/MaterialCommunityIcons.ttf (1.09 MiB)
+#24 42.29   static/js/2.c2ceadf3.chunk.js (1.13 MiB)
+#24 42.29   pwa/apple-touch-startup-image/apple-touch-startup-image-1242x2688.png (588 KiB)
+#24 42.29   pwa/apple-touch-startup-image/apple-touch-startup-image-2048x2732.png (1.19 MiB)
+#24 42.29   pwa/apple-touch-startup-image/apple-touch-startup-image-1668x2388.png (906 KiB)
+#24 42.29   pwa/apple-touch-startup-image/apple-touch-startup-image-1668x2224.png (905 KiB)
+#24 42.29   pwa/apple-touch-startup-image/apple-touch-startup-image-1536x2048.png (801 KiB)
+#24 42.29 
+#24 42.29 entrypoint size limit: The following entrypoint(s) combined asset size exceeds the recommended limit (586 KiB). This can impact web performance.
+#24 42.29 Entrypoints:
+#24 42.29   app (1.2 MiB)
+#24 42.29       static/js/runtime~app.27401809.js
+#24 42.29       static/js/2.c2ceadf3.chunk.js
+#24 42.29       static/js/app.0dd547f3.chunk.js
+#24 42.29 
+#24 42.29 webpack performance recommendations: 
+#24 42.29 You can limit the size of your bundles by using import() or require.ensure to lazy load some parts of your application.
+#24 42.29 For more info visit https://webpack.js.org/guides/code-splitting/
+#24 DONE 43.3s
+
+#25 [frontend-web stage-1 2/3] COPY --from=build /app/web-build /usr/share/nginx/html
+#25 CACHED
+
+#26 [frontend-web stage-1 3/3] COPY nginx.conf /etc/nginx/conf.d/default.conf
+#26 CACHED
+
+#27 [frontend-web] exporting to image
+#27 exporting layers done
+#27 writing image sha256:f996ee513ad2e31e31232b107aac1c9cd273e084de65a3b791f954bd4410daee 0.1s done
+#27 naming to docker.io/library/nutrition-tracker-frontend-web
+#27 naming to docker.io/library/nutrition-tracker-frontend-web 0.1s done
+#27 DONE 0.2s
+
+#28 [frontend-web] resolving provenance for metadata file
+#28 DONE 0.0s
+[03:04:38] SUCCESS: Successfully rebuilt and started frontend container
+[03:04:38] Waiting for the container to start (30 seconds)...
+..............................
+[03:05:08] Checking if the frontend container is running...
+[03:05:08] SUCCESS: Frontend container is running:
+b557b8210f2e   nutrition-tracker-frontend-web             "/docker-entrypoint.…"   32 seconds ago   Restarting (1) 8 seconds ago                                                                                                                         nutrition-tracker-frontend-web-1
+[03:05:08] Rebuild process completed

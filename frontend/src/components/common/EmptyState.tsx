@@ -9,6 +9,8 @@ interface EmptyStateProps {
   message: string;
   actionLabel?: string;
   onAction?: () => void;
+  secondaryActionLabel?: string;
+  onSecondaryAction?: () => void;
 }
 
 const EmptyState: React.FC<EmptyStateProps> = ({
@@ -17,6 +19,8 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   message,
   actionLabel,
   onAction,
+  secondaryActionLabel,
+  onSecondaryAction,
 }) => {
   const theme = useTheme();
 
@@ -31,16 +35,29 @@ const EmptyState: React.FC<EmptyStateProps> = ({
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>
 
-      {actionLabel && onAction && (
-        <Button
-          mode="contained"
-          onPress={onAction}
-          style={styles.button}
-          labelStyle={styles.buttonLabel}
-        >
-          {actionLabel}
-        </Button>
-      )}
+      <View style={styles.buttonContainer}>
+        {actionLabel && onAction && (
+          <Button
+            mode="contained"
+            onPress={onAction}
+            style={styles.button}
+            labelStyle={styles.buttonLabel}
+          >
+            {actionLabel}
+          </Button>
+        )}
+
+        {secondaryActionLabel && onSecondaryAction && (
+          <Button
+            mode="outlined"
+            onPress={onSecondaryAction}
+            style={[styles.button, styles.secondaryButton]}
+            labelStyle={styles.buttonLabel}
+          >
+            {secondaryActionLabel}
+          </Button>
+        )}
+      </View>
     </View>
   );
 };
@@ -68,8 +85,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
+  buttonContainer: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 12,
+  },
   button: {
     paddingHorizontal: 16,
+    minWidth: 200,
+  },
+  secondaryButton: {
+    marginTop: 8,
   },
   buttonLabel: {
     fontSize: 16,

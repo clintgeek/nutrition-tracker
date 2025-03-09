@@ -1,0 +1,145 @@
+const jwt = require('jsonwebtoken');
+const { validationResult } = require('express-validator');
+const User = require('../models/User');
+const logger = require('../config/logger');
+
+/**
+ * Register a new user
+ * @route POST /api/auth/register
+ */
+const register = async (req, res) => {
+  // Check for validation errors
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { name, email, password } = req.body;
+
+  try {
+    // Check if user already exists
+    const existingUser = await User.findByEmail(email);
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+
+    // Create new user
+    const user = await User.create({ name, email, password });
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET || 'nutrition_jwt_secret',
+      { expiresIn: '24h' }
+    );
+
+    // Return user and token
+    res.status(201).json({
+      message: 'User registered successfully',
+      token,
+      user: user.toJSON(),
+    });
+  } catch (error) {
+    logger.error(`Registration error: ${error.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/**
+ * Login user
+ * @route POST /api/auth/login
+ */
+const login = async (req, res) => {
+  // Check for validation errors
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { email, password } = req.body;
+
+  try {
+    // Find user by email
+    const user = await User.findByEmail(email);
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Verify password - FIXED: using verifyPassword instead of comparePassword
+    const isMatch = await user.verifyPassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET || 'nutrition_jwt_secret',
+      { expiresIn: '24h' }
+    );
+
+    // Return user and token
+    res.json({
+      message: 'Login successful',
+      token,
+      user: user.toJSON(),
+    });
+  } catch (error) {
+    logger.error(`Login error: ${error.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/**
+ * Get current user
+ * @route GET /api/auth/me
+ */
+const getCurrentUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ user: user.toJSON() });
+  } catch (error) {
+    logger.error(`Get current user error: ${error.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/**
+ * Refresh token
+ * @route POST /api/auth/refresh-token
+ */
+const refreshToken = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Generate new JWT token
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET || 'nutrition_jwt_secret',
+      { expiresIn: '24h' }
+    );
+
+    res.json({
+      message: 'Token refreshed',
+      token,
+      user: user.toJSON(),
+    });
+  } catch (error) {
+    logger.error(`Refresh token error: ${error.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+module.exports = {
+  register,
+  login,
+  getCurrentUser,
+  refreshToken,
+};

@@ -1,248 +1,217 @@
-const db = require('../config/db');
+const { getPool } = require('../utils/database');
 const logger = require('../config/logger');
-const { v4: uuidv4 } = require('uuid');
 
-/**
- * FoodLog model for database operations
- */
 class FoodLog {
-  /**
-   * Create a new food log entry
-   * @param {Object} logData - Food log data
-   * @returns {Promise<Object>} Created food log
-   */
-  static async create(logData) {
-    try {
-      const {
-        user_id,
-        food_item_id,
-        log_date,
-        meal_type,
-        servings,
-        sync_id = uuidv4(),
-      } = logData;
-
-      const result = await db.query(
-        `INSERT INTO food_logs
-         (user_id, food_item_id, log_date, meal_type, servings, sync_id)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING *`,
-        [user_id, food_item_id, log_date, meal_type, servings, sync_id]
-      );
-
-      return result.rows[0];
-    } catch (error) {
-      logger.error(`Error creating food log: ${error.message}`);
-      throw error;
-    }
+  constructor(data) {
+    this.id = data.id;
+    this.user_id = data.user_id;
+    this.food_item_id = data.food_item_id;
+    this.log_date = data.log_date;
+    this.meal_type = data.meal_type;
+    this.servings = data.servings;
+    this.created_at = data.created_at;
+    this.updated_at = data.updated_at;
+    
+    // Additional fields from joins
+    this.food_name = data.food_name;
+    this.calories_per_serving = data.calories_per_serving;
+    this.protein_grams = data.protein_grams;
+    this.carbs_grams = data.carbs_grams;
+    this.fat_grams = data.fat_grams;
   }
 
-  /**
-   * Find food log by ID
-   * @param {number} id - Food log ID
-   * @param {number} userId - User ID (for authorization)
-   * @returns {Promise<Object|null>} Food log or null
-   */
-  static async findById(id, userId) {
-    try {
-      const result = await db.query(
-        `SELECT fl.*, fi.name as food_name, fi.calories_per_serving,
-                fi.protein_grams, fi.carbs_grams, fi.fat_grams,
-                fi.serving_size, fi.serving_unit
-         FROM food_logs fl
-         JOIN food_items fi ON fl.food_item_id = fi.id
-         WHERE fl.id = $1 AND fl.user_id = $2 AND fl.is_deleted = false`,
-        [id, userId]
-      );
-
-      return result.rows[0] || null;
-    } catch (error) {
-      logger.error(`Error finding food log by ID: ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Get food logs for a specific date
-   * @param {number} userId - User ID
-   * @param {string} date - Date (YYYY-MM-DD)
-   * @returns {Promise<Array>} Food logs
-   */
+  // Get logs for a specific date
   static async getByDate(userId, date) {
+    let pool;
+    
     try {
-      const result = await db.query(
-        `SELECT fl.*, fi.name as food_name, fi.calories_per_serving,
-                fi.protein_grams, fi.carbs_grams, fi.fat_grams,
-                fi.serving_size, fi.serving_unit
-         FROM food_logs fl
-         JOIN food_items fi ON fl.food_item_id = fi.id
-         WHERE fl.user_id = $1 AND fl.log_date = $2 AND fl.is_deleted = false
-         ORDER BY fl.meal_type, fl.created_at`,
+      pool = getPool();
+      const result = await pool.query(
+        `SELECT 
+          fl.id, fl.user_id, fl.food_item_id, fl.log_date, fl.meal_type, fl.servings,
+          fi.name as food_name, fi.calories_per_serving, fi.protein_grams, fi.carbs_grams, fi.fat_grams
+        FROM food_logs fl
+        JOIN food_items fi ON fl.food_item_id = fi.id
+        WHERE fl.user_id = $1 AND fl.log_date = $2
+        ORDER BY fl.created_at DESC`,
         [userId, date]
       );
-
-      return result.rows;
-    } catch (error) {
-      logger.error(`Error getting food logs by date: ${error.message}`);
-      throw error;
+      
+      return result.rows.map(row => new FoodLog(row));
+    } catch (err) {
+      logger.error(`Error getting logs by date: ${err.message}`);
+      throw err;
+    } finally {
+      if (pool) {
+        await pool.end();
+      }
     }
   }
 
-  /**
-   * Get food logs for a date range
-   * @param {number} userId - User ID
-   * @param {string} startDate - Start date (YYYY-MM-DD)
-   * @param {string} endDate - End date (YYYY-MM-DD)
-   * @returns {Promise<Array>} Food logs
-   */
+  // Get logs for a date range
   static async getByDateRange(userId, startDate, endDate) {
+    let pool;
+    
     try {
-      const result = await db.query(
-        `SELECT fl.*, fi.name as food_name, fi.calories_per_serving,
-                fi.protein_grams, fi.carbs_grams, fi.fat_grams,
-                fi.serving_size, fi.serving_unit
-         FROM food_logs fl
-         JOIN food_items fi ON fl.food_item_id = fi.id
-         WHERE fl.user_id = $1 AND fl.log_date BETWEEN $2 AND $3 AND fl.is_deleted = false
-         ORDER BY fl.log_date, fl.meal_type, fl.created_at`,
+      pool = getPool();
+      const result = await pool.query(
+        `SELECT 
+          fl.id, fl.user_id, fl.food_item_id, fl.log_date, fl.meal_type, fl.servings,
+          fi.name as food_name, fi.calories_per_serving, fi.protein_grams, fi.carbs_grams, fi.fat_grams
+        FROM food_logs fl
+        JOIN food_items fi ON fl.food_item_id = fi.id
+        WHERE fl.user_id = $1 AND fl.log_date BETWEEN $2 AND $3
+        ORDER BY fl.log_date, fl.created_at`,
         [userId, startDate, endDate]
       );
-
-      return result.rows;
-    } catch (error) {
-      logger.error(`Error getting food logs by date range: ${error.message}`);
-      throw error;
+      
+      return result.rows.map(row => new FoodLog(row));
+    } catch (err) {
+      logger.error(`Error getting logs by date range: ${err.message}`);
+      throw err;
+    } finally {
+      if (pool) {
+        await pool.end();
+      }
     }
   }
 
-  /**
-   * Update food log
-   * @param {number} id - Food log ID
-   * @param {number} userId - User ID (for authorization)
-   * @param {Object} logData - Food log data
-   * @returns {Promise<Object|null>} Updated food log or null
-   */
-  static async update(id, userId, logData) {
+  // Create a new log
+  static async create(logData) {
+    let pool;
+    
     try {
-      const {
-        meal_type,
-        servings,
-        log_date,
-      } = logData;
-
-      const result = await db.query(
-        `UPDATE food_logs
-         SET meal_type = $1, servings = $2, log_date = $3, updated_at = NOW()
-         WHERE id = $4 AND user_id = $5 AND is_deleted = false
-         RETURNING *`,
-        [meal_type, servings, log_date, id, userId]
+      pool = getPool();
+      const result = await pool.query(
+        `INSERT INTO food_logs (user_id, food_item_id, log_date, meal_type, servings)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id`,
+        [
+          logData.user_id,
+          logData.food_item_id,
+          logData.log_date,
+          logData.meal_type,
+          logData.servings
+        ]
       );
-
-      return result.rows[0] || null;
-    } catch (error) {
-      logger.error(`Error updating food log: ${error.message}`);
-      throw error;
+      
+      // Get the full log with food item details
+      const logId = result.rows[0].id;
+      const logResult = await pool.query(
+        `SELECT 
+          fl.id, fl.user_id, fl.food_item_id, fl.log_date, fl.meal_type, fl.servings,
+          fi.name as food_name, fi.calories_per_serving, fi.protein_grams, fi.carbs_grams, fi.fat_grams
+        FROM food_logs fl
+        JOIN food_items fi ON fl.food_item_id = fi.id
+        WHERE fl.id = $1`,
+        [logId]
+      );
+      
+      return new FoodLog(logResult.rows[0]);
+    } catch (err) {
+      logger.error(`Error creating log: ${err.message}`);
+      throw err;
+    } finally {
+      if (pool) {
+        await pool.end();
+      }
     }
   }
 
-  /**
-   * Delete food log (soft delete)
-   * @param {number} id - Food log ID
-   * @param {number} userId - User ID (for authorization)
-   * @returns {Promise<boolean>} Success status
-   */
-  static async delete(id, userId) {
+  // Update a log
+  static async update(id, userId, logData) {
+    let pool;
+    
     try {
-      const result = await db.query(
+      pool = getPool();
+      const result = await pool.query(
         `UPDATE food_logs
-         SET is_deleted = true, updated_at = NOW()
-         WHERE id = $1 AND user_id = $2`,
+        SET meal_type = $1, servings = $2, log_date = $3, updated_at = NOW()
+        WHERE id = $4 AND user_id = $5
+        RETURNING id`,
+        [
+          logData.meal_type,
+          logData.servings,
+          logData.log_date,
+          id,
+          userId
+        ]
+      );
+      
+      if (result.rows.length === 0) {
+        return null;
+      }
+      
+      // Get the full log with food item details
+      const logResult = await pool.query(
+        `SELECT 
+          fl.id, fl.user_id, fl.food_item_id, fl.log_date, fl.meal_type, fl.servings,
+          fi.name as food_name, fi.calories_per_serving, fi.protein_grams, fi.carbs_grams, fi.fat_grams
+        FROM food_logs fl
+        JOIN food_items fi ON fl.food_item_id = fi.id
+        WHERE fl.id = $1`,
+        [id]
+      );
+      
+      return new FoodLog(logResult.rows[0]);
+    } catch (err) {
+      logger.error(`Error updating log: ${err.message}`);
+      throw err;
+    } finally {
+      if (pool) {
+        await pool.end();
+      }
+    }
+  }
+
+  // Delete a log
+  static async delete(id, userId) {
+    let pool;
+    
+    try {
+      pool = getPool();
+      const result = await pool.query(
+        'DELETE FROM food_logs WHERE id = $1 AND user_id = $2 RETURNING id',
         [id, userId]
       );
-
-      return result.rowCount > 0;
-    } catch (error) {
-      logger.error(`Error deleting food log: ${error.message}`);
-      throw error;
+      
+      return result.rows.length > 0;
+    } catch (err) {
+      logger.error(`Error deleting log: ${err.message}`);
+      throw err;
+    } finally {
+      if (pool) {
+        await pool.end();
+      }
     }
   }
 
-  /**
-   * Get daily summary
-   * @param {number} userId - User ID
-   * @param {string} date - Date (YYYY-MM-DD)
-   * @returns {Promise<Object>} Daily summary
-   */
+  // Get daily summary
   static async getDailySummary(userId, date) {
+    let pool;
+    
     try {
-      const result = await db.query(
-        `SELECT
-           SUM(fi.calories_per_serving * fl.servings) as total_calories,
-           SUM(fi.protein_grams * fl.servings) as total_protein,
-           SUM(fi.carbs_grams * fl.servings) as total_carbs,
-           SUM(fi.fat_grams * fl.servings) as total_fat,
-           COUNT(fl.id) as total_items
-         FROM food_logs fl
-         JOIN food_items fi ON fl.food_item_id = fi.id
-         WHERE fl.user_id = $1 AND fl.log_date = $2 AND fl.is_deleted = false`,
+      pool = getPool();
+      const result = await pool.query(
+        `SELECT 
+          SUM(fi.calories_per_serving * fl.servings) as total_calories,
+          SUM(fi.protein_grams * fl.servings) as total_protein,
+          SUM(fi.carbs_grams * fl.servings) as total_carbs,
+          SUM(fi.fat_grams * fl.servings) as total_fat
+        FROM food_logs fl
+        JOIN food_items fi ON fl.food_item_id = fi.id
+        WHERE fl.user_id = $1 AND fl.log_date = $2`,
         [userId, date]
       );
-
-      return result.rows[0] || {
-        total_calories: 0,
-        total_protein: 0,
-        total_carbs: 0,
-        total_fat: 0,
-        total_items: 0,
-      };
-    } catch (error) {
-      logger.error(`Error getting daily summary: ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Get logs changed since a specific timestamp
-   * @param {number} userId - User ID
-   * @param {string} timestamp - Timestamp
-   * @returns {Promise<Array>} Changed logs
-   */
-  static async getChangedSince(userId, timestamp) {
-    try {
-      const result = await db.query(
-        `SELECT fl.*, fi.name as food_name
-         FROM food_logs fl
-         JOIN food_items fi ON fl.food_item_id = fi.id
-         WHERE fl.user_id = $1 AND fl.updated_at > $2
-         ORDER BY fl.updated_at`,
-        [userId, timestamp]
-      );
-
-      return result.rows;
-    } catch (error) {
-      logger.error(`Error getting changed logs: ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Find food log by sync ID
-   * @param {string} syncId - Sync ID
-   * @param {number} userId - User ID (for authorization)
-   * @returns {Promise<Object|null>} Food log or null
-   */
-  static async findBySyncId(syncId, userId) {
-    try {
-      const result = await db.query(
-        `SELECT * FROM food_logs
-         WHERE sync_id = $1 AND user_id = $2`,
-        [syncId, userId]
-      );
-
-      return result.rows[0] || null;
-    } catch (error) {
-      logger.error(`Error finding food log by sync ID: ${error.message}`);
-      throw error;
+      
+      return result.rows[0];
+    } catch (err) {
+      logger.error(`Error getting daily summary: ${err.message}`);
+      throw err;
+    } finally {
+      if (pool) {
+        await pool.end();
+      }
     }
   }
 }

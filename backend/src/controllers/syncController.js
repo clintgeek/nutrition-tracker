@@ -113,7 +113,7 @@ const syncData = asyncHandler(async (req, res) => {
             await Goal.delete(existingGoal.id, req.user.id);
             processedChanges.goals.deleted.push(existingGoal.id);
           } else {
-            // Update
+            // Update - use the Goal model to handle the mapping
             const updatedGoal = await Goal.update(existingGoal.id, req.user.id, {
               daily_calorie_target: goal.daily_calorie_target,
               protein_target_grams: goal.protein_target_grams,
@@ -128,7 +128,7 @@ const syncData = asyncHandler(async (req, res) => {
             }
           }
         } else if (!goal.is_deleted) {
-          // Create new goal
+          // Create new goal - use the Goal model to handle the mapping
           const newGoal = await Goal.create({
             user_id: req.user.id,
             daily_calorie_target: goal.daily_calorie_target,

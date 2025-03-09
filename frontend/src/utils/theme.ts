@@ -2,7 +2,7 @@ import { DefaultTheme } from 'react-native-paper';
 
 // Define the app's color palette
 const colors = {
-  primary: '#4CAF50',
+  primary: '#6098cc',
   accent: '#2196F3',
   background: '#FFFFFF',
   surface: '#FFFFFF',

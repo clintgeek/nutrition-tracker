@@ -1,0 +1,56 @@
+FROM node:16-alpine
+
+WORKDIR /app
+
+# Create a simple package.json
+RUN echo '{\
+  "name": "nutrition-tracker-backend",\
+  "version": "1.0.0",\
+  "main": "server.js",\
+  "scripts": {\
+    "start": "node server.js"\
+  },\
+  "dependencies": {\
+    "express": "^4.18.2"\
+  }\
+}' > package.json
+
+# Install dependencies
+RUN npm install
+
+# Create a simple server
+RUN echo 'const express = require("express");\
+const app = express();\
+const PORT = process.env.PORT || 3000;\
+\
+app.use(express.json());\
+\
+// Enable CORS\
+app.use((req, res, next) => {\
+  res.header("Access-Control-Allow-Origin", "*");\
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");\
+  if (req.method === "OPTIONS") {\
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");\
+    return res.status(200).json({});\
+  }\
+  next();\
+});\
+\
+// Health check endpoint\
+app.get("/health", (req, res) => {\
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });\
+});\
+\
+// API routes\
+app.get("/api/status", (req, res) => {\
+  res.status(200).json({ status: "ok", message: "API is running" });\
+});\
+\
+// Start server\
+app.listen(PORT, () => {\
+  console.log(`Server running on port ${PORT}`);\
+});' > server.js
+
+EXPOSE 3000
+
+CMD ["npm", "start"]

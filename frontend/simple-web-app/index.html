@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nutrition Tracker</title>
+    <!-- React and React DOM -->
+    <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <!-- Axios for API calls -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .app {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            padding-bottom: 80px; /* Space for bottom nav */
+        }
+
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .button:hover {
+            background-color: #2980b9;
+        }
+
+        .food-log-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .food-log-item-name {
+            font-weight: bold;
+        }
+
+        .food-log-item-calories {
+            color: #e74c3c;
+        }
+
+        .nutrition-summary {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .nutrition-item {
+            text-align: center;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .nutrition-item-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .nutrition-item-label {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .nav-bar {
+            display: flex;
+            justify-content: space-around;
+            background-color: #fff;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 10px;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #666;
+            text-decoration: none;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .nav-item.active {
+            color: #3498db;
+        }
+
+        .material-icons {
+            font-size: 24px;
+        }
+
+        .add-food-form {
+            margin-top: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        /* Auth styles */
+        .auth-container {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+
+        .auth-tab {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            cursor: pointer;
+            background-color: #f5f5f5;
+        }
+
+        .auth-tab.active {
+            background-color: #3498db;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script>
+        // API configuration
+        const API_URL = window.location.hostname === 'localhost'
+            ? 'http://localhost:4081'
+            : `http://${window.location.hostname}:4081`;
+
+        console.log("API base URL:", API_URL);
+
+        // Token management
+        const getToken = () => localStorage.getItem('token');
+        const setToken = (token) => localStorage.setItem('token', token);
+        const removeToken = () => localStorage.removeItem('token');
+        const isAuthenticated = () => !!getToken();
+
+        // App component
+        const App = () => {
+            const [activeTab, setActiveTab] = React.useState("home");
+            const [isLoading, setIsLoading] = React.useState(false);
+            const [message, setMessage] = React.useState(null);
+            const [foodLogs, setFoodLogs] = React.useState([]);
+            const [nutritionSummary, setNutritionSummary] = React.useState({
+                calories: 0,
+                protein: 0,
+                carbs: 0,
+                fat: 0
+            });
+            const [newFood, setNewFood] = React.useState({
+                name: '',
+                calories: '',
+                protein: '',
+                carbs: '',
+                fat: '',
+                servingSize: '1'
+            });
+            const [isConnectedToApi, setIsConnectedToApi] = React.useState(false);
+            const [authMode, setAuthMode] = React.useState('login');
+            const [authForm, setAuthForm] = React.useState({
+                name: '',
+                email: '',
+                password: ''
+            });
+            const [user, setUser] = React.useState(null);
+
+            // Handle auth form input change
+            const handleAuthInputChange = (e) => {
+                const { name, value } = e.target;
+                setAuthForm({
+                    ...authForm,
+                    [name]: value
+                });
+            };
+
+            // Handle login
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                setIsLoading(true);
+
+                try {
+                    const response = await axios.post(`${API_URL}/api/auth/login`, {
+                        email: authForm.email,
+                        password: authForm.password
+                    });
+
+                    if (response.data && response.data.token) {
+                        setToken(response.data.token);
+                        setUser(response.data.user);
+                        setMessage({ type: 'info', text: 'Login successful!' });
+                        setActiveTab('home');
+                        fetchLogsFromApi();
+                    }
+                } catch (err) {
+                    console.error('Login error:', err.response?.data?.message || err.message);
+                    setMessage({
+                        type: 'error',
+                        text: err.response?.data?.message || 'Login failed. Please check your credentials.'
+                    });
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            // Handle register
+            const handleRegister = async (e) => {
+                e.preventDefault();
+                setIsLoading(true);
+
+                try {
+                    const response = await axios.post(`${API_URL}/api/auth/register`, {
+                        name: authForm.name,
+                        email: authForm.email,
+                        password: authForm.password
+                    });
+
+                    if (response.data && response.data.token) {
+                        setToken(response.data.token);
+                        setUser(response.data.user);
+                        setMessage({ type: 'info', text: 'Registration successful!' });
+                        setActiveTab('home');
+                        fetchLogsFromApi();
+                    }
+                } catch (err) {
+                    console.error('Registration error:', err.response?.data?.message || err.message);
+                    setMessage({
+                        type: 'error',
+                        text: err.response?.data?.message || 'Registration failed. Please try again.'
+                    });
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            // Handle logout
+            const handleLogout = () => {
+                removeToken();
+                setUser(null);
+                setFoodLogs([]);
+                setNutritionSummary({
+                    calories: 0,
+                    protein: 0,
+                    carbs: 0,
+                    fat: 0
+                });
+                setMessage({ type: 'info', text: 'You have been logged out.' });
+                setActiveTab('auth');
+            };
+
+            // Get current user
+            const getCurrentUser = async () => {
+                if (!isAuthenticated()) return null;
+
+                try {
+                    const response = await axios.get(`${API_URL}/api/auth/me`, {
+                        headers: {
+                            Authorization: `Bearer ${getToken()}`
+                        }
+                    });
+
+                    if (response.data && response.data.user) {
+                        setUser(response.data.user);
+                        return response.data.user;
+                    }
+                } catch (err) {
+                    console.error('Get user error:', err.response?.data?.message || err.message);
+                    if (err.response && err.response.status === 401) {
+                        // Token expired or invalid
+                        removeToken();
+                        setActiveTab('auth');
+                    }
+                }
+
+                return null;
+            };
+
+            // Try to connect to the API
+            const tryConnectToApi = async () => {
+                try {
+                    // Try the health check endpoint first
+                    const healthResponse = await axios.get(`${API_URL}/health`);
+                    console.log("Health check response:", healthResponse.data);
+
+                    if (healthResponse.status === 200) {
+                        setIsConnectedToApi(true);
+                        return true;
+                    }
+                } catch (err) {
+                    console.log("Health check failed:", err.message);
+                }
+
+                return false;
+            };
+
+            // Fetch food logs from API
+            const fetchLogsFromApi = async () => {
+                if (!isAuthenticated()) {
+                    setActiveTab('auth');
+                    return false;
+                }
+
+                setIsLoading(true);
+                try {
+                    // Get today's date in YYYY-MM-DD format
+                    const today = new Date();
+                    const dateString = today.toISOString().split("T")[0];
+
+                    // Use the authenticated endpoint
+                    const response = await axios.get(`${API_URL}/api/logs?date=${dateString}`, {
+                        headers: {
+                            Authorization: `Bearer ${getToken()}`
+                        }
+                    });
+                    console.log("API response:", response.data);
+
+                    if (response.data && response.data.logs && Array.isArray(response.data.logs)) {
+                        // Format the logs to match our expected structure
+                        const formattedLogs = response.data.logs.map(log => ({
+                            id: log.id,
+                            food: {
+                                name: log.food_name,
+                                calories: log.calories_per_serving,
+                                protein: log.protein_grams,
+                                carbs: log.carbs_grams,
+                                fat: log.fat_grams
+                            },
+                            servingSize: log.servings,
+                            date: log.log_date
+                        }));
+
+                        setFoodLogs(formattedLogs);
+                        setMessage({ type: 'info', text: 'Data loaded from API server.' });
+                    }
+                } catch (err) {
+                    console.log("API fetch failed:", err.message);
+                    if (err.response && err.response.status === 401) {
+                        // Token expired or invalid
+                        removeToken();
+                        setActiveTab('auth');
+                        setMessage({ type: 'error', text: 'Your session has expired. Please log in again.' });
+                    } else {
+                        setMessage({ type: 'error', text: 'Failed to load data from API.' });
+                    }
+                }
+
+                setIsLoading(false);
+                return false;
+            };
+
+            // Initialize data
+            const initializeData = async () => {
+                setIsLoading(true);
+
+                // Try to connect to the API
+                const isConnected = await tryConnectToApi();
+                setIsConnectedToApi(isConnected);
+
+                // Check if user is authenticated
+                if (isAuthenticated()) {
+                    const user = await getCurrentUser();
+                    if (user) {
+                        // User is authenticated
+                        setActiveTab('home');
+                    } else {
+                        // Token invalid, redirect to auth
+                        setActiveTab('auth');
+                    }
+                } else {
+                    // Not authenticated, show auth screen
+                    setActiveTab('auth');
+                    setMessage({ type: 'info', text: 'Please log in to use the app.' });
+                }
+
+                setIsLoading(false);
+            };
+
+            // Handle adding a new food log
+            const handleAddFood = async (e) => {
+                e.preventDefault();
+
+                if (!isAuthenticated()) {
+                    setActiveTab('auth');
+                    return;
+                }
+
+                // Validate form
+                if (!newFood.name || !newFood.calories) {
+                    setMessage({ type: 'error', text: 'Food name and calories are required' });
+                    return;
+                }
+
+                // Create new food log
+                const today = new Date();
+                const dateString = today.toISOString().split("T")[0];
+
+                const newFoodLog = {
+                    id: Date.now(),
+                    food: {
+                        name: newFood.name,
+                        calories: parseFloat(newFood.calories) || 0,
+                        protein: parseFloat(newFood.protein) || 0,
+                        carbs: parseFloat(newFood.carbs) || 0,
+                        fat: parseFloat(newFood.fat) || 0
+                    },
+                    servingSize: parseFloat(newFood.servingSize) || 1,
+                    date: dateString
+                };
+
+                // Try to add to API if connected
+                if (isConnectedToApi) {
+                    try {
+                        // Format for API
+                        const apiLog = {
+                            food_item_id: 1, // This would need to be a real ID in a production app
+                            log_date: dateString,
+                            meal_type: 'snack',
+                            servings: newFoodLog.servingSize
+                        };
+
+                        // Use the authenticated endpoint
+                        const response = await axios.post(`${API_URL}/api/logs`, apiLog, {
+                            headers: {
+                                Authorization: `Bearer ${getToken()}`
+                            }
+                        });
+                        console.log("API add response:", response.data);
+
+                        // If successful, use the returned log ID
+                        if (response.data && response.data.log && response.data.log.id) {
+                            newFoodLog.id = response.data.log.id;
+                        }
+                    } catch (err) {
+                        console.log("API add failed:", err.message);
+                        if (err.response && err.response.status === 401) {
+                            // Token expired or invalid
+                            removeToken();
+                            setActiveTab('auth');
+                            setMessage({ type: 'error', text: 'Your session has expired. Please log in again.' });
+                            return;
+                        }
+                    }
+                }
+
+                // Add to food logs
+                const updatedLogs = [...foodLogs, newFoodLog];
+                setFoodLogs(updatedLogs);
+
+                // Reset form
+                setNewFood({
+                    name: '',
+                    calories: '',
+                    protein: '',
+                    carbs: '',
+                    fat: '',
+                    servingSize: '1'
+                });
+
+                // Show success message
+                setMessage({ type: 'info', text: 'Food added successfully!' });
+
+                // Switch to home tab
+                setActiveTab('home');
+            };
+
+            // Handle input change for new food form
+            const handleInputChange = (e) => {
+                const { name, value } = e.target;
+                setNewFood({
+                    ...newFood,
+                    [name]: value
+                });
+            };
+
+            // Handle tab change
+            const handleTabChange = (tab) => {
+                if (tab !== 'auth' && !isAuthenticated()) {
+                    setMessage({ type: 'error', text: 'Please log in to access this feature.' });
+                    setActiveTab('auth');
+                    return;
+                }
+
+                setActiveTab(tab);
+            };
+
+            // Render the Auth tab
+            const renderAuthTab = () => {
+                return React.createElement("div", { className: "tab-content active" },
+                    React.createElement("div", { className: "card auth-container" },
+                        React.createElement("div", { className: "auth-tabs" },
+                            React.createElement("div", {
+                                className: `auth-tab ${authMode === 'login' ? 'active' : ''}`,
+                                onClick: () => setAuthMode('login')
+                            }, "Login"),
+                            React.createElement("div", {
+                                className: `auth-tab ${authMode === 'register' ? 'active' : ''}`,
+                                onClick: () => setAuthMode('register')
+                            }, "Register")
+                        ),
+                        authMode === 'login' ?
+                            React.createElement("form", { onSubmit: handleLogin },
+                                React.createElement("div", { className: "form-group" },
+                                    React.createElement("label", null, "Email"),
+                                    React.createElement("input", {
+                                        type: "email",
+                                        name: "email",
+                                        value: authForm.email,
+                                        onChange: handleAuthInputChange,
+                                        placeholder: "Enter your email",
+                                        required: true
+                                    })
+                                ),
+                                React.createElement("div", { className: "form-group" },
+                                    React.createElement("label", null, "Password"),
+                                    React.createElement("input", {
+                                        type: "password",
+                                        name: "password",
+                                        value: authForm.password,
+                                        onChange: handleAuthInputChange,
+                                        placeholder: "Enter your password",
+                                        required: true
+                                    })
+                                ),
+                                React.createElement("button", {
+                                    type: "submit",
+                                    className: "button",
+                                    disabled: isLoading
+                                }, isLoading ? "Logging in..." : "Login")
+                            ) :
+                            React.createElement("form", { onSubmit: handleRegister },
+                                React.createElement("div", { className: "form-group" },
+                                    React.createElement("label", null, "Name"),
+                                    React.createElement("input", {
+                                        type: "text",
+                                        name: "name",
+                                        value: authForm.name,
+                                        onChange: handleAuthInputChange,
+                                        placeholder: "Enter your name",
+                                        required: true
+                                    })
+                                ),
+                                React.createElement("div", { className: "form-group" },
+                                    React.createElement("label", null, "Email"),
+                                    React.createElement("input", {
+                                        type: "email",
+                                        name: "email",
+                                        value: authForm.email,
+                                        onChange: handleAuthInputChange,
+                                        placeholder: "Enter your email",
+                                        required: true
+                                    })
+                                ),
+                                React.createElement("div", { className: "form-group" },
+                                    React.createElement("label", null, "Password"),
+                                    React.createElement("input", {
+                                        type: "password",
+                                        name: "password",
+                                        value: authForm.password,
+                                        onChange: handleAuthInputChange,
+                                        placeholder: "Enter your password (min 6 characters)",
+                                        required: true,
+                                        minLength: 6
+                                    })
+                                ),
+                                React.createElement("button", {
+                                    type: "submit",
+                                    className: "button",
+                                    disabled: isLoading
+                                }, isLoading ? "Registering..." : "Register")
+                            )
+                    )
+                );
+            };
+
+            // Render the Home tab
+            const renderHomeTab = () => {
+                return React.createElement("div", { className: "tab-content active" },
+                    React.createElement("div", { className: "card" },
+                        React.createElement("h2", null, "Food Logs"),
+                        React.createElement("button", {
+                            className: "button",
+                            style: { float: "right" },
+                            onClick: () => handleTabChange("add")
+                        }, "Add Food"),
+                        isLoading
+                            ? React.createElement("div", { className: "loading" }, "Loading logs...")
+                            : foodLogs.length > 0
+                                ? React.createElement("div", null,
+                                    foodLogs.map((log, index) =>
+                                        React.createElement("div", { key: index, className: "food-log-item" },
+                                            React.createElement("div", { className: "food-log-item-name" }, log.food?.name || "Food Item"),
+                                            React.createElement("div", { className: "food-log-item-calories" },
+                                                `${Math.round((log.food?.calories || 0) * (log.servingSize || 1))} kcal`
+                                            )
+                                        )
+                                    )
+                                )
+                                : React.createElement("p", null, "No food logs for today. Add your first meal!")
+                    )
+                );
+            };
+
+            // Render the Add Food tab
+            const renderAddFoodTab = () => {
+                return React.createElement("div", { className: "tab-content active" },
+                    React.createElement("div", { className: "card" },
+                        React.createElement("h2", null, "Add Food"),
+                        React.createElement("form", { className: "add-food-form", onSubmit: handleAddFood },
+                            React.createElement("div", { className: "form-group" },
+                                React.createElement("label", null, "Food Name"),
+                                React.createElement("input", {
+                                    type: "text",
+                                    name: "name",
+                                    value: newFood.name,
+                                    onChange: handleInputChange,
+                                    placeholder: "e.g., Grilled Chicken Salad",
+                                    required: true
+                                })
+                            ),
+                            React.createElement("div", { className: "form-group" },
+                                React.createElement("label", null, "Calories"),
+                                React.createElement("input", {
+                                    type: "number",
+                                    name: "calories",
+                                    value: newFood.calories,
+                                    onChange: handleInputChange,
+                                    placeholder: "e.g., 350",
+                                    required: true
+                                })
+                            ),
+                            React.createElement("div", { className: "form-row" },
+                                React.createElement("div", { className: "form-group" },
+                                    React.createElement("label", null, "Protein (g)"),
+                                    React.createElement("input", {
+                                        type: "number",
+                                        name: "protein",
+                                        value: newFood.protein,
+                                        onChange: handleInputChange,
+                                        placeholder: "e.g., 25"
+                                    })
+                                ),
+                                React.createElement("div", { className: "form-group" },
+                                    React.createElement("label", null, "Carbs (g)"),
+                                    React.createElement("input", {
+                                        type: "number",
+                                        name: "carbs",
+                                        value: newFood.carbs,
+                                        onChange: handleInputChange,
+                                        placeholder: "e.g., 30"
+                                    })
+                                ),
+                                React.createElement("div", { className: "form-group" },
+                                    React.createElement("label", null, "Fat (g)"),
+                                    React.createElement("input", {
+                                        type: "number",
+                                        name: "fat",
+                                        value: newFood.fat,
+                                        onChange: handleInputChange,
+                                        placeholder: "e.g., 15"
+                                    })
+                                )
+                            ),
+                            React.createElement("div", { className: "form-group" },
+                                React.createElement("label", null, "Serving Size"),
+                                React.createElement("input", {
+                                    type: "number",
+                                    name: "servingSize",
+                                    value: newFood.servingSize,
+                                    onChange: handleInputChange,
+                                    placeholder: "e.g., 1",
+                                    step: "0.1"
+                                })
+                            ),
+                            React.createElement("button", { type: "submit", className: "button" }, "Add Food")
+                        )
+                    )
+                );
+            };
+
+            // Render the appropriate tab content
+            const renderTabContent = () => {
+                switch (activeTab) {
+                    case "home":
+                        return renderHomeTab();
+                    case "add":
+                        return renderAddFoodTab();
+                    case "auth":
+                        return renderAuthTab();
+                    default:
+                        return renderHomeTab();
+                }
+            };
+
+            // Fetch data on component mount
+            React.useEffect(() => {
+                initializeData();
+            }, []);
+
+            // Render the app
+            return React.createElement("div", { className: "app" },
+                React.createElement("div", { className: "header" },
+                    React.createElement("h1", null, "Nutrition Tracker"),
+                    isAuthenticated() && user && React.createElement("div", { style: { fontSize: '14px', marginTop: '5px' } },
+                        `Welcome, ${user.name}`,
+                        React.createElement("button", {
+                            style: { marginLeft: '10px', padding: '2px 5px', fontSize: '12px' },
+                            onClick: handleLogout
+                        }, "Logout")
+                    )
+                ),
+                message && React.createElement("div", { className: message.type }, message.text),
+                renderTabContent(),
+                React.createElement("div", { className: "nav-bar" },
+                    React.createElement("a", {
+                        className: `nav-item ${activeTab === "home" ? "active" : ""}`,
+                        onClick: () => handleTabChange("home")
+                    },
+                        React.createElement("span", { className: "material-icons" }, "home"),
+                        "Home"
+                    ),
+                    isAuthenticated() && React.createElement("a", {
+                        className: `nav-item ${activeTab === "add" ? "active" : ""}`,
+                        onClick: () => handleTabChange("add")
+                    },
+                        React.createElement("span", { className: "material-icons" }, "add_circle"),
+                        "Add"
+                    ),
+                    !isAuthenticated() && React.createElement("a", {
+                        className: `nav-item ${activeTab === "auth" ? "active" : ""}`,
+                        onClick: () => handleTabChange("auth")
+                    },
+                        React.createElement("span", { className: "material-icons" }, "person"),
+                        "Login"
+                    )
+                )
+            );
+        };
+
+        // Render the App
+        const root = ReactDOM.createRoot(document.getElementById("root"));
+        root.render(React.createElement(App));
+    </script>
+</body>
+</html>

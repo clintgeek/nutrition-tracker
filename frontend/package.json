@@ -7,7 +7,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "web:build": "expo build:web",
+    "web:build": "expo export:web",
     "eject": "expo eject"
   },
   "dependencies": {
@@ -35,12 +35,16 @@
     "react-native-screens": "~3.18.0",
     "react-native-svg": "13.4.0",
     "react-native-uuid": "^2.0.1",
-    "yup": "^1.0.2"
+    "yup": "^1.0.2",
+    "react-dom": "18.1.0",
+    "react-native-web": "~0.18.9",
+    "@expo/webpack-config": "^0.17.2"
   },
   "devDependencies": {
     "@babel/core": "^7.12.9",
     "@types/react": "^18.0.38",
     "@types/react-native": "~0.70.6",
+    "@types/axios": "^0.14.0",
     "typescript": "^4.6.3"
   },
   "private": true
