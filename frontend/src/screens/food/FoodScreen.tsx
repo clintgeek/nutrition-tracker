@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Alert, ScrollView, RefreshControl } from 'react-native';
 import {
   Searchbar,
   FAB,
@@ -345,7 +345,7 @@ const FoodScreen: React.FC = () => {
             <Title style={[styles.foodName, { color: sourceColor }]}>{item.name}</Title>
             {item.brand && <Paragraph style={styles.brandName}>{item.brand}</Paragraph>}
             <View style={styles.nutritionInfo}>
-              <Text style={styles.calories}>{item.calories} calories</Text>
+              <Text style={styles.calories}>{Math.round(item.calories)} calories</Text>
               <Text style={styles.macros}>
                 P: {item.protein}g • C: {item.carbs}g • F: {item.fat}g
               </Text>
@@ -375,75 +375,49 @@ const FoodScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.content}>
-        <View style={styles.searchContainer}>
-          <Searchbar
-            placeholder="Search foods..."
-            onChangeText={setSearchQuery}
-            value={searchQuery}
-            style={styles.searchBar}
-            icon="magnify"
-            clearIcon="close"
-          />
-
-          <TouchableOpacity
-            style={styles.scanButton}
-            onPress={navigateToScanBarcode}
-          >
-            <Ionicons name="barcode-outline" size={24} color={theme.colors.primary} />
-          </TouchableOpacity>
-        </View>
-
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={styles.loadingText}>Loading foods...</Text>
-          </View>
-        ) : filteredFoods.length === 0 ? (
-          <EmptyState
-            icon="food"
-            title="No foods found"
-            message={searchQuery
-              ? `No foods found matching "${searchQuery}"`
-              : "Add foods to your database or scan barcodes to get started"}
-            actionLabel="Add Food"
-            onAction={navigateToAddFood}
-          />
-        ) : (
-          <FlatList
-            data={filteredFoods}
-            renderItem={renderFoodItem}
-            keyExtractor={(item) => `${item.id}-${item.source || 'local'}`}
-            contentContainerStyle={styles.foodList}
-            refreshing={isRefreshing}
-            onRefresh={() => fetchFoods(searchQuery, true)}
-            ItemSeparatorComponent={() => <Divider />}
-          />
-        )}
-
-        <FAB
-          style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-          icon="plus"
-          onPress={navigateToAddFood}
-          color="white"
+      <View style={styles.searchContainer}>
+        <Searchbar
+          placeholder="Search foods..."
+          onChangeText={setSearchQuery}
+          value={searchQuery}
+          style={styles.searchBar}
+          icon="magnify"
+          clearIcon="close"
         />
+
+        <TouchableOpacity
+          style={styles.scanButton}
+          onPress={navigateToScanBarcode}
+        >
+          <Ionicons name="barcode-outline" size={24} color={theme.colors.primary} />
+        </TouchableOpacity>
       </View>
 
-      <Portal>
-        <Dialog
-          visible={isDeleteModalVisible}
-          onDismiss={() => setIsDeleteModalVisible(false)}
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.loadingText}>Loading foods...</Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollViewContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={() => fetchFoods(searchQuery, true)}
+            />
+          }
         >
-          <Dialog.Title>Delete Food</Dialog.Title>
-          <Dialog.Content>
-            <Text>Are you sure you want to delete "{foodToDelete?.name}"?</Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setIsDeleteModalVisible(false)}>Cancel</Button>
-            <Button onPress={confirmDelete} textColor={theme.colors.error}>Delete</Button>
-          </Dialog.Actions>
-        </Dialog>
+          {filteredFoods.map((item, index) => (
+            <View key={item.id || index}>
+              {renderFoodItem({ item })}
+            </View>
+          ))}
+        </ScrollView>
+      )}
 
+      <Portal>
         <Dialog
           visible={isFoodDetailsVisible}
           onDismiss={() => {
@@ -469,6 +443,25 @@ const FoodScreen: React.FC = () => {
           </Dialog.Actions>
         </Dialog>
       </Portal>
+
+      <FAB
+        style={styles.fab}
+        icon="plus"
+        onPress={() => {
+          setSelectedFood({
+            id: `new-${Date.now()}`,
+            name: '',
+            calories: 0,
+            protein: 0,
+            carbs: 0,
+            fat: 0,
+            serving_size: 100,
+            serving_unit: 'g',
+            source: 'custom'
+          });
+          setIsFoodDetailsVisible(true);
+        }}
+      />
     </View>
   );
 };
@@ -478,28 +471,37 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  content: {
-    padding: 16,
-  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    padding: 16,
+    backgroundColor: '#fff',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    zIndex: 1,
   },
   searchBar: {
     flex: 1,
-    borderRadius: 8,
-    elevation: 2,
-    backgroundColor: '#fff',
     marginRight: 8,
+    elevation: 0,
   },
   scanButton: {
     padding: 8,
-    backgroundColor: '#fff',
     borderRadius: 8,
+    backgroundColor: '#f0f0f0',
     elevation: 2,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    padding: 16,
+    paddingBottom: 80, // Add padding for FAB
   },
   loadingContainer: {
     flex: 1,
@@ -508,9 +510,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-  },
-  foodList: {
-    paddingBottom: 80,
   },
   foodCard: {
     marginBottom: 16,

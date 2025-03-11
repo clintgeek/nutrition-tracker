@@ -1,8 +1,62 @@
 const { validationResult } = require('express-validator');
 const FoodItem = require('../models/FoodItem');
 const FoodApiService = require('../utils/foodApiService');
+const nutritionixService = require('../utils/nutritionixService');
 const logger = require('../config/logger');
 const { asyncHandler } = require('../middleware/errorHandler');
+
+/**
+ * Debug endpoint to check raw API results
+ * @route GET /api/foods/debug-search
+ */
+const debugSearch = asyncHandler(async (req, res) => {
+  const { query } = req.query;
+
+  if (!query || query.length < 2) {
+    return res.status(400).json({ message: 'Search query must be at least 2 characters' });
+  }
+
+  try {
+    logger.info(`Debug search for: ${query}`);
+
+    // Run API searches in parallel
+    const searches = [
+      FoodApiService.searchOpenFoodFacts(query).catch(error => {
+        logger.error(`OpenFoodFacts search error: ${error.message}`);
+        return [];
+      }),
+      FoodApiService.searchUSDAByName(query, true).catch(error => {
+        logger.error(`USDA search error: ${error.message}`);
+        return [];
+      }),
+      nutritionixService.searchByName(query).catch(error => {
+        logger.error(`Nutritionix search error: ${error.message}`);
+        return [];
+      })
+    ];
+
+    // Wait for all searches to complete
+    const [openFoodResults, usdaResults, nutritionixResults] = await Promise.all(searches);
+
+    res.json({
+      openFoodFacts: {
+        count: openFoodResults.length,
+        results: openFoodResults.slice(0, 3)
+      },
+      usda: {
+        count: usdaResults.length,
+        results: usdaResults.slice(0, 3)
+      },
+      nutritionix: {
+        count: nutritionixResults.length,
+        results: nutritionixResults.slice(0, 3)
+      }
+    });
+  } catch (error) {
+    logger.error('Debug search error:', error);
+    res.status(500).json({ message: 'Error in debug search', error: error.message });
+  }
+});
 
 /**
  * Search food items
@@ -11,7 +65,7 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const searchFood = asyncHandler(async (req, res) => {
   const { query } = req.query;
   const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 20;
+  const limit = parseInt(req.query.limit) || 30;
   const offset = (page - 1) * limit;
 
   if (!query || query.length < 2) {
@@ -19,11 +73,15 @@ const searchFood = asyncHandler(async (req, res) => {
   }
 
   try {
+    logger.info(`Search request with limit: ${limit}, page: ${page}, offset: ${offset}`);
+
     // Search local database and external APIs in parallel
     const [localResults, apiResults] = await Promise.all([
       FoodItem.search(query, limit, offset),
       FoodApiService.searchFood(query)
     ]);
+
+    logger.info(`Local results: ${localResults.length}, API results: ${apiResults.length}`);
 
     // Filter out items that are already in local results
     const localSourceIds = new Set(localResults.map(item => `${item.source}:${item.source_id}`));
@@ -31,12 +89,15 @@ const searchFood = asyncHandler(async (req, res) => {
       !localSourceIds.has(`${item.source}:${item.source_id}`)
     );
 
-    // Combine results, respecting the limit
+    // Combine results with local results first, then add API results up to the limit
     const combinedResults = [...localResults];
     const remainingSlots = limit - localResults.length;
 
     if (remainingSlots > 0 && filteredApiResults.length > 0) {
-      combinedResults.push(...filteredApiResults.slice(0, remainingSlots));
+      // Add API results up to the remaining slots
+      // The API results are already sorted by relevance by FoodApiService.deduplicateResults
+      const apiResultsToAdd = filteredApiResults.slice(0, remainingSlots);
+      combinedResults.push(...apiResultsToAdd);
     }
 
     res.json({
@@ -230,4 +291,5 @@ module.exports = {
   updateCustomFood,
   deleteCustomFood,
   getCustomFoods,
+  debugSearch,
 };

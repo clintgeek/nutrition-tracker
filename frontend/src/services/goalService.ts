@@ -35,8 +35,16 @@ export const goalService = {
   getCurrentGoal: async (): Promise<Goal | null> => {
     try {
       // Try to get current goal from API
-      return apiService.get<{ goal: Goal }>('/goals/current').then((response) => response.goal);
+      const response = await apiService.get<{ goal?: Goal, message?: string }>('/goals/current');
+
+      // Check if the response contains a message indicating no goal found
+      if (response.message === 'No current goal found' || !response.goal) {
+        return null;
+      }
+
+      return response.goal;
     } catch (error) {
+      console.error('Error fetching current goal:', error);
       // If API call fails, get goal from offline storage
       return goalService.getOfflineCurrentGoal();
     }

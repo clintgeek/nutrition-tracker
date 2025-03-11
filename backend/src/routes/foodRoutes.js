@@ -7,6 +7,7 @@ const {
   updateCustomFood,
   deleteCustomFood,
   getCustomFoods,
+  debugSearch,
 } = require('../controllers/foodController');
 const { authenticate } = require('../middleware/auth');
 
@@ -18,6 +19,13 @@ const router = express.Router();
  * @access Public
  */
 router.get('/search', searchFood);
+
+/**
+ * @route GET /api/foods/debug-search
+ * @desc Debug endpoint to check raw API results
+ * @access Public
+ */
+router.get('/debug-search', debugSearch);
 
 /**
  * @route GET /api/foods/barcode/:barcode

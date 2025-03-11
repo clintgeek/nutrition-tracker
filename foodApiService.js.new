@@ -12,7 +12,7 @@ console.log('Environment variables:', {
   NUTRITIONIX_API_KEY: process.env.NUTRITIONIX_API_KEY ? 'Present' : 'Missing'
 });
 
-const API_TIMEOUT = 10000; // 10 seconds
+const API_TIMEOUT = 3000; // Reduced to 3 seconds
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 // Simple in-memory cache
@@ -62,14 +62,18 @@ function setCacheData(key, data) {
  * @returns {Promise} Response
  */
 async function fetchWithTimeout(url, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT);
+
   try {
     const response = await axios.get(url, {
       ...options,
-      timeout: API_TIMEOUT
+      signal: controller.signal
     });
+    clearTimeout(timeout);
     return response;
   } catch (error) {
-    logger.error(`Fetch error for ${url}: ${error.message}`);
+    clearTimeout(timeout);
     throw error;
   }
 }
@@ -206,7 +210,7 @@ class FoodApiService {
     let score = 0;
 
     // Source quality score (base points)
-    const sourceScores = { nutritionix: 20, openfoodfacts: 20, usda: 20 };
+    const sourceScores = { nutritionix: 30, usda: 20, openfoodfacts: 10 };
     score += sourceScores[food.source] || 0;
 
     // Name matching score
@@ -237,23 +241,12 @@ class FoodApiService {
     }
 
     // Completeness score (having all nutritional values)
-    // Give more weight to items with complete nutritional data
-    const hasCalories = food.calories > 0;
-    const hasProtein = food.protein > 0;
-    const hasCarbs = food.carbs > 0;
-    const hasFat = food.fat > 0;
-
-    if (hasCalories) score += 10;
-    if (hasProtein) score += 8;
-    if (hasCarbs) score += 8;
-    if (hasFat) score += 8;
+    if (food.calories > 0) score += 5;
+    if (food.protein > 0) score += 5;
+    if (food.carbs > 0) score += 5;
+    if (food.fat > 0) score += 5;
     if (food.serving_size) score += 5;
     if (food.serving_unit) score += 5;
-
-    // Bonus for having complete nutritional profile
-    if (hasCalories && hasProtein && hasCarbs && hasFat) {
-      score += 15;
-    }
 
     return score;
   }
@@ -297,53 +290,85 @@ class FoodApiService {
   static async searchFood(query) {
     try {
       logger.info(`Searching for food with query: ${query}`);
+      console.log(`🔍 Starting combined search for: "${query}"`);
 
       // Check cache first
       const cacheKey = `search:${query}`;
       const cachedData = getCachedData(cacheKey);
       if (cachedData) {
         logger.info(`Cache hit for combined search: ${query}`);
+        console.log(`📦 Using cached results for: "${query}"`);
         return cachedData;
       }
 
-      // Run API searches in parallel
-      const nutritionixPromise = nutritionixService.searchByName(query).catch(error => {
-        logger.error('Nutritionix search error:', error.message);
-        return [];
-      });
+      console.log('🚀 Running parallel API searches...');
 
-      const openFoodPromise = this.searchOpenFoodFacts(query).catch(error => {
-        logger.error('OpenFoodFacts search error:', error.message);
-        return [];
-      });
-
-      const usdaPromise = this.searchUSDAByName(query, true).catch(error => {
-        logger.error('USDA search error:', error.message);
-        return [];
-      });
+      // Run all API searches in parallel
+      const searches = [
+        nutritionixService.searchByName(query).catch(error => {
+          console.log(`❌ Nutritionix search error: ${error.message}`);
+          logger.error('Nutritionix search error:', error.message);
+          return [];
+        }),
+        this.searchOpenFoodFacts(query).catch(error => {
+          console.log(`❌ OpenFoodFacts search error: ${error.message}`);
+          logger.error('OpenFoodFacts search error:', error.message);
+          return [];
+        }),
+        this.searchUSDAByName(query, true).catch(error => {
+          console.log(`❌ USDA search error: ${error.message}`);
+          logger.error('USDA search error:', error.message);
+          return [];
+        })
+      ];
 
       // Wait for all searches to complete
-      const nutritionixResults = await nutritionixPromise;
-      const openFoodResults = await openFoodPromise;
-      const usdaResults = await usdaPromise;
+      console.log('⏳ Waiting for all API responses...');
+      const [nutritionixResults, openFoodResults, usdaResults] = await Promise.all(searches);
+
+      console.log('📊 API Results Summary:');
+      console.log(`- Nutritionix: ${nutritionixResults.length} results`);
+      console.log(`- OpenFoodFacts: ${Array.isArray(openFoodResults) ? openFoodResults.length : (openFoodResults ? 1 : 0)} results`);
+      console.log(`- USDA: ${Array.isArray(usdaResults) ? usdaResults.length : (usdaResults ? 1 : 0)} results`);
 
       // Combine all results
       const allResults = [
         ...nutritionixResults,
         ...(Array.isArray(openFoodResults) ? openFoodResults : [openFoodResults].filter(Boolean)),
-        ...usdaResults
+        ...(Array.isArray(usdaResults) ? usdaResults : [usdaResults].filter(Boolean))
       ];
+
+      console.log(`🔢 Total combined results: ${allResults.length}`);
 
       // Log results from each source
       logger.info('Search results from each source:', {
         nutritionix: nutritionixResults.length,
         openFoodFacts: Array.isArray(openFoodResults) ? openFoodResults.length : (openFoodResults ? 1 : 0),
-        usda: usdaResults.length,
+        usda: Array.isArray(usdaResults) ? usdaResults.length : (usdaResults ? 1 : 0),
         total: allResults.length
       });
 
       // Remove exact duplicates and sort by relevance
       const processedResults = this.deduplicateResults(allResults, query);
+
+      console.log(`✅ Final processed results: ${processedResults.length}`);
+      console.log('📊 Results by source:');
+      const sourceCount = {
+        nutritionix: 0,
+        openfoodfacts: 0,
+        usda: 0,
+        other: 0
+      };
+
+      processedResults.forEach(item => {
+        if (item.source in sourceCount) {
+          sourceCount[item.source]++;
+        } else {
+          sourceCount.other++;
+        }
+      });
+
+      console.log(sourceCount);
 
       logger.info('Search results after processing:', {
         total: processedResults.length,
@@ -354,6 +379,7 @@ class FoodApiService {
       setCacheData(cacheKey, processedResults);
       return processedResults;
     } catch (error) {
+      console.log(`❌ Error in parallel food search: ${error.message}`);
       logger.error(`Error in parallel food search: ${error.message}`);
       return [];
     }
@@ -379,7 +405,7 @@ class FoodApiService {
       // Try Nutritionix first
       const nutritionixResult = await nutritionixService.searchByUPC(barcode);
       if (nutritionixResult) {
-        logger.info('Food found in Nutritionix');
+        logger.info('Food found in Nutritionix:', nutritionixResult);
         return nutritionixResult;
       }
 
@@ -409,9 +435,12 @@ class FoodApiService {
       const cachedData = getCachedData(cacheKey);
       if (cachedData) {
         logger.info(`Cache hit for OpenFoodFacts query: ${query}`);
+        console.log(`📦 Using cached OpenFoodFacts results for: "${query}"`);
         return cachedData;
       }
 
+      console.log('🔍 Querying OpenFoodFacts API:', query);
+      console.log(`URL: ${OPENFOODFACTS_API_URL}/cgi/search.pl`);
       logger.info(`Searching OpenFoodFacts for: ${query}`);
 
       // Call OpenFoodFacts search API with timeout
@@ -429,7 +458,14 @@ class FoodApiService {
         }
       );
 
-      const data = response.data;
+      console.log(`✅ OpenFoodFacts API response status: ${response.status}`);
+      const data = await response.data;
+      console.log(`📦 OpenFoodFacts raw data:`, {
+        count: data.count,
+        page: data.page,
+        page_size: data.page_size,
+        products: data.products ? data.products.length : 0
+      });
 
       if (data.products && data.products.length > 0) {
         const transformedResults = data.products.map(product => ({
@@ -451,6 +487,7 @@ class FoodApiService {
           item.name && (item.calories > 0 || item.protein > 0 || item.carbs > 0 || item.fat > 0)
         );
 
+        console.log(`✅ Found ${validResults.length} valid results from OpenFoodFacts`);
         logger.info(`Found ${validResults.length} valid foods in OpenFoodFacts for "${query}"`);
 
         // Cache the transformed data
@@ -458,9 +495,11 @@ class FoodApiService {
         return validResults;
       }
 
+      console.log('❌ No results from OpenFoodFacts');
       logger.info(`No products found in OpenFoodFacts for query: ${query}`);
       return [];
     } catch (error) {
+      console.log('❌ OpenFoodFacts error:', error.message);
       logger.error(`Error searching OpenFoodFacts: ${error.message}`);
       return [];
     }
@@ -478,81 +517,89 @@ class FoodApiService {
       const cachedData = getCachedData(cacheKey);
       if (cachedData) {
         logger.info(`Cache hit for USDA query: ${query}`);
+        console.log(`📦 Using cached USDA results for: "${query}"`);
         return cachedData;
       }
 
       // Check if USDA API key is available
       const apiKey = process.env.USDA_API_KEY;
       if (!apiKey) {
+        console.log('❌ USDA API key not found');
         logger.warn('USDA API key not found');
         return returnArray ? [] : null;
       }
 
+      console.log('🔍 Querying USDA API:', query);
+      console.log(`URL: ${USDA_API_URL}/foods/search`);
+      console.log(`API Key: ${apiKey ? apiKey.substring(0, 3) + '...' : 'Missing'}`);
       logger.info(`Searching USDA for: ${query}`);
 
-      try {
-        // Make a direct axios request
-        const response = await axios.get(`${USDA_API_URL}/foods/search`, {
+      // Call USDA API with timeout
+      const response = await fetchWithTimeout(
+        `${USDA_API_URL}/foods/search`,
+        {
           params: {
             query,
             pageSize: 25,
             pageNumber: 1,
             api_key: apiKey,
-            dataType: 'Foundation,SR Legacy,Survey (FNDDS),Branded'
-          },
-          timeout: API_TIMEOUT
+            dataType: ['Survey (FNDDS)', 'SR Legacy', 'Branded']
+          }
+        }
+      );
+
+      console.log(`✅ USDA API response status: ${response.status}`);
+      const data = await response.data;
+      console.log(`📦 USDA raw data:`, {
+        totalHits: data.totalHits,
+        currentPage: data.currentPage,
+        totalPages: data.totalPages,
+        foods: data.foods ? data.foods.length : 0
+      });
+
+      if (data.foods && data.foods.length > 0) {
+        console.log(`✅ Found ${data.foods.length} results from USDA`);
+        logger.info(`Found ${data.foods.length} foods in USDA`);
+
+        // Map foods to our format
+        const transformedResults = data.foods.map(food => {
+          // Extract nutrients
+          const getNutrientValue = (nutrientId) => {
+            const nutrient = food.foodNutrients.find(n => n.nutrientId === nutrientId);
+            return nutrient ? nutrient.value : 0;
+          };
+
+          return {
+            name: food.description,
+            brand: food.brandOwner || food.brandName || null,
+            calories: getNutrientValue(1008) || 0, // Energy (kcal)
+            protein: getNutrientValue(1003) || 0, // Protein
+            carbs: getNutrientValue(1005) || 0, // Carbohydrates
+            fat: getNutrientValue(1004) || 0, // Total lipid (fat)
+            serving_size: food.servingSize || 100,
+            serving_unit: food.servingSizeUnit?.toLowerCase() || 'g',
+            source: 'usda',
+            source_id: food.fdcId.toString()
+          };
         });
 
-        if (!response.data) {
-          logger.info('USDA API returned empty data');
-          return returnArray ? [] : null;
-        }
+        // Filter out items without basic nutritional info
+        const validResults = transformedResults.filter(item =>
+          item.name && (item.calories > 0 || item.protein > 0 || item.carbs > 0 || item.fat > 0)
+        );
 
-        const data = response.data;
+        console.log(`✅ Found ${validResults.length} valid results from USDA after filtering`);
 
-        if (data.foods && data.foods.length > 0) {
-          logger.info(`Found ${data.foods.length} foods in USDA`);
-
-          // Map foods to our format
-          const transformedResults = data.foods.map(food => {
-            // Extract nutrients
-            const getNutrientValue = (nutrientId) => {
-              if (!food.foodNutrients) return 0;
-              const nutrient = food.foodNutrients.find(n => n.nutrientId === nutrientId);
-              return nutrient ? nutrient.value : 0;
-            };
-
-            return {
-              name: food.description,
-              brand: food.brandOwner || food.brandName || null,
-              calories: getNutrientValue(1008) || 0, // Energy (kcal)
-              protein: getNutrientValue(1003) || 0, // Protein
-              carbs: getNutrientValue(1005) || 0, // Carbohydrates
-              fat: getNutrientValue(1004) || 0, // Total lipid (fat)
-              serving_size: food.servingSize || 100,
-              serving_unit: food.servingSizeUnit?.toLowerCase() || 'g',
-              source: 'usda',
-              source_id: food.fdcId.toString()
-            };
-          });
-
-          // Filter out items without basic nutritional info
-          const validResults = transformedResults.filter(item =>
-            item.name && (item.calories > 0 || item.protein > 0 || item.carbs > 0 || item.fat > 0)
-          );
-
-          // Cache the transformed data
-          setCacheData(cacheKey, validResults);
-          return validResults;
-        }
-
-        logger.info(`No products found in USDA for query: ${query}`);
-        return returnArray ? [] : null;
-      } catch (error) {
-        logger.error(`USDA API error: ${error.message}`);
-        throw error;
+        // Cache the transformed data
+        setCacheData(cacheKey, validResults);
+        return validResults;
       }
+
+      console.log('❌ No results from USDA');
+      logger.info(`No products found in USDA for query: ${query}`);
+      return returnArray ? [] : null;
     } catch (error) {
+      console.log('❌ USDA error:', error.message);
       logger.error(`Error searching USDA: ${error.message}`);
       return returnArray ? [] : null;
     }
@@ -570,7 +617,7 @@ class FoodApiService {
       const response = await fetchWithTimeout(
         `${OPENFOODFACTS_API_URL}/api/v0/product/${barcode}.json`
       );
-      const data = response.data;
+      const data = await response.data;
 
       if (data.status === 1 && data.product) {
         logger.info('Food found in OpenFoodFacts');

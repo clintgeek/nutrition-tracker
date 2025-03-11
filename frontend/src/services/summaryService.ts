@@ -34,9 +34,18 @@ export const summaryService = {
       // Format date as YYYY-MM-DD for the API
       const formattedDate = formatDate(date);
 
+      // Log the API call for debugging
+      console.log('Fetching daily summary for date:', formattedDate);
+
       // Call the correct API endpoint
-      return apiService.get<{ summary: DailySummary }>(`/logs/daily-summary?date=${formattedDate}`)
-        .then((response) => response.summary);
+      const endpoint = `/logs/daily-summary?date=${formattedDate}`;
+      console.log('API endpoint:', endpoint);
+
+      return apiService.get<{ summary: DailySummary }>(endpoint)
+        .then((response) => {
+          console.log('Daily summary response:', response);
+          return response.summary;
+        });
     } catch (error) {
       console.error('Error fetching daily summary:', error);
       return emptySummary;

@@ -16,13 +16,16 @@ import {
   Divider,
   useTheme,
   Searchbar,
-  Chip,
-  Avatar
+  Chip
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import axios from 'axios';
 import { apiService, setAuthToken } from '../../services/apiService';
 import { useAuth } from '../../contexts/AuthContext';
+
+// USDA API configuration
+const USDA_API_KEY = 'jrHM0qobnLkHbRdSATHkU7sBaEqqXcB85R7rTPM7'; // Using the key from .env
+const USDA_API_URL = 'https://api.nal.usda.gov/fdc/v1';
 
 // API response interface
 interface FoodApiResponse {
@@ -39,26 +42,6 @@ interface FoodApiResponse {
     source: string;
     source_id: string;
   };
-}
-
-// API search response interface
-interface ApiSearchResponse {
-  foods: Array<{
-    id?: number;
-    source_id: string;
-    name: string;
-    brand?: string;
-    calories?: number;
-    protein?: number;
-    carbs?: number;
-    fat?: number;
-    serving_size?: string;
-    serving_unit?: string;
-    source: string;
-  }>;
-  total?: number;
-  page?: number;
-  limit?: number;
 }
 
 // Food item interface
@@ -91,36 +74,26 @@ interface SimplifiedFoodItem {
   source?: string;
 }
 
-// Helper functions for source display
-const getSourceIcon = (source: string) => {
-  switch (source?.toLowerCase()) {
-    case 'usda':
-      return 'leaf';  // Leaf icon for USDA
-    case 'nutritionix':
-      return 'check-decagram';  // Verified icon for Nutritionix
-    case 'openfoodfacts':
-      return 'database';  // Database icon for OpenFoodFacts
-    case 'custom':
-      return 'food-apple';  // Apple icon for custom foods
-    default:
-      return 'food';
-  }
-};
-
-const getSourceColor = (source: string, theme: any) => {
-  switch (source?.toLowerCase()) {
-    case 'usda':
-      return '#4CAF50';  // Green for USDA
-    case 'nutritionix':
-      return '#2196F3';  // Blue for Nutritionix
-    case 'openfoodfacts':
-      return '#FF9800';  // Orange for OpenFoodFacts
-    case 'custom':
-      return theme.colors.primary;  // Theme color for custom foods
-    default:
-      return theme.colors.primary;
-  }
-};
+interface ApiSearchResponse {
+  foods: Array<{
+    id: string | number;
+    source_id: string;
+    name: string;
+    brand?: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    serving_size?: number;
+    serving_unit?: string;
+    source: string;
+  }>;
+  page: number;
+  limit: number;
+  source: string;
+  total_local: number;
+  total_api: number;
+}
 
 const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
   const theme = useTheme();
@@ -174,7 +147,7 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
           protein: food.protein || 0,
           carbs: food.carbs || 0,
           fat: food.fat || 0,
-          servingSize: food.serving_size ? parseFloat(food.serving_size) : undefined,
+          servingSize: food.serving_size,
           servingSizeUnit: food.serving_unit,
           source: food.source
         })));
@@ -208,8 +181,8 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
         fat_grams: food.fat,
         serving_size: food.servingSize?.toString() || '100',
         serving_unit: food.servingSizeUnit || 'g',
-        source: food.source || 'unknown',
-        source_id: `${food.source}-${food.id}`
+        source: 'usda',
+        source_id: `usda-${food.id}`
       };
 
       // Make API call to save the food using apiService
@@ -244,35 +217,26 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
   const renderFoodItem = ({ item }: { item: SimplifiedFoodItem }) => (
     <TouchableOpacity onPress={() => setSelectedFood(item)}>
       <Card style={[styles.foodCard, selectedFood?.id === item.id && { borderColor: theme.colors.primary, borderWidth: 2 }]}>
-        <Card.Content style={styles.foodCardContent}>
-          <Avatar.Icon
-            size={40}
-            icon={getSourceIcon(item.source || '')}
-            style={{ backgroundColor: getSourceColor(item.source || '', theme) }}
-            color="#fff"
-          />
-          <View style={styles.foodInfo}>
-            <Title numberOfLines={1}>{item.name}</Title>
-            {item.brand && <Text style={styles.brandText}>{item.brand}</Text>}
-            {item.source && <Text style={styles.sourceText}>Source: {item.source}</Text>}
+        <Card.Content>
+          <Title numberOfLines={1}>{item.name}</Title>
+          {item.brand && <Text style={styles.brandText}>{item.brand}</Text>}
 
-            <View style={styles.macroContainer}>
-              <View style={styles.macroItem}>
-                <Text style={styles.macroValue}>{item.calories}</Text>
-                <Text style={styles.macroLabel}>Calories</Text>
-              </View>
-              <View style={styles.macroItem}>
-                <Text style={styles.macroValue}>{item.protein}g</Text>
-                <Text style={styles.macroLabel}>Protein</Text>
-              </View>
-              <View style={styles.macroItem}>
-                <Text style={styles.macroValue}>{item.carbs}g</Text>
-                <Text style={styles.macroLabel}>Carbs</Text>
-              </View>
-              <View style={styles.macroItem}>
-                <Text style={styles.macroValue}>{item.fat}g</Text>
-                <Text style={styles.macroLabel}>Fat</Text>
-              </View>
+          <View style={styles.macroContainer}>
+            <View style={styles.macroItem}>
+              <Text style={styles.macroValue}>{item.calories}</Text>
+              <Text style={styles.macroLabel}>Calories</Text>
+            </View>
+            <View style={styles.macroItem}>
+              <Text style={styles.macroValue}>{item.protein}g</Text>
+              <Text style={styles.macroLabel}>Protein</Text>
+            </View>
+            <View style={styles.macroItem}>
+              <Text style={styles.macroValue}>{item.carbs}g</Text>
+              <Text style={styles.macroLabel}>Carbs</Text>
+            </View>
+            <View style={styles.macroItem}>
+              <Text style={styles.macroValue}>{item.fat}g</Text>
+              <Text style={styles.macroLabel}>Fat</Text>
             </View>
           </View>
         </Card.Content>
@@ -284,7 +248,7 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
     <View style={styles.container}>
       <View style={styles.searchContainer}>
         <Searchbar
-          placeholder="Search foods..."
+          placeholder="Search for foods..."
           onChangeText={setSearchQuery}
           value={searchQuery}
           onSubmitEditing={searchFoods}
@@ -374,24 +338,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderRadius: 8,
   },
-  foodCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  foodInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
   brandText: {
     fontSize: 14,
     opacity: 0.7,
-    marginBottom: 4,
-  },
-  sourceText: {
-    fontSize: 12,
-    opacity: 0.6,
     marginBottom: 8,
-    fontStyle: 'italic',
   },
   macroContainer: {
     flexDirection: 'row',

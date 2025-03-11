@@ -68,28 +68,43 @@ class NutritionixService {
       console.log('🔍 Querying Nutritionix API by name:', query);
       logger.info(`Searching Nutritionix by name: "${query}"`);
 
-      const response = await this.axiosInstance.post('/natural/nutrients', {
-        query: query,
-        line_delimited: false,
-        use_raw_foods: false,
-        include_subrecipe: false,
-        lat: 0,
-        lng: 0,
-        timezone: "US/Eastern"
+      const response = await this.axiosInstance.get('/search/instant', {
+        params: {
+          query: query,
+          detailed: true,
+          branded: true,
+          common: true,
+          self: false
+        }
       });
 
-      if (!response.data?.foods?.length) {
+      if (!response.data?.common?.length && !response.data?.branded?.length) {
         console.log('❌ No results from Nutritionix');
         logger.info('No results found in Nutritionix for query:', query);
         return [];
       }
 
+      // Combine common and branded foods
+      const foods = [
+        ...(response.data.common || []).map(food => ({
+          ...food,
+          food_name: food.food_name,
+          serving_unit: food.serving_unit || 'g',
+          serving_qty: food.serving_qty || 100,
+          nf_calories: food.full_nutrients?.find(n => n.attr_id === 208)?.value || 0,
+          nf_protein: food.full_nutrients?.find(n => n.attr_id === 203)?.value || 0,
+          nf_total_carbohydrate: food.full_nutrients?.find(n => n.attr_id === 205)?.value || 0,
+          nf_total_fat: food.full_nutrients?.find(n => n.attr_id === 204)?.value || 0
+        })),
+        ...(response.data.branded || [])
+      ];
+
       // Log the number of results
-      console.log(`✅ Found ${response.data.foods.length} results from Nutritionix`);
-      logger.info(`Found ${response.data.foods.length} results in Nutritionix for "${query}"`);
+      console.log(`✅ Found ${foods.length} results from Nutritionix (${response.data.common?.length || 0} common, ${response.data.branded?.length || 0} branded)`);
+      logger.info(`Found ${foods.length} results in Nutritionix for "${query}"`);
 
       // Transform and return the results
-      const transformedResults = response.data.foods.map(food => this.transformFood(food));
+      const transformedResults = foods.map(food => this.transformFood(food));
       logger.info('Transformed Nutritionix results:', transformedResults.map(f => ({ name: f.name, brand: f.brand })));
       return transformedResults;
     } catch (error) {

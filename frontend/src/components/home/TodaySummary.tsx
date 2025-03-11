@@ -5,6 +5,8 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { goalService, Goal } from '../../services/goalService';
 import { summaryService, DailySummary } from '../../services/summaryService';
+import { useAuth } from '../../contexts/AuthContext';
+import { setAuthToken } from '../../services/apiService';
 
 // Mock data for now - in a real app, this would come from an API
 interface NutritionSummary {
@@ -22,6 +24,7 @@ interface NutritionSummary {
 const TodaySummary: React.FC = () => {
   const theme = useTheme();
   const navigation = useNavigation<StackNavigationProp<any>>();
+  const { token } = useAuth();
   const [summary, setSummary] = useState<NutritionSummary>({
     calories: {
       consumed: 0,
@@ -37,6 +40,13 @@ const TodaySummary: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Set token in apiService when it changes
+  useEffect(() => {
+    if (token) {
+      setAuthToken(token);
+    }
+  }, [token]);
+
   useEffect(() => {
     let mounted = true;
 
@@ -44,6 +54,13 @@ const TodaySummary: React.FC = () => {
       try {
         setIsLoading(true);
         setError(null);
+
+        // Ensure we have a token
+        if (!token) {
+          setError('Please log in to view your summary');
+          setIsLoading(false);
+          return;
+        }
 
         // First fetch goals to establish baseline
         const currentGoal = await goalService.getCurrentGoal();
@@ -128,7 +145,7 @@ const TodaySummary: React.FC = () => {
 
     loadData();
     return () => { mounted = false; };
-  }, []);
+  }, [token]);
 
   const calculatePercentage = (consumed: number, goal: number) => {
     if (!goal) return 0;
