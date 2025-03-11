@@ -41,6 +41,7 @@ const RecentLogsCard: React.FC<RecentLogsCardProps> = ({ recentLogs }) => {
 
           <View style={styles.foodInfo}>
             <Text style={styles.foodName}>{item.food.name}</Text>
+            {item.food.brand && <Text style={styles.brandName}>{item.food.brand}</Text>}
             <Text style={styles.foodDetails}>
               {item.servingSize} {item.servingUnit} • {formatDate(item.date)} • {item.mealType}
             </Text>
@@ -136,6 +137,11 @@ const styles = StyleSheet.create({
   viewAllButton: {
     color: '#2196F3',
     fontWeight: 'bold',
+  },
+  brandName: {
+    fontSize: 12,
+    color: '#757575',
+    marginBottom: 2,
   },
 });
 

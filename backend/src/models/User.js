@@ -1,4 +1,4 @@
-const { getPool } = require('../utils/database');
+const { getClient } = require('../config/db');
 const bcrypt = require('bcrypt');
 const logger = require('../config/logger');
 
@@ -15,10 +15,11 @@ class User {
   // Create a new user
   static async create(userData) {
     const { name, email, password } = userData;
-    const pool = getPool();
-    const client = await pool.connect();
+    const client = await getClient();
 
     try {
+      await client.query('BEGIN');
+
       // Hash password
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(password, saltRounds);
@@ -29,8 +30,10 @@ class User {
         [name, email, hashedPassword]
       );
 
+      await client.query('COMMIT');
       return new User(result.rows[0]);
     } catch (err) {
+      await client.query('ROLLBACK');
       logger.error(`Error creating user: ${err.message}`);
       throw err;
     } finally {
@@ -40,11 +43,13 @@ class User {
 
   // Find user by email
   static async findByEmail(email) {
-    const pool = getPool();
-    const client = await pool.connect();
+    const client = await getClient();
 
     try {
-      const result = await client.query('SELECT * FROM users WHERE email = $1', [email]);
+      const result = await client.query(
+        'SELECT * FROM users WHERE email = $1',
+        [email]
+      );
       return result.rows.length ? new User(result.rows[0]) : null;
     } catch (err) {
       logger.error(`Error finding user by email: ${err.message}`);
@@ -56,11 +61,13 @@ class User {
 
   // Find user by ID
   static async findById(id) {
-    const pool = getPool();
-    const client = await pool.connect();
+    const client = await getClient();
 
     try {
-      const result = await client.query('SELECT * FROM users WHERE id = $1', [id]);
+      const result = await client.query(
+        'SELECT * FROM users WHERE id = $1',
+        [id]
+      );
       return result.rows.length ? new User(result.rows[0]) : null;
     } catch (err) {
       logger.error(`Error finding user by ID: ${err.message}`);

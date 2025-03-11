@@ -27,7 +27,7 @@ const LoginScreen: React.FC = () => {
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.formContainer}>
-          <Text style={styles.title}>Login</Text>
+          <Text style={styles.title}>Please Login</Text>
 
           {error && (
             <Text style={styles.errorText}>{error}</Text>

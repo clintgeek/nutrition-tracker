@@ -18,42 +18,39 @@ const searchFood = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'Search query must be at least 2 characters' });
   }
 
-  // First search local database
-  const localResults = await FoodItem.search(query, limit, offset);
+  try {
+    // Search local database and external APIs in parallel
+    const [localResults, apiResults] = await Promise.all([
+      FoodItem.search(query, limit, offset),
+      FoodApiService.searchFood(query)
+    ]);
 
-  // If we have enough local results, return them
-  if (localResults.length >= limit) {
-    return res.json({
-      foods: localResults,
+    // Filter out items that are already in local results
+    const localSourceIds = new Set(localResults.map(item => `${item.source}:${item.source_id}`));
+    const filteredApiResults = apiResults.filter(item =>
+      !localSourceIds.has(`${item.source}:${item.source_id}`)
+    );
+
+    // Combine results, respecting the limit
+    const combinedResults = [...localResults];
+    const remainingSlots = limit - localResults.length;
+
+    if (remainingSlots > 0 && filteredApiResults.length > 0) {
+      combinedResults.push(...filteredApiResults.slice(0, remainingSlots));
+    }
+
+    res.json({
+      foods: combinedResults,
       page,
       limit,
-      source: 'local',
+      source: 'combined',
+      total_local: localResults.length,
+      total_api: filteredApiResults.length
     });
+  } catch (error) {
+    logger.error(`Error searching foods: ${error.message}`);
+    res.status(500).json({ message: 'Error searching foods', error: error.message });
   }
-
-  // Otherwise, search external APIs
-  const apiResults = await FoodApiService.searchFood(query);
-
-  // Filter out items that are already in local results (by source and source_id)
-  const localSourceIds = localResults.map(item => `${item.source}:${item.source_id}`);
-  const filteredApiResults = apiResults.filter(item =>
-    !localSourceIds.includes(`${item.source}:${item.source_id}`)
-  );
-
-  // Combine results, respecting the limit
-  const combinedResults = [...localResults];
-  const remainingSlots = limit - localResults.length;
-
-  if (remainingSlots > 0 && filteredApiResults.length > 0) {
-    combinedResults.push(...filteredApiResults.slice(0, remainingSlots));
-  }
-
-  res.json({
-    foods: combinedResults,
-    page,
-    limit,
-    source: 'combined',
-  });
 });
 
 /**
@@ -101,48 +98,35 @@ const createCustomFood = asyncHandler(async (req, res) => {
 
   const {
     name,
-    calories_per_serving,
-    protein_grams,
-    carbs_grams,
-    fat_grams,
+    calories,
+    protein,
+    carbs,
+    fat,
     serving_size,
     serving_unit,
-    source,
-    source_id
+    barcode,
+    brand
   } = req.body;
 
   // Create food item
   const foodItem = await FoodItem.create({
     name,
-    barcode: null,
-    calories_per_serving,
-    protein_grams,
-    carbs_grams,
-    fat_grams,
+    barcode,
+    brand,
+    calories,
+    protein,
+    carbs,
+    fat,
     serving_size,
     serving_unit,
-    source: source || 'custom',
-    source_id: source_id || `custom-${req.user.id}-${Date.now()}`,
+    source: 'custom',
+    source_id: `custom-${req.user.id}-${Date.now()}`,
     user_id: req.user.id,
   });
 
-  // Ensure we have all required fields in the response
-  const responseFood = {
-    id: foodItem.id,
-    name: foodItem.name,
-    calories_per_serving: foodItem.calories_per_serving,
-    protein_grams: foodItem.protein_grams,
-    carbs_grams: foodItem.carbs_grams,
-    fat_grams: foodItem.fat_grams,
-    serving_size: foodItem.serving_size,
-    serving_unit: foodItem.serving_unit,
-    source: foodItem.source,
-    source_id: foodItem.source_id
-  };
-
   res.status(201).json({
     message: 'Custom food item created',
-    food: responseFood,
+    food: foodItem,
   });
 });
 
@@ -172,7 +156,11 @@ const updateCustomFood = asyncHandler(async (req, res) => {
   }
 
   // Update food item
-  const updatedFoodItem = await FoodItem.update(id, req.body);
+  const updatedFoodItem = await FoodItem.update(id, {
+    ...req.body,
+    source: 'custom',  // Ensure source remains 'custom'
+    source_id: foodItem.source_id  // Preserve the original source_id
+  });
 
   res.json({
     message: 'Food item updated',
@@ -197,6 +185,14 @@ const deleteCustomFood = asyncHandler(async (req, res) => {
   // Check if it's a custom food item
   if (foodItem.source !== 'custom') {
     return res.status(403).json({ message: 'Only custom food items can be deleted' });
+  }
+
+  // Check if the food item has any associated logs
+  const hasLogs = await FoodItem.hasAssociatedLogs(id);
+  if (hasLogs) {
+    return res.status(400).json({
+      message: 'Cannot delete food item that has associated logs. Consider marking it as deleted instead.'
+    });
   }
 
   // Delete food item

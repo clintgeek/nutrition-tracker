@@ -27,10 +27,6 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
     await logout();
   };
 
-  const navigateToHome = () => {
-    navigation.navigate('Home');
-  };
-
   return (
     <View style={[styles.header, { backgroundColor: theme.colors.primary }]}>
       <View style={styles.headerContent}>
@@ -43,9 +39,6 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
           <Text style={styles.title}>{title}</Text>
         </View>
         <View style={styles.buttonContainer}>
-          <TouchableOpacity onPress={navigateToHome} style={styles.headerButton}>
-            <MaterialCommunityIcons name="home" size={24} color="white" />
-          </TouchableOpacity>
           <TouchableOpacity onPress={handleLogout} style={styles.headerButton}>
             <MaterialCommunityIcons name="logout" size={24} color="white" />
           </TouchableOpacity>

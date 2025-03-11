@@ -19,7 +19,11 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.nutritiontracker"
+      "bundleIdentifier": "com.yourcompany.nutritiontracker",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to scan food barcodes for easy food logging.",
+        "NSMicrophoneUsageDescription": "This app does not use the microphone."
+      }
     },
     "android": {
       "adaptiveIcon": {

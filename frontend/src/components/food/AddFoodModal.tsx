@@ -8,6 +8,7 @@ interface AddFoodModalProps {
   onClose: () => void;
   onSubmit: (foodData: {
     name: string;
+    brand?: string;
     calories: number;
     protein: number;
     carbs: number;
@@ -19,6 +20,7 @@ interface AddFoodModalProps {
 const AddFoodModal: React.FC<AddFoodModalProps> = ({ visible, onClose, onSubmit }) => {
   const theme = useTheme();
   const [name, setName] = useState('');
+  const [brand, setBrand] = useState('');
   const [calories, setCalories] = useState('');
   const [protein, setProtein] = useState('');
   const [carbs, setCarbs] = useState('');
@@ -33,6 +35,7 @@ const AddFoodModal: React.FC<AddFoodModalProps> = ({ visible, onClose, onSubmit 
 
     onSubmit({
       name,
+      brand: brand || undefined,
       calories: parseFloat(calories) || 0,
       protein: parseFloat(protein) || 0,
       carbs: parseFloat(carbs) || 0,
@@ -42,6 +45,7 @@ const AddFoodModal: React.FC<AddFoodModalProps> = ({ visible, onClose, onSubmit 
 
     // Reset form
     setName('');
+    setBrand('');
     setCalories('');
     setProtein('');
     setCarbs('');
@@ -69,6 +73,14 @@ const AddFoodModal: React.FC<AddFoodModalProps> = ({ visible, onClose, onSubmit 
             label="Food Name"
             value={name}
             onChangeText={setName}
+            style={styles.input}
+            mode="outlined"
+          />
+
+          <TextInput
+            label="Brand (Optional)"
+            value={brand}
+            onChangeText={setBrand}
             style={styles.input}
             mode="outlined"
           />

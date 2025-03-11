@@ -1,28 +1,19 @@
 const { Pool } = require('pg');
 const logger = require('./logger');
 
-// Load environment variables
-const {
-  DB_USER = 'nutrition_user',
-  DB_PASSWORD = 'nutrition_password',
-  DB_HOST = 'db',
-  DB_PORT = 5432,
-  DB_NAME = 'nutrition_tracker'
-} = process.env;
-
-// Create a new pool instance
+// Create a new pool instance using environment variables
 const pool = new Pool({
-  user: DB_USER,
-  password: DB_PASSWORD,
-  host: DB_HOST,
-  port: DB_PORT,
-  database: DB_NAME,
-  max: 20, // Maximum number of clients in the pool
-  idleTimeoutMillis: 30000, // How long a client is allowed to remain idle before being closed
-  connectionTimeoutMillis: 2000, // How long to wait for a connection
+  user: process.env.POSTGRES_USER,
+  password: process.env.POSTGRES_PASSWORD,
+  host: process.env.POSTGRES_HOST,
+  port: parseInt(process.env.POSTGRES_PORT, 10),
+  database: process.env.POSTGRES_DB,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
 });
 
-// Test the connection
+// Log pool events
 pool.on('connect', () => {
   logger.info('Connected to PostgreSQL database');
 });
@@ -31,11 +22,22 @@ pool.on('error', (err) => {
   logger.error('PostgreSQL error:', err);
 });
 
-// Export a query function
+// Get a client from the pool
+async function getClient() {
+  try {
+    const client = await pool.connect();
+    return client;
+  } catch (err) {
+    logger.error('Error getting client:', err);
+    throw err;
+  }
+}
+
 module.exports = {
   query: (text, params) => {
     logger.debug(`Executing query: ${text}`);
     return pool.query(text, params);
   },
   getPool: () => pool,
+  getClient
 };

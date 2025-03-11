@@ -2,6 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
+import { Ionicons } from '@expo/vector-icons';
 
 // Import screens and navigators
 import HomeScreen from '../screens/HomeScreen';
@@ -64,7 +65,7 @@ const MainTabNavigator: React.FC = () => {
         name="FoodStack"
         component={FoodStackNavigator}
         options={{
-          tabBarLabel: 'Food',
+          tabBarLabel: 'Foods',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="food-apple" color={color} size={size} />
           ),

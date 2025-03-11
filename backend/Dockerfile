@@ -2,8 +2,8 @@ FROM node:16-alpine
 
 WORKDIR /app
 
-# Install build dependencies for bcrypt
-RUN apk add --no-cache --virtual .gyp python3 make g++
+# Install build dependencies and postgresql-client
+RUN apk add --no-cache --virtual .gyp python3 make g++ postgresql-client
 
 # Copy package files
 COPY package*.json ./

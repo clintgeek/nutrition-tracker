@@ -1,4 +1,4 @@
-const { getPool } = require('../utils/database');
+const { getClient } = require('../config/db');
 const logger = require('../config/logger');
 
 class FoodLog {
@@ -14,22 +14,21 @@ class FoodLog {
 
     // Additional fields from joins
     this.food_name = data.food_name;
-    this.calories_per_serving = data.calories_per_serving;
-    this.protein_grams = data.protein_grams;
-    this.carbs_grams = data.carbs_grams;
-    this.fat_grams = data.fat_grams;
+    this.calories = data.calories;
+    this.protein = data.protein;
+    this.carbs = data.carbs;
+    this.fat = data.fat;
   }
 
   // Get logs for a specific date
   static async getByDate(userId, date) {
-    let pool;
+    const client = await getClient();
 
     try {
-      pool = getPool();
-      const result = await pool.query(
+      const result = await client.query(
         `SELECT
           fl.id, fl.user_id, fl.food_item_id, fl.log_date, fl.meal_type, fl.servings,
-          fi.name as food_name, fi.calories_per_serving, fi.protein_grams, fi.carbs_grams, fi.fat_grams
+          fi.name as food_name, fi.calories, fi.protein, fi.carbs, fi.fat
         FROM food_logs fl
         JOIN food_items fi ON fl.food_item_id = fi.id
         WHERE fl.user_id = $1 AND fl.log_date = $2
@@ -42,22 +41,19 @@ class FoodLog {
       logger.error(`Error getting logs by date: ${err.message}`);
       throw err;
     } finally {
-      if (pool) {
-        await pool.end();
-      }
+      client.release();
     }
   }
 
   // Get logs for a date range
   static async getByDateRange(userId, startDate, endDate) {
-    let pool;
+    const client = await getClient();
 
     try {
-      pool = getPool();
-      const result = await pool.query(
+      const result = await client.query(
         `SELECT
           fl.id, fl.user_id, fl.food_item_id, fl.log_date, fl.meal_type, fl.servings,
-          fi.name as food_name, fi.calories_per_serving, fi.protein_grams, fi.carbs_grams, fi.fat_grams
+          fi.name as food_name, fi.calories, fi.protein, fi.carbs, fi.fat
         FROM food_logs fl
         JOIN food_items fi ON fl.food_item_id = fi.id
         WHERE fl.user_id = $1 AND fl.log_date BETWEEN $2 AND $3
@@ -70,19 +66,18 @@ class FoodLog {
       logger.error(`Error getting logs by date range: ${err.message}`);
       throw err;
     } finally {
-      if (pool) {
-        await pool.end();
-      }
+      client.release();
     }
   }
 
   // Create a new log
   static async create(logData) {
-    let pool;
+    const client = await getClient();
 
     try {
-      pool = getPool();
-      const result = await pool.query(
+      await client.query('BEGIN');
+
+      const result = await client.query(
         `INSERT INTO food_logs (user_id, food_item_id, log_date, meal_type, servings)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING id`,
@@ -97,34 +92,35 @@ class FoodLog {
 
       // Get the full log with food item details
       const logId = result.rows[0].id;
-      const logResult = await pool.query(
+      const logResult = await client.query(
         `SELECT
           fl.id, fl.user_id, fl.food_item_id, fl.log_date, fl.meal_type, fl.servings,
-          fi.name as food_name, fi.calories_per_serving, fi.protein_grams, fi.carbs_grams, fi.fat_grams
+          fi.name as food_name, fi.calories, fi.protein, fi.carbs, fi.fat
         FROM food_logs fl
         JOIN food_items fi ON fl.food_item_id = fi.id
         WHERE fl.id = $1`,
         [logId]
       );
 
+      await client.query('COMMIT');
       return new FoodLog(logResult.rows[0]);
     } catch (err) {
+      await client.query('ROLLBACK');
       logger.error(`Error creating log: ${err.message}`);
       throw err;
     } finally {
-      if (pool) {
-        await pool.end();
-      }
+      client.release();
     }
   }
 
   // Update a log
   static async update(id, userId, logData) {
-    let pool;
+    const client = await getClient();
 
     try {
-      pool = getPool();
-      const result = await pool.query(
+      await client.query('BEGIN');
+
+      const result = await client.query(
         `UPDATE food_logs
         SET meal_type = $1, servings = $2, log_date = $3, updated_at = NOW()
         WHERE id = $4 AND user_id = $5
@@ -139,69 +135,70 @@ class FoodLog {
       );
 
       if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
         return null;
       }
 
       // Get the full log with food item details
-      const logResult = await pool.query(
+      const logResult = await client.query(
         `SELECT
           fl.id, fl.user_id, fl.food_item_id, fl.log_date, fl.meal_type, fl.servings,
-          fi.name as food_name, fi.calories_per_serving, fi.protein_grams, fi.carbs_grams, fi.fat_grams
+          fi.name as food_name, fi.calories, fi.protein, fi.carbs, fi.fat
         FROM food_logs fl
         JOIN food_items fi ON fl.food_item_id = fi.id
         WHERE fl.id = $1`,
         [id]
       );
 
+      await client.query('COMMIT');
       return new FoodLog(logResult.rows[0]);
     } catch (err) {
+      await client.query('ROLLBACK');
       logger.error(`Error updating log: ${err.message}`);
       throw err;
     } finally {
-      if (pool) {
-        await pool.end();
-      }
+      client.release();
     }
   }
 
   // Delete a log
   static async delete(id, userId) {
-    let pool;
+    const client = await getClient();
 
     try {
-      pool = getPool();
-      const result = await pool.query(
+      await client.query('BEGIN');
+
+      const result = await client.query(
         'DELETE FROM food_logs WHERE id = $1 AND user_id = $2 RETURNING id',
         [id, userId]
       );
 
+      await client.query('COMMIT');
       return result.rows.length > 0;
     } catch (err) {
+      await client.query('ROLLBACK');
       logger.error(`Error deleting log: ${err.message}`);
       throw err;
     } finally {
-      if (pool) {
-        await pool.end();
-      }
+      client.release();
     }
   }
 
   // Get daily summary
   static async getDailySummary(userId, date) {
-    let pool;
+    const client = await getClient();
 
     try {
-      pool = getPool();
-      const result = await pool.query(
+      const result = await client.query(
         `SELECT
-          COALESCE(SUM(fi.calories_per_serving * fl.quantity), 0) as total_calories,
-          COALESCE(SUM(fi.protein_grams * fl.quantity), 0) as total_protein,
-          COALESCE(SUM(fi.carbs_grams * fl.quantity), 0) as total_carbs,
-          COALESCE(SUM(fi.fat_grams * fl.quantity), 0) as total_fat,
+          COALESCE(SUM(fi.calories * fl.servings), 0) as total_calories,
+          COALESCE(SUM(fi.protein * fl.servings), 0) as total_protein,
+          COALESCE(SUM(fi.carbs * fl.servings), 0) as total_carbs,
+          COALESCE(SUM(fi.fat * fl.servings), 0) as total_fat,
           COUNT(fl.id) as total_items
         FROM food_logs fl
         JOIN food_items fi ON fl.food_item_id = fi.id
-        WHERE fl.user_id = $1 AND fl.date = $2`,
+        WHERE fl.user_id = $1 AND fl.log_date = $2`,
         [userId, date]
       );
 
@@ -217,9 +214,7 @@ class FoodLog {
       logger.error(`Error getting daily summary: ${err.message}`);
       throw err;
     } finally {
-      if (pool) {
-        await pool.end();
-      }
+      client.release();
     }
   }
 }

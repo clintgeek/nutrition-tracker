@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS food_items (
   source VARCHAR(50), -- API or custom
   source_id VARCHAR(100), -- ID from external API if applicable
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  is_deleted BOOLEAN DEFAULT FALSE
 );
 
 -- User food logs table
@@ -35,12 +36,12 @@ CREATE TABLE IF NOT EXISTS food_logs (
   servings DECIMAL(10, 2) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  sync_id UUID NOT NULL, -- For synchronization
+  sync_id VARCHAR(36) NOT NULL, -- For synchronization
   is_deleted BOOLEAN DEFAULT FALSE
 );
 
--- Goals table
-CREATE TABLE IF NOT EXISTS goals (
+-- Nutrition goals table
+CREATE TABLE IF NOT EXISTS nutrition_goals (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id),
   daily_calorie_target INTEGER,
@@ -48,10 +49,9 @@ CREATE TABLE IF NOT EXISTS goals (
   carbs_target_grams INTEGER,
   fat_target_grams INTEGER,
   start_date DATE,
-  end_date DATE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  sync_id UUID NOT NULL, -- For synchronization
+  sync_id VARCHAR(36) NOT NULL DEFAULT gen_random_uuid(), -- For synchronization
   is_deleted BOOLEAN DEFAULT FALSE
 );
 
@@ -70,4 +70,7 @@ CREATE TABLE IF NOT EXISTS sync_metadata (
 CREATE INDEX IF NOT EXISTS idx_food_logs_user_date ON food_logs(user_id, log_date);
 CREATE INDEX IF NOT EXISTS idx_food_items_barcode ON food_items(barcode);
 CREATE INDEX IF NOT EXISTS idx_food_items_name ON food_items(name);
-CREATE INDEX IF NOT EXISTS idx_goals_user ON goals(user_id);
+CREATE INDEX IF NOT EXISTS idx_nutrition_goals_user ON nutrition_goals(user_id);
+CREATE INDEX IF NOT EXISTS idx_nutrition_goals_sync_id ON nutrition_goals(sync_id);
+CREATE INDEX IF NOT EXISTS idx_nutrition_goals_start_date ON nutrition_goals(start_date);
+CREATE INDEX IF NOT EXISTS idx_food_items_is_deleted ON food_items(is_deleted);

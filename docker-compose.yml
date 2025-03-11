@@ -1,4 +1,3 @@
-
 services:
   # Frontend web service
   frontend-web:
@@ -27,12 +26,14 @@ services:
     restart: always
     environment:
       - NODE_ENV=${NODE_ENV:-production}
-      - DATABASE_URL=postgres://${POSTGRES_USER:-nutrition_user}:${POSTGRES_PASSWORD:-your_secure_password_here}@db:5432/${POSTGRES_DB:-nutrition_tracker}
+      - DATABASE_URL=postgres://nutrition_user:nutrition123@db:5432/nutrition_tracker
       - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_key_here}
       - USDA_API_KEY=${USDA_API_KEY:-}
       - PORT=3000
+      - TZ=America/Chicago
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   # Database service
   db:
@@ -40,12 +41,17 @@ services:
     ports:
       - "${DATABASE_PORT:-4082}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./db/data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-nutrition_user}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-your_secure_password_here}
-      - POSTGRES_DB=${POSTGRES_DB:-nutrition_tracker}
+      - POSTGRES_USER=nutrition_user
+      - POSTGRES_PASSWORD=nutrition123
+      - POSTGRES_DB=nutrition_tracker
+      - TZ=America/Chicago
+      - PGTZ=America/Chicago
     restart: always
-
-volumes:
-  postgres_data:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nutrition_user -d nutrition_tracker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
