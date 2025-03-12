@@ -24,31 +24,23 @@ const RecentLogsCard: React.FC<RecentLogsCardProps> = ({ recentLogs }) => {
       <View>
         <View style={styles.logItem}>
           <View style={styles.foodImageContainer}>
-            {item.food.imageUrl ? (
-              <Avatar.Image
-                source={{ uri: item.food.imageUrl }}
-                size={40}
-              />
-            ) : (
-              <Avatar.Icon
-                icon="food"
-                size={40}
-                color="white"
-                style={{ backgroundColor: theme.colors.primary }}
-              />
-            )}
+            <Avatar.Icon
+              icon="food"
+              size={40}
+              color="white"
+              style={{ backgroundColor: theme.colors.primary }}
+            />
           </View>
 
           <View style={styles.foodInfo}>
-            <Text style={styles.foodName}>{item.food.name}</Text>
-            {item.food.brand && <Text style={styles.brandName}>{item.food.brand}</Text>}
+            <Text style={styles.foodName}>{item.food_name}</Text>
             <Text style={styles.foodDetails}>
-              {item.servingSize} {item.servingUnit} • {formatDate(item.date)} • {item.mealType}
+              {item.servings} {item.serving_unit || 'servings'} • {formatDate(item.log_date)} • {item.meal_type}
             </Text>
           </View>
 
           <View style={styles.caloriesContainer}>
-            <Text style={styles.calories}>{Math.round(item.food.calories * item.servingSize)}</Text>
+            <Text style={styles.calories}>{Math.round((item.calories_per_serving || 0) * item.servings)}</Text>
             <Text style={styles.caloriesLabel}>kcal</Text>
           </View>
         </View>
@@ -66,7 +58,8 @@ const RecentLogsCard: React.FC<RecentLogsCardProps> = ({ recentLogs }) => {
           <FlatList
             data={recentLogs.slice(0, 5)} // Show only the 5 most recent logs
             renderItem={renderLogItem}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item.id.toString()}
+            ItemSeparatorComponent={() => <Divider />}
             scrollEnabled={false}
           />
         ) : (

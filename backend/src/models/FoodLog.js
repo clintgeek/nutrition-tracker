@@ -14,10 +14,12 @@ class FoodLog {
 
     // Additional fields from joins
     this.food_name = data.food_name;
-    this.calories = data.calories;
-    this.protein = data.protein;
-    this.carbs = data.carbs;
-    this.fat = data.fat;
+    this.calories_per_serving = data.calories_per_serving;
+    this.protein_grams = data.protein_grams;
+    this.carbs_grams = data.carbs_grams;
+    this.fat_grams = data.fat_grams;
+    this.serving_size = data.serving_size;
+    this.serving_unit = data.serving_unit;
   }
 
   // Get logs for a specific date
@@ -25,10 +27,19 @@ class FoodLog {
     const client = await getClient();
 
     try {
+      logger.info(`Getting logs for user ${userId} on date ${date}`);
+
+      // Validate userId
+      if (!userId) {
+        logger.error('getByDate called with missing or invalid userId');
+        throw new Error('User ID is required');
+      }
+
       const result = await client.query(
         `SELECT
           fl.id, fl.user_id, fl.food_item_id, fl.log_date, fl.meal_type, fl.servings,
-          fi.name as food_name, fi.calories, fi.protein, fi.carbs, fi.fat
+          fi.name as food_name, fi.calories_per_serving, fi.protein_grams,
+          fi.carbs_grams, fi.fat_grams, fi.serving_size, fi.serving_unit
         FROM food_logs fl
         JOIN food_items fi ON fl.food_item_id = fi.id
         WHERE fl.user_id = $1 AND fl.log_date = $2
@@ -36,7 +47,27 @@ class FoodLog {
         [userId, date]
       );
 
-      return result.rows.map(row => new FoodLog(row));
+      logger.debug(`Found ${result.rows.length} logs for user ${userId}`);
+      if (result.rows.length > 0) {
+        logger.debug(`Sample log data for user ${userId}: ${JSON.stringify(result.rows[0])}`);
+      } else {
+        logger.debug(`No logs found for user ${userId} on date ${date}`);
+      }
+
+      // Log the full SQL query with parameters for debugging
+      logger.debug('SQL Query:', {
+        text: result.command,
+        values: [userId, date],
+        rowCount: result.rowCount
+      });
+
+      const logs = result.rows.map(row => {
+        const log = new FoodLog(row);
+        logger.debug(`Mapped log data for user ${userId}: ${JSON.stringify(log)}`);
+        return log;
+      });
+
+      return logs;
     } catch (err) {
       logger.error(`Error getting logs by date: ${err.message}`);
       throw err;
@@ -53,7 +84,8 @@ class FoodLog {
       const result = await client.query(
         `SELECT
           fl.id, fl.user_id, fl.food_item_id, fl.log_date, fl.meal_type, fl.servings,
-          fi.name as food_name, fi.calories, fi.protein, fi.carbs, fi.fat
+          fi.name as food_name, fi.calories_per_serving, fi.protein_grams,
+          fi.carbs_grams, fi.fat_grams, fi.serving_size, fi.serving_unit
         FROM food_logs fl
         JOIN food_items fi ON fl.food_item_id = fi.id
         WHERE fl.user_id = $1 AND fl.log_date BETWEEN $2 AND $3
@@ -95,7 +127,8 @@ class FoodLog {
       const logResult = await client.query(
         `SELECT
           fl.id, fl.user_id, fl.food_item_id, fl.log_date, fl.meal_type, fl.servings,
-          fi.name as food_name, fi.calories, fi.protein, fi.carbs, fi.fat
+          fi.name as food_name, fi.calories_per_serving, fi.protein_grams,
+          fi.carbs_grams, fi.fat_grams, fi.serving_size, fi.serving_unit
         FROM food_logs fl
         JOIN food_items fi ON fl.food_item_id = fi.id
         WHERE fl.id = $1`,
@@ -143,7 +176,8 @@ class FoodLog {
       const logResult = await client.query(
         `SELECT
           fl.id, fl.user_id, fl.food_item_id, fl.log_date, fl.meal_type, fl.servings,
-          fi.name as food_name, fi.calories, fi.protein, fi.carbs, fi.fat
+          fi.name as food_name, fi.calories_per_serving, fi.protein_grams,
+          fi.carbs_grams, fi.fat_grams, fi.serving_size, fi.serving_unit
         FROM food_logs fl
         JOIN food_items fi ON fl.food_item_id = fi.id
         WHERE fl.id = $1`,
@@ -189,18 +223,36 @@ class FoodLog {
     const client = await getClient();
 
     try {
+      logger.info(`Getting daily summary for user ${userId} on date ${date}`);
+
+      // Validate inputs
+      if (!userId) {
+        logger.error('getDailySummary called with missing userId');
+        throw new Error('User ID is required');
+      }
+
+      if (!date) {
+        logger.error('getDailySummary called with missing date');
+        throw new Error('Date is required');
+      }
+
       const result = await client.query(
         `SELECT
-          COALESCE(SUM(fi.calories * fl.servings), 0) as total_calories,
-          COALESCE(SUM(fi.protein * fl.servings), 0) as total_protein,
-          COALESCE(SUM(fi.carbs * fl.servings), 0) as total_carbs,
-          COALESCE(SUM(fi.fat * fl.servings), 0) as total_fat,
+          COALESCE(SUM(fi.calories_per_serving * fl.servings), 0) as total_calories,
+          COALESCE(SUM(fi.protein_grams * fl.servings), 0) as total_protein,
+          COALESCE(SUM(fi.carbs_grams * fl.servings), 0) as total_carbs,
+          COALESCE(SUM(fi.fat_grams * fl.servings), 0) as total_fat,
           COUNT(fl.id) as total_items
         FROM food_logs fl
         JOIN food_items fi ON fl.food_item_id = fi.id
         WHERE fl.user_id = $1 AND fl.log_date = $2`,
         [userId, date]
       );
+
+      logger.info(`Daily summary query completed for user ${userId} on date ${date}`);
+
+      // Log the result for debugging
+      logger.debug(`Daily summary result: ${JSON.stringify(result.rows[0])}`);
 
       // Ensure we always return an object with default values
       return {
@@ -211,7 +263,36 @@ class FoodLog {
         total_items: result.rows[0]?.total_items || 0
       };
     } catch (err) {
-      logger.error(`Error getting daily summary: ${err.message}`);
+      logger.error(`Error getting daily summary: ${err.message}`, {
+        userId,
+        date,
+        stack: err.stack
+      });
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Find a log by ID
+  static async findById(id, userId) {
+    const client = await getClient();
+
+    try {
+      const result = await client.query(
+        `SELECT
+          fl.id, fl.user_id, fl.food_item_id, fl.log_date, fl.meal_type, fl.servings,
+          fi.name as food_name, fi.calories_per_serving, fi.protein_grams,
+          fi.carbs_grams, fi.fat_grams, fi.serving_size, fi.serving_unit
+        FROM food_logs fl
+        JOIN food_items fi ON fl.food_item_id = fi.id
+        WHERE fl.id = $1 AND fl.user_id = $2`,
+        [id, userId]
+      );
+
+      return result.rows.length > 0 ? new FoodLog(result.rows[0]) : null;
+    } catch (err) {
+      logger.error(`Error finding log by id: ${err.message}`);
       throw err;
     } finally {
       client.release();

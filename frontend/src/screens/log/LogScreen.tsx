@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import {
   Text,
   Card,
@@ -10,7 +10,9 @@ import {
   ActivityIndicator,
   Avatar,
   useTheme,
-  Button
+  Button,
+  Portal,
+  Dialog
 } from 'react-native-paper';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -33,6 +35,9 @@ const LogScreen: React.FC = () => {
     carbs: 0,
     fat: 0,
   });
+  const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
 
   const theme = useTheme();
   const navigation = useNavigation<StackNavigationProp<any>>();
@@ -40,27 +45,43 @@ const LogScreen: React.FC = () => {
   const fetchLogs = async () => {
     try {
       setIsLoading(true);
-      // Use type assertion to bypass type checking
-      const logsData = await foodLogService.getLogs(selectedDate) as any[];
-      setLogs(logsData as any);
+      console.log('Fetching logs for date:', selectedDate);
+      const logsData = await foodLogService.getLogs(selectedDate);
+      console.log('API Response:', {
+        success: !!logsData,
+        logCount: logsData?.length || 0
+      });
+
+      setLogs(logsData);
 
       // Calculate nutrition summary
-      const summary = logsData.reduce((acc, log: any) => {
-        // Handle potential property name differences
-        const calories = log.food?.calories || log.calories_per_serving || 0;
-        const protein = log.food?.protein || log.protein_grams || 0;
-        const carbs = log.food?.carbs || log.carbs_grams || 0;
-        const fat = log.food?.fat || log.fat_grams || 0;
-        const servingSize = log.servingSize || log.servings || 1;
+      const summary = logsData.reduce((acc, log) => {
+        // Get values from the correct properties
+        const calories = log.calories_per_serving || 0;
+        const protein = log.protein_grams || 0;
+        const carbs = log.carbs_grams || 0;
+        const fat = log.fat_grams || 0;
+        const servings = log.servings || 1;
+
+        console.log('Processing log:', {
+          id: log.id,
+          food_name: log.food_name,
+          calories_per_serving: log.calories_per_serving,
+          protein_grams: log.protein_grams,
+          carbs_grams: log.carbs_grams,
+          fat_grams: log.fat_grams,
+          servings: log.servings
+        });
 
         return {
-          calories: acc.calories + (calories * servingSize),
-          protein: acc.protein + (protein * servingSize),
-          carbs: acc.carbs + (carbs * servingSize),
-          fat: acc.fat + (fat * servingSize),
+          calories: acc.calories + (calories * servings),
+          protein: acc.protein + (protein * servings),
+          carbs: acc.carbs + (carbs * servings),
+          fat: acc.fat + (fat * servings),
         };
       }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
 
+      console.log('Calculated summary:', summary);
       setNutritionSummary(summary);
     } catch (error) {
       console.error('Error fetching logs:', error);
@@ -83,8 +104,16 @@ const LogScreen: React.FC = () => {
     }
   };
 
-  const navigateToAddLog = () => {
-    navigation.navigate('AddLog', { date: selectedDate });
+  const navigateToAddLog = (mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
+    // Navigate to FoodScreen with a parameter indicating we're adding to the log
+    navigation.navigate('FoodStack', {
+      screen: 'FoodList',
+      params: {
+        addToLog: true,
+        logDate: selectedDate,
+        mealType: mealType
+      }
+    });
   };
 
   const navigateToLogDetails = (logId: string) => {
@@ -103,9 +132,32 @@ const LogScreen: React.FC = () => {
     setSelectedDate(date.toISOString().split('T')[0]);
   };
 
+  const handleDeleteLog = (id: number) => {
+    setSelectedLogId(id);
+    setShowDeleteDialog(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedLogId) return;
+
+    setIsDeleting(prev => ({ ...prev, [selectedLogId]: true }));
+    try {
+      await foodLogService.deleteLog(selectedLogId);
+      setShowDeleteDialog(false);
+      // Refresh logs
+      await fetchLogs();
+    } catch (error) {
+      console.error('Error deleting log:', error);
+      Alert.alert('Error', 'Failed to delete log');
+    } finally {
+      setIsDeleting(prev => ({ ...prev, [selectedLogId]: false }));
+      setSelectedLogId(null);
+    }
+  };
+
   const renderMealSection = (mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
-    const mealLogs = logs.filter(log => log.mealType === mealType);
-    const mealCalories = mealLogs.reduce((sum, log) => sum + (log.food.calories * log.servingSize), 0);
+    const mealLogs = logs.filter(log => log.meal_type === mealType);
+    const mealCalories = mealLogs.reduce((sum, log) => sum + ((log.calories_per_serving || 0) * (log.servings || 1)), 0);
 
     const mealTitles = {
       breakfast: 'Breakfast',
@@ -137,7 +189,7 @@ const LogScreen: React.FC = () => {
             <Button
               icon="plus"
               mode="text"
-              onPress={() => navigation.navigate('AddLog', { date: selectedDate, mealType })}
+              onPress={() => navigateToAddLog(mealType)}
             >
               Add
             </Button>
@@ -149,39 +201,46 @@ const LogScreen: React.FC = () => {
         {mealLogs.length > 0 ? (
           <Card.Content>
             {mealLogs.map((log) => (
-              <TouchableOpacity
-                key={log.id}
-                onPress={() => navigateToLogDetails(log.id)}
-                style={styles.logItem}
-              >
+              <View key={log.id} style={styles.logItem}>
                 <View style={styles.foodInfo}>
-                  <Text style={styles.foodName}>{log.food.name}</Text>
+                  <Text style={styles.foodName}>{log.food_name || 'Unknown Food'}</Text>
                   <Text style={styles.servingInfo}>
-                    {log.servingSize} {log.servingUnit}
+                    {log.servings} {log.servings === 1 ? 'serving' : 'servings'}
                   </Text>
                 </View>
 
                 <View style={styles.nutritionInfo}>
                   <Text style={styles.calories}>
-                    {Math.round(log.food.calories * log.servingSize)} kcal
+                    {Math.round((log.calories_per_serving || 0) * (log.servings || 1))} kcal
                   </Text>
                   <Text style={styles.macros}>
-                    P: {Math.round(log.food.protein * log.servingSize)}g •
-                    C: {Math.round(log.food.carbs * log.servingSize)}g •
-                    F: {Math.round(log.food.fat * log.servingSize)}g
+                    P: {Math.round((log.protein_grams || 0) * (log.servings || 1))}g •
+                    C: {Math.round((log.carbs_grams || 0) * (log.servings || 1))}g •
+                    F: {Math.round((log.fat_grams || 0) * (log.servings || 1))}g
                   </Text>
+                  <Button
+                    icon="delete"
+                    mode="text"
+                    compact
+                    loading={isDeleting[log.id || '']}
+                    onPress={() => log.id && handleDeleteLog(Number(log.id))}
+                    style={styles.deleteButton}
+                    textColor={theme.colors.error}
+                  >
+                    Remove
+                  </Button>
                 </View>
-              </TouchableOpacity>
+              </View>
             ))}
           </Card.Content>
         ) : (
           <Card.Content style={styles.emptyMeal}>
             <Text style={styles.emptyMealText}>
-              No foods logged for {mealTitles[mealType].toLowerCase()}
+              No foods logged for {mealTitles[mealType]}
             </Text>
             <Button
               mode="outlined"
-              onPress={() => navigation.navigate('AddLog', { date: selectedDate, mealType })}
+              onPress={() => navigateToAddLog(mealType)}
               style={styles.addButton}
             >
               Add Food
@@ -247,14 +306,6 @@ const LogScreen: React.FC = () => {
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={styles.loadingText}>Loading food logs...</Text>
         </View>
-      ) : logs.length === 0 ? (
-        <EmptyState
-          icon="food-off"
-          title="No Food Logged"
-          message={`You haven't logged any food for ${formatDate(selectedDate)}`}
-          actionLabel="Add Food"
-          onAction={navigateToAddLog}
-        />
       ) : (
         <FlatList
           data={['breakfast', 'lunch', 'dinner', 'snack']}
@@ -264,12 +315,36 @@ const LogScreen: React.FC = () => {
         />
       )}
 
-      <FAB
-        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-        icon="plus"
-        onPress={navigateToAddLog}
-        color="white"
-      />
+      <Portal>
+        <Dialog visible={showDeleteDialog} onDismiss={() => setShowDeleteDialog(false)}>
+          <Dialog.Title style={styles.deleteDialogTitle}>Remove Food Log</Dialog.Title>
+          <Dialog.Content>
+            <View style={styles.deleteDialogContent}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={40} color={theme.colors.error} style={styles.deleteIcon} />
+              <Text style={styles.deleteDialogText}>Are you sure you want to remove this food from your log?</Text>
+              <Text style={styles.deleteDialogSubtext}>This action cannot be undone.</Text>
+            </View>
+          </Dialog.Content>
+          <Dialog.Actions style={styles.deleteDialogActions}>
+            <Button
+              mode="outlined"
+              onPress={() => setShowDeleteDialog(false)}
+              style={styles.cancelButton}
+            >
+              Cancel
+            </Button>
+            <Button
+              mode="contained"
+              onPress={handleConfirmDelete}
+              loading={isDeleting[selectedLogId || '']}
+              buttonColor={theme.colors.error}
+              style={styles.deleteButton}
+            >
+              Remove
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </View>
   );
 };
@@ -326,7 +401,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   mealList: {
-    paddingBottom: 80,
+    paddingBottom: 16,
   },
   mealCard: {
     margin: 16,
@@ -372,11 +447,39 @@ const styles = StyleSheet.create({
   addButton: {
     marginTop: 8,
   },
-  fab: {
-    position: 'absolute',
-    margin: 16,
-    right: 0,
-    bottom: 0,
+  deleteButton: {
+    minWidth: 120,
+    marginLeft: 8,
+  },
+  deleteDialogTitle: {
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  deleteDialogContent: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  deleteIcon: {
+    marginBottom: 16,
+  },
+  deleteDialogText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  deleteDialogSubtext: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  deleteDialogActions: {
+    justifyContent: 'space-evenly',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  cancelButton: {
+    minWidth: 120,
   },
 });
 

@@ -1,9 +1,6 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useTheme } from 'react-native-paper';
-import { CompositeScreenProps } from '@react-navigation/native';
-import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import FoodScreen from '../screens/food/FoodScreen';
 import AddFoodScreen from '../screens/food/AddFoodScreen';
@@ -15,17 +12,24 @@ import { RootStackParamList } from './AppNavigator';
 
 // Define the stack navigator param list
 export type FoodStackParamList = {
-  FoodList: { scannedFood?: Food };
+  FoodList: {
+    scannedFood?: Food;
+    addToLog?: boolean;
+    logDate?: string;
+    mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+    servings?: number;
+  };
   FoodDetails: { foodId: string };
   AddFood: undefined;
-  FoodSearch: { searchQuery?: string };
+  FoodSearch: {
+    searchQuery?: string;
+    addToLog?: boolean;
+    logDate?: string;
+    mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+    servings?: number;
+  };
   BarcodeScanner: undefined;
 };
-
-export type FoodScreenProps<T extends keyof FoodStackParamList> = CompositeScreenProps<
-  NativeStackScreenProps<FoodStackParamList, T>,
-  BottomTabScreenProps<RootStackParamList>
->;
 
 // Create the stack navigator
 const Stack = createStackNavigator();

@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   FlatList,
-  TextInput as RNTextInput
+  TextInput as RNTextInput,
+  Alert
 } from 'react-native';
 import {
   Text,
@@ -17,12 +18,15 @@ import {
   useTheme,
   Searchbar,
   Chip,
-  Avatar
+  Avatar,
+  Portal,
+  Dialog
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import axios from 'axios';
 import { apiService, setAuthToken } from '../../services/apiService';
 import { useAuth } from '../../contexts/AuthContext';
+import { foodLogService } from '../../services/foodLogService';
 
 // API response interface
 interface FoodApiResponse {
@@ -130,6 +134,24 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
   const [loading, setLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<SimplifiedFoodItem[]>([]);
   const [selectedFood, setSelectedFood] = useState<SimplifiedFoodItem | null>(null);
+
+  // Add to log state
+  const [showAddToLogModal, setShowAddToLogModal] = useState(false);
+  const [logDate, setLogDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('snack');
+  const [servings, setServings] = useState('1');
+  const [addingToLog, setAddingToLog] = useState(false);
+
+  // Check if we're adding to the log
+  useEffect(() => {
+    if (route.params) {
+      const { addToLog, logDate: date, mealType: meal } = route.params as any;
+      if (addToLog) {
+        setLogDate(date || new Date().toISOString().split('T')[0]);
+        setMealType((meal || 'snack') as 'breakfast' | 'lunch' | 'dinner' | 'snack');
+      }
+    }
+  }, [route.params]);
 
   // Set token in apiService when it changes
   useEffect(() => {
@@ -240,6 +262,62 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
     }
   };
 
+  // Function to add food directly to log
+  const addFoodToLog = async () => {
+    if (!selectedFood) return;
+
+    setAddingToLog(true);
+
+    try {
+      // Ensure we have a token
+      if (!token) {
+        Alert.alert('Authentication Required', 'Please log in to add foods to your log.');
+        return;
+      }
+
+      // First import the food to get a proper ID
+      const foodData = {
+        name: selectedFood.name,
+        calories_per_serving: selectedFood.calories,
+        protein_grams: selectedFood.protein,
+        carbs_grams: selectedFood.carbs,
+        fat_grams: selectedFood.fat,
+        serving_size: selectedFood.servingSize?.toString() || '100',
+        serving_unit: selectedFood.servingSizeUnit || 'g',
+        source: selectedFood.source || 'unknown',
+        source_id: `${selectedFood.source}-${selectedFood.id}`
+      };
+
+      // Make API call to save the food
+      const response = await apiService.post<FoodApiResponse>('/foods/custom', foodData);
+
+      if (response?.food && response.food.id) {
+        // Now add to the log
+        await foodLogService.createLog({
+          food_item_id: Number(response.food.id),
+          log_date: logDate,
+          meal_type: mealType,
+          servings: parseFloat(servings) || 1,
+        });
+
+        // Show success message
+        Alert.alert(
+          'Success',
+          `${selectedFood.name} has been added to your log!`,
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+      } else {
+        throw new Error('Failed to save food item: Invalid response format');
+      }
+    } catch (error) {
+      console.error('Error adding food to log:', error);
+      Alert.alert('Error', 'Failed to add food to your log. Please try again.');
+    } finally {
+      setAddingToLog(false);
+      setShowAddToLogModal(false);
+    }
+  };
+
   // Render a food item
   const renderFoodItem = ({ item }: { item: SimplifiedFoodItem }) => (
     <TouchableOpacity onPress={() => setSelectedFood(item)}>
@@ -326,16 +404,77 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
       )}
 
       {selectedFood && (
-        <View style={styles.importContainer}>
+        <View style={styles.actionContainer}>
           <Button
             mode="contained"
             onPress={() => importFood(selectedFood)}
-            style={styles.importButton}
+            style={styles.actionButton}
           >
             Import {selectedFood.name}
           </Button>
+          <Button
+            mode="contained"
+            onPress={() => setShowAddToLogModal(true)}
+            style={[styles.actionButton, { marginTop: 8 }]}
+            icon="notebook"
+          >
+            Add to Log
+          </Button>
         </View>
       )}
+
+      <Portal>
+        <Dialog
+          visible={showAddToLogModal}
+          onDismiss={() => setShowAddToLogModal(false)}
+          style={styles.modalContainer}
+        >
+          <Dialog.Title>Add to Food Log</Dialog.Title>
+          <Dialog.Content>
+            <Text style={styles.modalText}>
+              Add {selectedFood?.name} to your log for {new Date(logDate).toLocaleDateString()}
+            </Text>
+
+            <View style={styles.mealTypeContainer}>
+              {['breakfast', 'lunch', 'dinner', 'snack'].map((type) => (
+                <Chip
+                  key={type}
+                  selected={mealType === type}
+                  onPress={() => setMealType(type as 'breakfast' | 'lunch' | 'dinner' | 'snack')}
+                  style={styles.mealTypeChip}
+                  selectedColor={theme.colors.primary}
+                >
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </Chip>
+              ))}
+            </View>
+
+            <View style={styles.servingsContainer}>
+              <Text style={styles.servingsLabel}>Servings:</Text>
+              <RNTextInput
+                value={servings}
+                onChangeText={setServings}
+                keyboardType="numeric"
+                style={styles.servingsInput}
+                maxLength={4}
+              />
+            </View>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setShowAddToLogModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              mode="contained"
+              onPress={addFoodToLog}
+              loading={addingToLog}
+              disabled={addingToLog}
+            >
+              Add to Log
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </View>
   );
 };
@@ -421,15 +560,49 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.7,
   },
-  importContainer: {
+  actionContainer: {
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#ddd',
     backgroundColor: 'white',
   },
-  importButton: {
+  actionButton: {
     height: 50,
     justifyContent: 'center',
+  },
+  modalContainer: {
+    backgroundColor: 'white',
+    padding: 20,
+    margin: 20,
+    borderRadius: 8,
+  },
+  modalText: {
+    marginBottom: 16,
+  },
+  mealTypeContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+  },
+  mealTypeChip: {
+    margin: 4,
+  },
+  servingsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  servingsLabel: {
+    marginRight: 8,
+    fontSize: 16,
+  },
+  servingsInput: {
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    paddingHorizontal: 8,
   },
 });
 

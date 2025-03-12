@@ -44,7 +44,9 @@ router.get('/daily-summary', getDailySummary);
 router.post(
   '/',
   [
-    check('food_item_id', 'Food item ID is required').isNumeric(),
+    check('food_item_id', 'Food item ID is required')
+      .if((value, { req }) => !req.body.food_item)
+      .isNumeric(),
     check('log_date', 'Log date is required').isDate(),
     check('meal_type', 'Meal type is required').isIn(['breakfast', 'lunch', 'dinner', 'snack']),
     check('servings', 'Servings must be a positive number').isFloat({ min: 0.1 }),

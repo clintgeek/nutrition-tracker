@@ -24,6 +24,7 @@ import axios from 'axios';
 import debounce from 'lodash/debounce';
 
 import { foodService, FoodItem } from '../../services/foodService';
+import { foodLogService } from '../../services/foodLogService';
 import { Food, CreateFoodDTO } from '../../types/Food';
 import EmptyState from '../../components/common/EmptyState';
 import EditableTextInput from '../../components/common/EditableTextInput';
@@ -86,6 +87,25 @@ const FoodScreen: React.FC = () => {
   const [isFoodDetailsVisible, setIsFoodDetailsVisible] = useState(false);
   const [foodToDelete, setFoodToDelete] = useState<Food | null>(null);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+  const [isAddingToLog, setIsAddingToLog] = useState(false);
+  const [logDate, setLogDate] = useState<string | undefined>(undefined);
+  const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('snack');
+  const [isAddingToLogModalVisible, setIsAddingToLogModalVisible] = useState(false);
+  const [servings, setServings] = useState('1');
+  const [foodToAddToLog, setFoodToAddToLog] = useState<Food | null>(null);
+
+  // Check if we're adding to the log
+  useEffect(() => {
+    if (route.params) {
+      const { addToLog, logDate: date, mealType: meal, servings: initialServings } = route.params as any;
+      setIsAddingToLog(!!addToLog);
+      setLogDate(date);
+      setMealType(meal || 'snack');
+      if (initialServings) {
+        setServings(initialServings.toString());
+      }
+    }
+  }, [route.params]);
 
   // Fetch foods function
   const fetchFoods = useCallback(async (query: string = '', forceRefresh: boolean = false) => {
@@ -186,37 +206,84 @@ const FoodScreen: React.FC = () => {
     }, [route.params, navigation, fetchFoods, searchQuery])
   );
 
+  // Reset isAddingToLog when screen loses focus
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => {
+        // This runs when the screen loses focus
+        setIsAddingToLog(false);
+      };
+    }, [])
+  );
+
   const handleSaveFood = async () => {
     if (!selectedFood) return;
 
     try {
       const foodData: CreateFoodDTO = {
-        name: selectedFood.name,
+        name: selectedFood.name.trim().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' '),
         calories: Math.round(selectedFood.calories || 0),
         protein: Math.round(selectedFood.protein || 0),
         carbs: Math.round(selectedFood.carbs || 0),
         fat: Math.round(selectedFood.fat || 0),
         serving_size: Math.round(Number(selectedFood.serving_size) || 100),
-        serving_unit: selectedFood.serving_unit || 'g',
+        serving_unit: selectedFood.serving_unit || '',
         barcode: selectedFood.barcode,
         brand: selectedFood.brand,
         source: 'custom',  // Always set source to custom for saved foods
         source_id: selectedFood.source_id,
       };
 
+      let savedFoodId: number;
+
       if (selectedFood.id && selectedFood.source === 'custom') {
         // Update existing custom food
         console.log('Updating existing custom food:', selectedFood.id);
-        await foodService.updateCustomFood(parseInt(selectedFood.id), foodData);
+        const id = parseInt(selectedFood.id);
+        if (isNaN(id)) {
+          throw new Error('Invalid food ID');
+        }
+        await foodService.updateCustomFood(id, foodData);
+        savedFoodId = id;
       } else {
         // Create new custom food
         console.log('Creating new custom food');
-        await foodService.createCustomFood(foodData);
+        const result = await foodService.createCustomFood(foodData);
+        if (!result || typeof result.id !== 'number') {
+          throw new Error('Invalid response from createCustomFood');
+        }
+        savedFoodId = result.id;
       }
 
-      setIsFoodDetailsVisible(false);
-      setSelectedFood(null);
-      fetchFoods(searchQuery, true);
+      // If we're adding to log, create the log entry
+      if (isAddingToLog && logDate && mealType) {
+        try {
+          await foodLogService.createLog({
+            food_item_id: savedFoodId,
+            log_date: logDate,
+            meal_type: mealType,
+            servings: parseFloat(servings) || 1,
+          });
+          console.log('Food added to log successfully');
+
+          // Close the dialog and navigate back to the log screen
+          setIsFoodDetailsVisible(false);
+          setSelectedFood(null);
+          navigation.navigate('LogStack', {
+            screen: 'LogScreen',
+            params: { date: logDate }
+          });
+        } catch (logError) {
+          console.error('Error adding food to log:', logError);
+          Alert.alert('Error', 'Food was saved but could not be added to your log.');
+        }
+      } else {
+        // Just saving the food, stay on food screen
+        setIsFoodDetailsVisible(false);
+        setSelectedFood(null);
+        fetchFoods(searchQuery, true);
+        Alert.alert('Success', 'Food saved successfully!');
+      }
     } catch (error) {
       console.error('Error saving food:', error);
       alert('Failed to save food. Please try again.');
@@ -255,6 +322,33 @@ const FoodScreen: React.FC = () => {
     }
   };
 
+  // Function to add a food directly to the log
+  const handleAddToLog = async (food: Food) => {
+    setFoodToAddToLog(food);
+    setServings('1');
+    setIsAddingToLogModalVisible(true);
+  };
+
+  // Function to confirm adding to log
+  const confirmAddToLog = async () => {
+    if (!foodToAddToLog || !logDate || !mealType) return;
+
+    try {
+      await foodLogService.createLog({
+        food_item_id: parseInt(foodToAddToLog.id),
+        log_date: logDate,
+        meal_type: mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+        servings: parseFloat(servings) || 1,
+      });
+
+      setIsAddingToLogModalVisible(false);
+      Alert.alert('Success', `${foodToAddToLog.name} added to your food log.`);
+    } catch (error) {
+      console.error('Error adding food to log:', error);
+      Alert.alert('Error', 'Failed to add food to your log. Please try again.');
+    }
+  };
+
   const renderNutritionInfo = (food: Food) => (
     <View style={styles.nutritionInfo}>
       <Text>Calories: {food.calories}</Text>
@@ -282,34 +376,6 @@ const FoodScreen: React.FC = () => {
           onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, brand: text } : null)}
           style={styles.input}
         />
-        <EditableTextInput
-          label="Calories"
-          value={selectedFood.calories?.toString() || '0'}
-          onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, calories: parseFloat(text) || 0 } : null)}
-          keyboardType="numeric"
-          style={styles.input}
-        />
-        <EditableTextInput
-          label="Protein (g)"
-          value={selectedFood.protein?.toString() || '0'}
-          onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, protein: parseFloat(text) || 0 } : null)}
-          keyboardType="numeric"
-          style={styles.input}
-        />
-        <EditableTextInput
-          label="Carbs (g)"
-          value={selectedFood.carbs?.toString() || '0'}
-          onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, carbs: parseFloat(text) || 0 } : null)}
-          keyboardType="numeric"
-          style={styles.input}
-        />
-        <EditableTextInput
-          label="Fat (g)"
-          value={selectedFood.fat?.toString() || '0'}
-          onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, fat: parseFloat(text) || 0 } : null)}
-          keyboardType="numeric"
-          style={styles.input}
-        />
         <View style={styles.servingContainer}>
           <EditableTextInput
             label="Serving Size"
@@ -320,11 +386,50 @@ const FoodScreen: React.FC = () => {
           />
           <EditableTextInput
             label="Unit"
-            value={selectedFood.serving_unit || 'g'}
+            value={selectedFood.serving_unit || ''}
             onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, serving_unit: text } : null)}
             style={[styles.input, styles.servingUnitInput]}
           />
         </View>
+        {isAddingToLog && (
+          <View style={styles.servingContainer}>
+            <EditableTextInput
+              label="Number of Servings"
+              value={servings}
+              onChangeText={setServings}
+              keyboardType="numeric"
+              style={[styles.input, styles.servingSizeInput]}
+            />
+          </View>
+        )}
+        <EditableTextInput
+          label="Calories (per serving)"
+          value={selectedFood.calories?.toString() || '0'}
+          onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, calories: parseFloat(text) || 0 } : null)}
+          keyboardType="numeric"
+          style={styles.input}
+        />
+        <EditableTextInput
+          label="Protein (g per serving)"
+          value={selectedFood.protein?.toString() || '0'}
+          onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, protein: parseFloat(text) || 0 } : null)}
+          keyboardType="numeric"
+          style={styles.input}
+        />
+        <EditableTextInput
+          label="Carbs (g per serving)"
+          value={selectedFood.carbs?.toString() || '0'}
+          onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, carbs: parseFloat(text) || 0 } : null)}
+          keyboardType="numeric"
+          style={styles.input}
+        />
+        <EditableTextInput
+          label="Fat (g per serving)"
+          value={selectedFood.fat?.toString() || '0'}
+          onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, fat: parseFloat(text) || 0 } : null)}
+          keyboardType="numeric"
+          style={styles.input}
+        />
       </View>
     );
   };
@@ -333,43 +438,58 @@ const FoodScreen: React.FC = () => {
     const sourceColor = getSourceColor(item.source || '', theme);
 
     return (
-      <Card style={styles.foodCard} onPress={() => navigateToFoodDetails(item)}>
-        <Card.Content style={styles.foodCardContent}>
-          <Avatar.Icon
-            size={50}
-            icon={getSourceIcon(item.source || '')}
-            style={{ backgroundColor: sourceColor }}
-            color="#fff"
-          />
-          <View style={styles.foodInfo}>
-            <Title style={[styles.foodName, { color: sourceColor }]}>{item.name}</Title>
-            {item.brand && <Paragraph style={styles.brandName}>{item.brand}</Paragraph>}
-            <View style={styles.nutritionInfo}>
-              <Text style={styles.calories}>{Math.round(item.calories)} calories</Text>
-              <Text style={styles.macros}>
-                P: {item.protein}g • C: {item.carbs}g • F: {item.fat}g
-              </Text>
-              <Text style={styles.macros}>
-                per {item.serving_size} {item.serving_unit}
-              </Text>
+      <TouchableOpacity onPress={() => navigateToFoodDetails(item)}>
+        <Card style={styles.foodCard}>
+          <Card.Content style={styles.foodCardContent}>
+            <Avatar.Icon
+              size={40}
+              icon={getSourceIcon(item.source || '')}
+              style={{ backgroundColor: sourceColor }}
+              color="#fff"
+            />
+            <View style={styles.foodInfo}>
+              <Title style={[styles.foodName, { color: sourceColor }]}>{item.name}</Title>
+              {item.brand && <Text style={styles.brandText}>{item.brand}</Text>}
+
+              <View style={styles.macroContainer}>
+                <View style={styles.macroItem}>
+                  <Text style={styles.macroValue}>{item.calories}</Text>
+                  <Text style={styles.macroLabel}>Calories</Text>
+                </View>
+                <View style={styles.macroItem}>
+                  <Text style={styles.macroValue}>{item.protein}g</Text>
+                  <Text style={styles.macroLabel}>Protein</Text>
+                </View>
+                <View style={styles.macroItem}>
+                  <Text style={styles.macroValue}>{item.carbs}g</Text>
+                  <Text style={styles.macroLabel}>Carbs</Text>
+                </View>
+                <View style={styles.macroItem}>
+                  <Text style={styles.macroValue}>{item.fat}g</Text>
+                  <Text style={styles.macroLabel}>Fat</Text>
+                </View>
+              </View>
             </View>
-          </View>
-          {item.source === 'custom' && (
-            <View style={styles.rightActions}>
+
+            {/* Show add button when adding to log, delete button otherwise */}
+            {isAddingToLog ? (
               <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => handleDeleteFood(item)}
+                onPress={() => handleAddToLog(item)}
+                style={styles.actionButton}
               >
-                <MaterialCommunityIcons
-                  name="delete-outline"
-                  size={24}
-                  color={theme.colors.error}
-                />
+                <MaterialCommunityIcons name="plus-circle" size={24} color={theme.colors.primary} />
               </TouchableOpacity>
-            </View>
-          )}
-        </Card.Content>
-      </Card>
+            ) : (
+              <TouchableOpacity
+                onPress={() => handleDeleteFood(item)}
+                style={styles.actionButton}
+              >
+                <MaterialCommunityIcons name="delete" size={24} color={theme.colors.error} />
+              </TouchableOpacity>
+            )}
+          </Card.Content>
+        </Card>
+      </TouchableOpacity>
     );
   };
 
@@ -456,12 +576,53 @@ const FoodScreen: React.FC = () => {
             carbs: 0,
             fat: 0,
             serving_size: 100,
-            serving_unit: 'g',
+            serving_unit: '',
             source: 'custom'
           });
           setIsFoodDetailsVisible(true);
         }}
       />
+
+      {/* Add to Log Modal */}
+      <Portal>
+        <Dialog
+          visible={isAddingToLogModalVisible}
+          onDismiss={() => setIsAddingToLogModalVisible(false)}
+        >
+          <Dialog.Title>Add to Food Log</Dialog.Title>
+          <Dialog.Content>
+            <Text style={styles.modalText}>
+              {foodToAddToLog?.name}
+            </Text>
+            <Text style={styles.modalLabel}>Servings:</Text>
+            <EditableTextInput
+              value={servings}
+              onChangeText={setServings}
+              keyboardType="numeric"
+              style={styles.servingInput}
+              label="Servings"
+            />
+            <Text style={styles.modalLabel}>Meal:</Text>
+            <View style={styles.mealTypeContainer}>
+              {['breakfast', 'lunch', 'dinner', 'snack'].map((type) => (
+                <Chip
+                  key={type}
+                  selected={mealType === type}
+                  onPress={() => setMealType(type as 'breakfast' | 'lunch' | 'dinner' | 'snack')}
+                  style={styles.mealTypeChip}
+                  selectedColor={theme.colors.primary}
+                >
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </Chip>
+              ))}
+            </View>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setIsAddingToLogModalVisible(false)}>Cancel</Button>
+            <Button onPress={confirmAddToLog}>Add</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </View>
   );
 };
@@ -536,7 +697,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     textTransform: 'capitalize',
   },
-  brandName: {
+  brandText: {
     fontSize: 14,
     color: '#757575',
     marginBottom: 4,
@@ -588,6 +749,47 @@ const styles = StyleSheet.create({
   },
   servingUnitInput: {
     flex: 1,
+  },
+  macroContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  macroItem: {
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  macroValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  macroLabel: {
+    fontSize: 14,
+    color: '#757575',
+  },
+  actionButton: {
+    margin: 0,
+    padding: 0,
+  },
+  modalText: {
+    fontSize: 16,
+    marginBottom: 16,
+  },
+  modalLabel: {
+    fontSize: 14,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  servingInput: {
+    marginBottom: 16,
+  },
+  mealTypeContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+  },
+  mealTypeChip: {
+    margin: 4,
   },
 });
 

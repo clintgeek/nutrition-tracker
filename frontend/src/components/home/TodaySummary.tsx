@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { Card, Title, Text, ProgressBar, useTheme, Button } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { goalService, Goal } from '../../services/goalService';
 import { summaryService, DailySummary } from '../../services/summaryService';
@@ -24,6 +24,7 @@ interface NutritionSummary {
 const TodaySummary: React.FC = () => {
   const theme = useTheme();
   const navigation = useNavigation<StackNavigationProp<any>>();
+  const isFocused = useIsFocused();
   const { token } = useAuth();
   const [summary, setSummary] = useState<NutritionSummary>({
     calories: {
@@ -49,6 +50,9 @@ const TodaySummary: React.FC = () => {
 
   useEffect(() => {
     let mounted = true;
+    let retryCount = 0;
+    const maxRetries = 3;
+    let retryTimeout: NodeJS.Timeout | null = null;
 
     const loadData = async () => {
       try {
@@ -104,48 +108,78 @@ const TodaySummary: React.FC = () => {
             }
           }));
 
-          // Now fetch today's consumption
-          const today = new Date();
-          const dailySummary = await summaryService.getDailySummary(today);
+          try {
+            // Now fetch today's consumption
+            const today = new Date();
+            const dailySummary = await summaryService.getDailySummary(today);
 
-          if (!mounted) return;
+            if (!mounted) return;
 
-          // Update only consumption values
-          setSummary(prev => ({
-            ...prev,
-            calories: {
-              ...prev.calories,
-              consumed: dailySummary.total_calories || 0,
-            },
-            macros: {
-              protein: {
-                ...prev.macros.protein,
-                consumed: dailySummary.total_protein || 0,
+            // Update only consumption values
+            setSummary(prev => ({
+              ...prev,
+              calories: {
+                ...prev.calories,
+                consumed: dailySummary.total_calories || 0,
               },
-              carbs: {
-                ...prev.macros.carbs,
-                consumed: dailySummary.total_carbs || 0,
-              },
-              fat: {
-                ...prev.macros.fat,
-                consumed: dailySummary.total_fat || 0,
-              },
-            }
-          }));
+              macros: {
+                protein: {
+                  ...prev.macros.protein,
+                  consumed: dailySummary.total_protein || 0,
+                },
+                carbs: {
+                  ...prev.macros.carbs,
+                  consumed: dailySummary.total_carbs || 0,
+                },
+                fat: {
+                  ...prev.macros.fat,
+                  consumed: dailySummary.total_fat || 0,
+                },
+              }
+            }));
+          } catch (summaryError) {
+            console.error('Error fetching daily summary:', summaryError);
+            // Don't fail the whole component if just the summary fails
+            // We'll show the goals with 0 consumption instead
+          }
         }
+
+        // Successfully loaded data, reset retry count
+        retryCount = 0;
+        setIsLoading(false);
       } catch (error) {
         console.error('Error fetching nutrition data:', error);
-        setError('Unable to load nutrition data. Please check your connection and try again.');
-      } finally {
+
+        // Only retry a limited number of times
+        if (retryCount < maxRetries && mounted) {
+          retryCount++;
+          console.log(`Retry attempt ${retryCount} of ${maxRetries}`);
+          // Wait before retrying with exponential backoff
+          const retryDelay = Math.min(2000 * Math.pow(2, retryCount - 1), 30000);
+          console.log(`Retrying in ${retryDelay}ms`);
+
+          retryTimeout = setTimeout(loadData, retryDelay);
+          return;
+        }
+
         if (mounted) {
+          setError('Unable to load nutrition data. Please check your connection and try again.');
           setIsLoading(false);
         }
       }
     };
 
-    loadData();
-    return () => { mounted = false; };
-  }, [token]);
+    if (isFocused) {
+      loadData();
+    }
+
+    return () => {
+      mounted = false;
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
+    };
+  }, [token, isFocused]);
 
   const calculatePercentage = (consumed: number, goal: number) => {
     if (!goal) return 0;
@@ -175,7 +209,18 @@ const TodaySummary: React.FC = () => {
           <Text style={{ color: theme.colors.error, textAlign: 'center', marginVertical: 16 }}>
             {error}
           </Text>
-          <Button mode="contained" onPress={() => window.location.reload()} style={styles.retryButton}>
+          <Button
+            mode="contained"
+            onPress={() => {
+              setIsLoading(true);
+              setError(null);
+              // Use setTimeout to prevent immediate re-render
+              setTimeout(() => {
+                window.location.reload();
+              }, 100);
+            }}
+            style={styles.retryButton}
+          >
             Retry
           </Button>
         </Card.Content>
@@ -207,13 +252,11 @@ const TodaySummary: React.FC = () => {
   return (
     <Card style={styles.card}>
       <Card.Content>
-        <Title style={styles.title}>Today's Summary</Title>
-
         <View style={styles.calorieSection}>
           <View style={styles.calorieHeader}>
             <Text style={styles.calorieLabel}>Calories</Text>
             <Text style={styles.calorieValue}>
-              {summary.calories.consumed} / {summary.calories.goal}
+              {Math.round(summary.calories.consumed)} / {Math.round(summary.calories.goal)}
             </Text>
           </View>
           <ProgressBar
@@ -233,7 +276,7 @@ const TodaySummary: React.FC = () => {
                   <View style={styles.macroHeader}>
                     <Text style={styles.macroLabel}>Protein</Text>
                     <Text style={styles.macroValue}>
-                      {summary.macros.protein.consumed}g / {summary.macros.protein.goal}g
+                      {Math.round(summary.macros.protein.consumed)}g / {Math.round(summary.macros.protein.goal)}g
                     </Text>
                   </View>
                   <ProgressBar
@@ -249,7 +292,7 @@ const TodaySummary: React.FC = () => {
                   <View style={styles.macroHeader}>
                     <Text style={styles.macroLabel}>Carbs</Text>
                     <Text style={styles.macroValue}>
-                      {summary.macros.carbs.consumed}g / {summary.macros.carbs.goal}g
+                      {Math.round(summary.macros.carbs.consumed)}g / {Math.round(summary.macros.carbs.goal)}g
                     </Text>
                   </View>
                   <ProgressBar
@@ -265,7 +308,7 @@ const TodaySummary: React.FC = () => {
                   <View style={styles.macroHeader}>
                     <Text style={styles.macroLabel}>Fat</Text>
                     <Text style={styles.macroValue}>
-                      {summary.macros.fat.consumed}g / {summary.macros.fat.goal}g
+                      {Math.round(summary.macros.fat.consumed)}g / {Math.round(summary.macros.fat.goal)}g
                     </Text>
                   </View>
                   <ProgressBar

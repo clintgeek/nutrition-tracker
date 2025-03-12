@@ -6,30 +6,22 @@
 - [x] HTML title is broken again
 - [x] Food search isn't working
 - [x] Food search is complaining that you have to type at least two characters and resulting in a Failed to fetch foods. Please try again. error message on screen
-- [ ] Add Custom food is not working
+- [x] Add Custom food is not working
 
 ### Feature Additions
-- [x] Use favicon.png instead
-- [x] Today's summary tile on home page is using dummy information. It should use your goal and actual nutrition counts from your log
-- [x] Add Home button beside logout button in header
-- [x] API results should be automatically searched and added to the search list with the other foods
-- [x] Implement food search functionality
-- [ ] Break up food log into Breakfast, Lunch, Dinner, Snacks each with an add food button that adds food to that category
-- [x] Implement Today's Summary page with calories and macros, maybe using some sort of chart rather than just a line graph
-- [x] use OpenFoodFacts as primary API, fail to USDA
-- [ ] implement handling of recipies in the food database
-- [x] make the food database available to all users
-- [x] Add barcode scanning with food lookup
-- [ ] Add barcode scanning for food log
-- [ ] Create data visualization for nutrition trends
-- [ ] Add user profile management
-- [ ] Implement OAUTH through google account
-- [ ] Implement user avatars
+- [x] Break up food log into Breakfast, Lunch, Dinner, Snacks each with an add food button that adds food to that category
 - [ ] recommend recent foods/meals on log page
 - [ ] track weight and weight goals
 - [ ] show weight loss progress
+- [ ] Add user profile management
+- [ ] Implement OAUTH through google account
+- [ ] Implement user avatars
 - [ ] Rework home to be more of a dashboard
 - [ ] allow setting of default page in user profile settings
+- [ ] implement handling of recipies in the food database
+- [ ] Add barcode scanning with food lookup
+- [ ] Add barcode scanning for food log
+- [ ] Create data visualization for nutrition trends
 - [ ] implement "milestones" as badges for various things like each 5 pounds lost or every 30 days logged
 - [ ] Make the web page "installable" in the chrome browser
 - [ ] insights that highlight most logged foods or recipies and total logged calories, total logged days and a avg calories per day. Maybe make this page a tabbed interface to show a bunch of information without overwhelming the user
@@ -37,6 +29,14 @@
 - [ ] see what data could be imported from Garmin
 - [ ] meal planning and scheduling
 - [ ] swipe between screens
+- [x] Use favicon.png instead
+- [x] Today's summary tile on home page is using dummy information. It should use your goal and actual nutrition counts from your log
+- [x] Add Home button beside logout button in header
+- [x] API results should be automatically searched and added to the search list with the other foods
+- [x] Implement food search functionality
+- [x] Implement Today's Summary page with calories and macros, maybe using some sort of chart rather than just a line graph
+- [x] use OpenFoodFacts as primary API, fail to USDA
+- [x] make the food database available to all users
 
 ### User Experience
 - [x] Today's summary tile on the home screen should only show calories if your using a calorie goal and only show macros if you're using a macro goal
@@ -51,7 +51,7 @@
 - [x] Update foodApiService.js to call actual external API instead of using mock data
 - [x] Optimize API usage by saving results to database
 - [x] Ensure database tables are created automatically during initial setup
-- [ ] Ensure logController.js properly connects to the database
+- [x] Ensure logController.js properly connects to the database
 - [x] Ensure goalController.js properly connects to the database
 - [x] Ensure authController.js properly connects to the database
 - [x] Ensure userController.js properly connects to the database

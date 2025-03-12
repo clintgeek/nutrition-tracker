@@ -84,7 +84,7 @@ const mapNutritionData = (food: any): {
     carbs: 0,
     fat: 0,
     serving_size: 100,
-    serving_unit: 'g'
+    serving_unit: 'servings'
   };
 
   // Handle calories (different possible field names)
@@ -245,7 +245,12 @@ export const foodService = {
   // Search for foods
   async searchFood(query: string, page = 1, limit = 20): Promise<SearchResponse> {
     const response = await apiService.get<SearchResponse>('/foods/search', {
-      params: { query, page, limit },
+      params: {
+        query,
+        page,
+        limit,
+        include_deleted: false
+      },
     });
 
     if (response.foods) {
@@ -369,7 +374,7 @@ export const foodService = {
   // Get custom foods
   async getCustomFoods(page = 1, limit = 20): Promise<FoodItem[]> {
     try {
-      const response = await apiService.get<CustomFoodsResponse>(`/foods/custom?page=${page}&limit=${limit}`);
+      const response = await apiService.get<CustomFoodsResponse>(`/foods/custom?page=${page}&limit=${limit}&include_deleted=false`);
 
       if (response && response.foods && Array.isArray(response.foods)) {
         return response.foods.map(food => ({
@@ -389,6 +394,7 @@ export const foodService = {
   // Create custom food
   async createCustomFood(foodData: CreateFoodDTO): Promise<Food> {
     try {
+      console.log('Creating custom food with data:', foodData);
       const response = await apiService.post<FoodApiResponse>('/foods/custom', foodData);
       return response.food;
     } catch (error) {
@@ -441,7 +447,17 @@ export const foodService = {
 
   // Delete food (alias for deleteCustomFood for backward compatibility)
   async deleteFood(id: number): Promise<void> {
-    await apiService.delete(`/foods/custom/${id}`);
+    try {
+      // Transform the data to match database column names
+      const transformedData = {
+        is_deleted: true
+      };
+
+      await apiService.put<{ message: string; food: Food }>(`/foods/custom/${id}`, transformedData);
+    } catch (error) {
+      console.error('Error soft deleting food:', error);
+      throw error;
+    }
   },
 
   // Map food item from database to frontend format
@@ -456,7 +472,7 @@ export const foodService = {
       carbs: item.carbs || item.carbs_grams || 0,
       fat: item.fat || item.fat_grams || 0,
       serving_size: item.serving_size || 100,
-      serving_unit: item.serving_unit || 'g',
+      serving_unit: item.serving_unit || '',
       source: item.source,
       source_id: item.source_id,
       is_custom: item.source === 'custom',

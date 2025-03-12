@@ -108,7 +108,7 @@ export const foodLogService = {
   },
 
   // Create a new food log
-  createLog: async (logData: Omit<FoodLog, 'id' | 'sync_id' | 'created_at' | 'updated_at'>): Promise<FoodLog> => {
+  createLog: async (logData: Omit<FoodLog, 'id' | 'sync_id' | 'created_at' | 'updated_at'> & { food_item?: any }): Promise<FoodLog> => {
     // Generate sync ID
     const syncId = uuid.v4() as string;
 
@@ -117,6 +117,17 @@ export const foodLogService = {
       const log = await apiService.post<{ message: string; log: FoodLog }>('/logs', {
         ...logData,
         sync_id: syncId,
+        food_item: logData.food_item ? {
+          name: logData.food_item.name,
+          calories_per_serving: logData.food_item.calories || logData.food_item.calories_per_serving,
+          protein_grams: logData.food_item.protein || logData.food_item.protein_grams,
+          carbs_grams: logData.food_item.carbs || logData.food_item.carbs_grams,
+          fat_grams: logData.food_item.fat || logData.food_item.fat_grams,
+          serving_size: logData.food_item.serving_size || 1,
+          serving_unit: logData.food_item.serving_unit || 'serving'
+        } : undefined,
+        // Only include food_item_id if it's provided and food_item is not provided
+        ...(logData.food_item_id && !logData.food_item ? { food_item_id: logData.food_item_id } : {})
       }).then((response) => response.log);
 
       return log;
@@ -153,9 +164,69 @@ export const foodLogService = {
     try {
       // Try to delete log via API
       await apiService.delete<{ message: string }>(`/logs/${id}`);
+
+      // Remove from offline storage regardless of API success
+      const offlineLogsJson = await AsyncStorage.getItem(OFFLINE_LOGS_KEY);
+      if (offlineLogsJson) {
+        const offlineLogs: FoodLog[] = JSON.parse(offlineLogsJson);
+        // Filter out the log by either id or sync_id
+        const updatedLogs = offlineLogs.filter(log => {
+          if (log.id === id) return false;
+          // If the log has no id but matches the sync_id of a deleted log, remove it
+          const deletedLog = offlineLogs.find(l => l.id === id);
+          if (deletedLog && log.sync_id === deletedLog.sync_id) return false;
+          return true;
+        });
+        await AsyncStorage.setItem(OFFLINE_LOGS_KEY, JSON.stringify(updatedLogs));
+      }
+
+      // Remove from pending changes
+      const pendingLogsJson = await AsyncStorage.getItem(PENDING_LOGS_KEY);
+      if (pendingLogsJson) {
+        const pendingLogs: FoodLog[] = JSON.parse(pendingLogsJson);
+        // Filter out the log by either id or sync_id
+        const updatedPendingLogs = pendingLogs.filter(log => {
+          if (log.id === id) return false;
+          // If the log has no id but matches the sync_id of a deleted log, remove it
+          const deletedLog = pendingLogs.find(l => l.id === id);
+          if (deletedLog && log.sync_id === deletedLog.sync_id) return false;
+          return true;
+        });
+        await AsyncStorage.setItem(PENDING_LOGS_KEY, JSON.stringify(updatedPendingLogs));
+      }
     } catch (error) {
-      // If API call fails, mark log for deletion
-      await foodLogService.markLogForDeletion(id);
+      // If API call fails, still try to remove from local storage
+      try {
+        const offlineLogsJson = await AsyncStorage.getItem(OFFLINE_LOGS_KEY);
+        if (offlineLogsJson) {
+          const offlineLogs: FoodLog[] = JSON.parse(offlineLogsJson);
+          // Filter out the log by either id or sync_id
+          const updatedLogs = offlineLogs.filter(log => {
+            if (log.id === id) return false;
+            // If the log has no id but matches the sync_id of a deleted log, remove it
+            const deletedLog = offlineLogs.find(l => l.id === id);
+            if (deletedLog && log.sync_id === deletedLog.sync_id) return false;
+            return true;
+          });
+          await AsyncStorage.setItem(OFFLINE_LOGS_KEY, JSON.stringify(updatedLogs));
+        }
+
+        const pendingLogsJson = await AsyncStorage.getItem(PENDING_LOGS_KEY);
+        if (pendingLogsJson) {
+          const pendingLogs: FoodLog[] = JSON.parse(pendingLogsJson);
+          // Filter out the log by either id or sync_id
+          const updatedPendingLogs = pendingLogs.filter(log => {
+            if (log.id === id) return false;
+            // If the log has no id but matches the sync_id of a deleted log, remove it
+            const deletedLog = pendingLogs.find(l => l.id === id);
+            if (deletedLog && log.sync_id === deletedLog.sync_id) return false;
+            return true;
+          });
+          await AsyncStorage.setItem(PENDING_LOGS_KEY, JSON.stringify(updatedPendingLogs));
+        }
+      } catch (storageError) {
+        console.error('Error removing log from storage:', storageError);
+      }
     }
   },
 

@@ -41,13 +41,42 @@ export const summaryService = {
       const endpoint = `/logs/daily-summary?date=${formattedDate}`;
       console.log('API endpoint:', endpoint);
 
-      return apiService.get<{ summary: DailySummary }>(endpoint)
-        .then((response) => {
-          console.log('Daily summary response:', response);
-          return response.summary;
-        });
-    } catch (error) {
+      // Add timeout to prevent hanging requests
+      const response = await Promise.race([
+        apiService.get<{ summary: DailySummary }>(endpoint),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Request timeout after 10 seconds')), 10000)
+        )
+      ]) as { summary: DailySummary };
+
+      console.log('Daily summary response:', response);
+
+      // Check if the response has the expected structure
+      if (response && response.summary) {
+        return response.summary;
+      } else {
+        console.warn('Invalid summary response format:', response);
+        return emptySummary;
+      }
+    } catch (error: any) {
       console.error('Error fetching daily summary:', error);
+
+      // Log more details about the error
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error('Error response data:', error.response.data);
+        console.error('Error response status:', error.response.status);
+        console.error('Error response headers:', error.response.headers);
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error('Error request:', error.request);
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error('Error message:', error.message);
+      }
+
+      // Return empty summary instead of throwing the error
       return emptySummary;
     }
   },

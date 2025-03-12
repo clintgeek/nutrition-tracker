@@ -68,15 +68,39 @@ const getLogSummary = asyncHandler(async (req, res) => {
  * @route GET /api/logs/daily-summary
  */
 const getDailySummary = asyncHandler(async (req, res) => {
-  const { date } = req.query;
+  try {
+    const { date } = req.query;
 
-  if (!date) {
-    return res.status(400).json({ message: 'Date is required' });
+    logger.info(`Daily summary requested for user ${req.user.id} on date ${date}`);
+
+    if (!date) {
+      logger.warn(`Daily summary request missing date parameter from user ${req.user.id}`);
+      return res.status(400).json({ message: 'Date is required' });
+    }
+
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(date)) {
+      logger.warn(`Invalid date format in daily summary request: ${date} from user ${req.user.id}`);
+      return res.status(400).json({ message: 'Invalid date format. Use YYYY-MM-DD' });
+    }
+
+    const summary = await FoodLog.getDailySummary(req.user.id, date);
+
+    logger.info(`Daily summary successfully retrieved for user ${req.user.id} on date ${date}`);
+    logger.debug(`Summary data: ${JSON.stringify(summary)}`);
+
+    res.json({ summary });
+  } catch (error) {
+    logger.error(`Error in getDailySummary controller: ${error.message}`, {
+      userId: req.user?.id,
+      date: req.query?.date,
+      stack: error.stack
+    });
+
+    // Don't expose internal error details to client
+    res.status(500).json({ message: 'Error retrieving daily summary' });
   }
-
-  const summary = await FoodLog.getDailySummary(req.user.id, date);
-
-  res.json({ summary });
 });
 
 /**
@@ -90,10 +114,33 @@ const createLog = asyncHandler(async (req, res) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { food_item_id, log_date, meal_type, servings, sync_id } = req.body;
+  const { food_item_id, log_date, meal_type, servings, sync_id, food_item } = req.body;
+
+  let finalFoodItemId = food_item_id;
+
+  // If food_item is provided and food_item_id doesn't exist, create the food item
+  if (food_item && !food_item_id) {
+    try {
+      const newFoodItem = await FoodItem.create({
+        name: food_item.name,
+        calories_per_serving: food_item.calories_per_serving,
+        protein_grams: food_item.protein_grams,
+        carbs_grams: food_item.carbs_grams,
+        fat_grams: food_item.fat_grams,
+        serving_size: food_item.serving_size,
+        serving_unit: food_item.serving_unit,
+        source: 'custom',
+        user_id: req.user.id
+      });
+      finalFoodItemId = newFoodItem.id;
+    } catch (error) {
+      logger.error(`Error creating food item: ${error.message}`);
+      return res.status(500).json({ message: 'Failed to create food item' });
+    }
+  }
 
   // Check if food item exists
-  const foodItem = await FoodItem.findById(food_item_id);
+  const foodItem = await FoodItem.findById(finalFoodItemId);
   if (!foodItem) {
     return res.status(404).json({ message: 'Food item not found' });
   }
@@ -101,7 +148,7 @@ const createLog = asyncHandler(async (req, res) => {
   // Create log
   const log = await FoodLog.create({
     user_id: req.user.id,
-    food_item_id,
+    food_item_id: finalFoodItemId,
     log_date,
     meal_type,
     servings,

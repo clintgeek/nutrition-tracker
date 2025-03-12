@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import uuid from 'react-native-uuid';
@@ -34,6 +34,10 @@ const SyncContext = createContext<SyncContextData>({
 // Storage keys
 const DEVICE_ID_KEY = '@NutritionTracker:deviceId';
 const LAST_SYNC_TIME_KEY = '@NutritionTracker:lastSyncTime';
+const LAST_SYNC_ERROR_TIME_KEY = '@NutritionTracker:lastSyncErrorTime';
+
+// Error cooldown period in milliseconds (5 minutes)
+const ERROR_COOLDOWN_PERIOD = 5 * 60 * 1000;
 
 // Sync provider component
 export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -44,6 +48,8 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [syncError, setSyncError] = useState<string | null>(null);
   const [pendingChanges, setPendingChanges] = useState(0);
   const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [lastSyncErrorTime, setLastSyncErrorTime] = useState<number | null>(null);
+  const syncInProgressRef = useRef(false);
 
   // Load device ID and last sync time from storage on app start
   useEffect(() => {
@@ -64,6 +70,12 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const storedLastSyncTime = await AsyncStorage.getItem(LAST_SYNC_TIME_KEY);
         if (storedLastSyncTime) {
           setLastSyncTime(storedLastSyncTime);
+        }
+
+        // Load last sync error time
+        const storedLastSyncErrorTime = await AsyncStorage.getItem(LAST_SYNC_ERROR_TIME_KEY);
+        if (storedLastSyncErrorTime) {
+          setLastSyncErrorTime(parseInt(storedLastSyncErrorTime, 10));
         }
       } catch (error) {
         console.error('Error loading sync data from storage:', error);
@@ -111,10 +123,31 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Auto-sync when online and there are pending changes
   useEffect(() => {
-    if (isOnline && pendingChanges > 0 && user && !isSyncing) {
+    // Check if we should sync
+    const shouldSync = () => {
+      // Don't sync if not online, no user, no pending changes, or already syncing
+      if (!isOnline || !user || pendingChanges === 0 || isSyncing || syncInProgressRef.current) {
+        return false;
+      }
+
+      // Don't sync if we had an error recently
+      if (lastSyncErrorTime) {
+        const now = Date.now();
+        const timeSinceLastError = now - lastSyncErrorTime;
+
+        if (timeSinceLastError < ERROR_COOLDOWN_PERIOD) {
+          console.log(`Skipping auto-sync due to recent error (${Math.round(timeSinceLastError / 1000)}s ago)`);
+          return false;
+        }
+      }
+
+      return true;
+    };
+
+    if (shouldSync()) {
       syncNow();
     }
-  }, [isOnline, pendingChanges, user, isSyncing]);
+  }, [isOnline, pendingChanges, user, isSyncing, lastSyncErrorTime]);
 
   // Get device ID function
   const getDeviceId = async (): Promise<string> => {
@@ -141,7 +174,10 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Sync now function
   const syncNow = async () => {
-    if (!user || !token || !deviceId || isSyncing) return;
+    if (!user || !token || !deviceId || isSyncing || syncInProgressRef.current) return;
+
+    // Set sync in progress flag
+    syncInProgressRef.current = true;
 
     try {
       setIsSyncing(true);
@@ -152,6 +188,14 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Get pending goals
       const pendingGoals = await goalService.getPendingChanges();
+
+      // If no pending changes, just update the last sync time
+      if (pendingFoodLogs.length === 0 && pendingGoals.length === 0) {
+        console.log('No pending changes to sync');
+        setIsSyncing(false);
+        syncInProgressRef.current = false;
+        return;
+      }
 
       // Prepare changes object
       const changes = {
@@ -194,19 +238,33 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLastSyncTime(result.sync_timestamp);
       await AsyncStorage.setItem(LAST_SYNC_TIME_KEY, result.sync_timestamp);
 
+      // Clear last sync error time
+      setLastSyncErrorTime(null);
+      await AsyncStorage.removeItem(LAST_SYNC_ERROR_TIME_KEY);
+
       // Update pending changes count
       setPendingChanges(0);
     } catch (error: any) {
-      setSyncError(error.message || 'Failed to synchronize data');
       console.error('Sync error:', error);
+
+      // Set sync error
+      setSyncError(error.message || 'Failed to synchronize data');
+
+      // Record the error time
+      const now = Date.now();
+      setLastSyncErrorTime(now);
+      await AsyncStorage.setItem(LAST_SYNC_ERROR_TIME_KEY, now.toString());
     } finally {
       setIsSyncing(false);
+      syncInProgressRef.current = false;
     }
   };
 
   // Clear sync error function
   const clearSyncError = () => {
     setSyncError(null);
+    setLastSyncErrorTime(null);
+    AsyncStorage.removeItem(LAST_SYNC_ERROR_TIME_KEY);
   };
 
   return (
