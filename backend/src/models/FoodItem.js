@@ -11,6 +11,10 @@ class FoodItem {
    * @returns {Object} Transformed food item
    */
   static transformToFrontend(dbItem) {
+    if (!dbItem) {
+      return null;
+    }
+
     return {
       id: dbItem.id,
       name: dbItem.name,
@@ -96,14 +100,28 @@ class FoodItem {
    */
   static async findById(id) {
     try {
+      logger.debug(`Finding food item by ID: ${id}`);
+
+      if (!id) {
+        logger.debug('No ID provided to findById');
+        return null;
+      }
+
       const result = await db.query(
-        'SELECT * FROM food_items WHERE id = $1 AND is_deleted = FALSE',
+        'SELECT * FROM food_items WHERE id = $1',  // Removed is_deleted check to find item even if deleted
         [id]
       );
 
+      if (!result.rows[0]) {
+        logger.debug(`No food item found with ID: ${id}`);
+        return null;
+      }
+
+      logger.debug(`Found food item: ${JSON.stringify(result.rows[0])}`);
       return this.transformToFrontend(result.rows[0]);
     } catch (error) {
-      logger.error(`Error finding food item by ID: ${error.message}`);
+      logger.error(`Error finding food item by ID ${id}:`, error);
+      logger.error('Stack trace:', error.stack);
       throw error;
     }
   }
@@ -179,42 +197,70 @@ class FoodItem {
    * @param {Object} foodData - Food item data
    * @returns {Promise<Object|null>} Updated food item or null
    */
-  static async update(id, foodData) {
+  static async update(id, foodData, userId) {
     try {
+      // Check if this is a soft delete request
+      if (foodData.hasOwnProperty('is_deleted') && Object.keys(foodData).length === 1) {
+        // Ensure is_deleted is a boolean
+        const isDeleted = foodData.is_deleted === true || foodData.is_deleted === 'true';
+        logger.debug(`Soft delete request - ID: ${id}, UserID: ${userId}, Value: ${isDeleted}`);
+
+        const result = await db.query(
+          'UPDATE food_items SET is_deleted = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3 RETURNING *',
+          [isDeleted, id, userId]
+        );
+
+        if (!result.rows[0]) {
+          logger.debug(`No rows updated for ID: ${id}, UserID: ${userId}`);
+          return null;
+        }
+
+        logger.debug(`Successfully updated food item: ${JSON.stringify(result.rows[0])}`);
+        return this.transformToFrontend(result.rows[0]);
+      }
+
+      // Regular update - transform the data first
       const dbData = this.transformToDatabase(foodData);
+
+      // Log the transformed data for debugging
+      logger.debug('Update data after transformation:', dbData);
+
+      const setClause = Object.keys(dbData)
+        .filter(key => dbData[key] !== undefined)
+        .map((key, i) => `${key} = $${i + 1}`)
+        .join(', ');
+
+      if (!setClause) {
+        throw new Error('No valid fields to update');
+      }
+
+      const values = Object.keys(dbData)
+        .filter(key => dbData[key] !== undefined)
+        .map(key => dbData[key]);
+
+      values.push(id);
+      values.push(userId);
+
+      logger.debug(`Update query values: ${JSON.stringify(values)}`);
+
       const result = await db.query(
         `UPDATE food_items
-         SET name = $1,
-             barcode = $2,
-             calories_per_serving = $3,
-             protein_grams = $4,
-             carbs_grams = $5,
-             fat_grams = $6,
-             serving_size = $7,
-             serving_unit = $8,
-             source = $9,
-             source_id = $10,
-             updated_at = NOW()
-         WHERE id = $11 AND is_deleted = FALSE
+         SET ${setClause}, updated_at = NOW()
+         WHERE id = $${values.length - 1} AND user_id = $${values.length}
          RETURNING *`,
-        [
-          dbData.name,
-          dbData.barcode,
-          dbData.calories_per_serving,
-          dbData.protein_grams,
-          dbData.carbs_grams,
-          dbData.fat_grams,
-          dbData.serving_size,
-          dbData.serving_unit,
-          dbData.source,
-          dbData.source_id,
-          id
-        ]
+        values
       );
 
+      if (!result.rows[0]) {
+        logger.debug(`No rows updated for regular update - ID: ${id}, UserID: ${userId}`);
+        return null;
+      }
+
+      logger.debug(`Successfully updated food item: ${JSON.stringify(result.rows[0])}`);
       return this.transformToFrontend(result.rows[0]);
     } catch (error) {
-      logger.error(`Error updating food item: ${error.message}`);
+      logger.error(`Error updating food item (ID: ${id}):`, error);
+      logger.error('Stack trace:', error.stack);
       throw error;
     }
   }
@@ -240,21 +286,31 @@ class FoodItem {
   /**
    * Soft delete food item
    * @param {number} id - Food item ID
+   * @param {number} userId - User ID
    * @returns {Promise<boolean>} Success status
    */
-  static async delete(id) {
+  static async delete(id, userId) {
     try {
+      logger.debug(`Attempting to soft delete food item - ID: ${id}, UserID: ${userId}`);
+
       const result = await db.query(
         `UPDATE food_items
          SET is_deleted = TRUE, updated_at = NOW()
-         WHERE id = $1
-         RETURNING id`,
-        [id]
+         WHERE id = $1 AND user_id = $2 AND source = 'custom'
+         RETURNING *`,
+        [id, userId]
       );
 
-      return result.rowCount > 0;
+      if (!result.rows[0]) {
+        logger.debug(`No rows updated for soft delete - ID: ${id}, UserID: ${userId}`);
+        return false;
+      }
+
+      logger.debug(`Successfully soft deleted food item ${id}`);
+      return true;
     } catch (error) {
-      logger.error(`Error soft deleting food item: ${error.message}`);
+      logger.error(`Error soft deleting food item (ID: ${id}):`, error);
+      logger.error('Stack trace:', error.stack);
       throw error;
     }
   }

@@ -13,6 +13,22 @@ const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Validation middleware for regular food updates
+const validateFoodUpdate = [
+  check('name', 'Name is required').not().isEmpty(),
+  check('calories_per_serving', 'Calories must be a number').isNumeric(),
+  check('protein_grams', 'Protein must be a number').isNumeric(),
+  check('carbs_grams', 'Carbs must be a number').isNumeric(),
+  check('fat_grams', 'Fat must be a number').isNumeric(),
+  check('serving_size', 'Serving size is required').not().isEmpty(),
+  check('serving_unit', 'Serving unit is required').not().isEmpty(),
+];
+
+// Validation middleware for soft deletion
+const validateSoftDelete = [
+  check('is_deleted', 'is_deleted must be a boolean').isBoolean()
+];
+
 /**
  * @route GET /api/foods/search
  * @desc Search food items
@@ -64,13 +80,14 @@ router.post(
 router.put(
   '/custom/:id',
   [
-    check('name', 'Name is required').not().isEmpty(),
-    check('calories_per_serving', 'Calories must be a number').isNumeric(),
-    check('protein_grams', 'Protein must be a number').isNumeric(),
-    check('carbs_grams', 'Carbs must be a number').isNumeric(),
-    check('fat_grams', 'Fat must be a number').isNumeric(),
-    check('serving_size', 'Serving size is required').not().isEmpty(),
-    check('serving_unit', 'Serving unit is required').not().isEmpty(),
+    check('is_deleted').optional().isBoolean().withMessage('is_deleted must be a boolean'),
+    check('name').optional().not().isEmpty().withMessage('Name cannot be empty'),
+    check('calories_per_serving').optional().isNumeric().withMessage('Calories must be a number'),
+    check('protein_grams').optional().isNumeric().withMessage('Protein must be a number'),
+    check('carbs_grams').optional().isNumeric().withMessage('Carbs must be a number'),
+    check('fat_grams').optional().isNumeric().withMessage('Fat must be a number'),
+    check('serving_size').optional().not().isEmpty().withMessage('Serving size cannot be empty'),
+    check('serving_unit').optional().not().isEmpty().withMessage('Serving unit cannot be empty'),
   ],
   updateCustomFood
 );

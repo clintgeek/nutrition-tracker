@@ -196,37 +196,74 @@ const createCustomFood = asyncHandler(async (req, res) => {
  * @route PUT /api/foods/custom/:id
  */
 const updateCustomFood = asyncHandler(async (req, res) => {
-  // Validate request
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
+  try {
+    // Validate request
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      logger.debug('Validation failed:', errors.array());
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Check if this is a soft delete request
+    if (req.body.hasOwnProperty('is_deleted') && Object.keys(req.body).length === 1) {
+      logger.debug(`Processing soft delete request - ID: ${id}, UserID: ${userId}`);
+
+      const isDeleted = req.body.is_deleted === true || req.body.is_deleted === 'true';
+      const food = await FoodItem.findById(id);
+
+      if (!food) {
+        return res.status(404).json({ message: 'Food item not found' });
+      }
+
+      if (food.user_id !== userId) {
+        return res.status(403).json({ message: 'Not authorized to update this food item' });
+      }
+
+      try {
+        const updatedFood = await FoodItem.update(id, { is_deleted: isDeleted }, userId);
+        if (!updatedFood) {
+          return res.status(404).json({ message: 'Food item not found or update failed' });
+        }
+
+        logger.debug(`Successfully soft deleted food item ${id}`);
+        return res.json({ message: 'Food item updated successfully', food: updatedFood });
+      } catch (updateError) {
+        logger.error('Error during soft delete:', updateError);
+        throw updateError;
+      }
+    }
+
+    // Regular update
+    logger.debug(`Processing regular update - ID: ${id}, UserID: ${userId}`);
+
+    const food = await FoodItem.findById(id);
+    if (!food) {
+      return res.status(404).json({ message: 'Food item not found' });
+    }
+
+    if (food.user_id !== userId) {
+      return res.status(403).json({ message: 'Not authorized to update this food item' });
+    }
+
+    const updatedFood = await FoodItem.update(id, req.body, userId);
+    if (!updatedFood) {
+      return res.status(404).json({ message: 'Food item not found or update failed' });
+    }
+
+    logger.debug(`Successfully updated food item ${id}`);
+    res.json({ message: 'Food item updated successfully', food: updatedFood });
+  } catch (error) {
+    logger.error('Error in updateCustomFood:', error);
+    logger.error('Stack trace:', error.stack);
+    res.status(500).json({
+      message: 'Server error',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
-
-  const { id } = req.params;
-
-  // Check if food item exists
-  const foodItem = await FoodItem.findById(id);
-
-  if (!foodItem) {
-    return res.status(404).json({ message: 'Food item not found' });
-  }
-
-  // Check if it's a custom food item
-  if (foodItem.source !== 'custom') {
-    return res.status(403).json({ message: 'Only custom food items can be updated' });
-  }
-
-  // Update food item
-  const updatedFoodItem = await FoodItem.update(id, {
-    ...req.body,
-    source: 'custom',  // Ensure source remains 'custom'
-    source_id: foodItem.source_id  // Preserve the original source_id
-  });
-
-  res.json({
-    message: 'Food item updated',
-    food: updatedFoodItem,
-  });
 });
 
 /**
@@ -234,36 +271,78 @@ const updateCustomFood = asyncHandler(async (req, res) => {
  * @route DELETE /api/foods/custom/:id
  */
 const deleteCustomFood = asyncHandler(async (req, res) => {
-  const { id } = req.params;
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
 
-  // Check if food item exists
-  const foodItem = await FoodItem.findById(id);
+    logger.debug(`Delete request - ID: ${id}, UserID: ${userId}`);
 
-  if (!foodItem) {
-    return res.status(404).json({ message: 'Food item not found' });
-  }
+    if (!id || !userId) {
+      logger.debug('Missing required parameters:', { id, userId });
+      return res.status(400).json({ message: 'Missing required parameters' });
+    }
 
-  // Check if it's a custom food item
-  if (foodItem.source !== 'custom') {
-    return res.status(403).json({ message: 'Only custom food items can be deleted' });
-  }
+    // Check if food item exists and belongs to user
+    const foodItem = await FoodItem.findById(id);
 
-  // Check if the food item has any associated logs
-  const hasLogs = await FoodItem.hasAssociatedLogs(id);
-  if (hasLogs) {
-    return res.status(400).json({
-      message: 'Cannot delete food item that has associated logs. Consider marking it as deleted instead.'
+    logger.debug('Found food item:', foodItem);
+
+    if (!foodItem) {
+      logger.debug(`Food item ${id} not found`);
+      return res.status(404).json({ message: 'Food item not found' });
+    }
+
+    // Check if it's a custom food item
+    if (foodItem.source !== 'custom') {
+      logger.debug(`Food item ${id} is not a custom food item (source: ${foodItem.source})`);
+      return res.status(403).json({ message: 'Only custom food items can be deleted' });
+    }
+
+    // Check if the food item belongs to the user
+    if (foodItem.user_id !== userId) {
+      logger.debug(`User ${userId} not authorized to delete food item ${id} (owner: ${foodItem.user_id})`);
+      return res.status(403).json({ message: 'Not authorized to delete this food item' });
+    }
+
+    // Check if the food item has any associated logs
+    const hasLogs = await FoodItem.hasAssociatedLogs(id);
+    logger.debug(`Food item ${id} has logs:`, hasLogs);
+
+    if (hasLogs) {
+      logger.debug(`Food item ${id} has associated logs, cannot delete`);
+      return res.status(400).json({
+        message: 'Cannot delete food item that has associated logs. Consider marking it as deleted instead.'
+      });
+    }
+
+    // Delete food item
+    logger.debug(`Attempting to delete food item ${id}`);
+    const success = await FoodItem.delete(id, userId);
+
+    if (!success) {
+      logger.debug(`Failed to delete food item ${id}`);
+      return res.status(500).json({
+        message: 'Failed to delete food item',
+        details: 'The database operation did not affect any rows'
+      });
+    }
+
+    logger.debug(`Successfully deleted food item ${id}`);
+    res.json({
+      message: 'Food item deleted',
+      id: id,
+      success: true
+    });
+  } catch (error) {
+    logger.error('Error deleting custom food:', error);
+    logger.error('Stack trace:', error.stack);
+    res.status(500).json({
+      message: 'Server error while deleting food item',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      details: 'An unexpected error occurred during the deletion process'
     });
   }
-
-  // Delete food item
-  const success = await FoodItem.delete(id);
-
-  if (!success) {
-    return res.status(500).json({ message: 'Failed to delete food item' });
-  }
-
-  res.json({ message: 'Food item deleted' });
 });
 
 /**

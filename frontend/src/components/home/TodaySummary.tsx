@@ -8,7 +8,6 @@ import { summaryService, DailySummary } from '../../services/summaryService';
 import { useAuth } from '../../contexts/AuthContext';
 import { setAuthToken } from '../../services/apiService';
 
-// Mock data for now - in a real app, this would come from an API
 interface NutritionSummary {
   calories: {
     consumed: number;

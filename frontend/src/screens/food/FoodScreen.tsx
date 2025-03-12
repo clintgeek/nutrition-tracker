@@ -562,29 +562,25 @@ const FoodScreen: React.FC = () => {
             </Button>
           </Dialog.Actions>
         </Dialog>
-      </Portal>
 
-      <FAB
-        style={styles.fab}
-        icon="plus"
-        onPress={() => {
-          setSelectedFood({
-            id: `new-${Date.now()}`,
-            name: '',
-            calories: 0,
-            protein: 0,
-            carbs: 0,
-            fat: 0,
-            serving_size: 100,
-            serving_unit: '',
-            source: 'custom'
-          });
-          setIsFoodDetailsVisible(true);
-        }}
-      />
+        {/* Delete Confirmation Dialog */}
+        <Dialog
+          visible={isDeleteModalVisible}
+          onDismiss={() => setIsDeleteModalVisible(false)}
+        >
+          <Dialog.Title>Delete Food</Dialog.Title>
+          <Dialog.Content>
+            <Text>Are you sure you want to delete "{foodToDelete?.name}"?</Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setIsDeleteModalVisible(false)}>Cancel</Button>
+            <Button onPress={confirmDelete} mode="contained" textColor={theme.colors.error}>
+              Delete
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
 
-      {/* Add to Log Modal */}
-      <Portal>
+        {/* Add to Log Modal */}
         <Dialog
           visible={isAddingToLogModalVisible}
           onDismiss={() => setIsAddingToLogModalVisible(false)}
@@ -623,6 +619,25 @@ const FoodScreen: React.FC = () => {
           </Dialog.Actions>
         </Dialog>
       </Portal>
+
+      <FAB
+        style={styles.fab}
+        icon="plus"
+        onPress={() => {
+          setSelectedFood({
+            id: `new-${Date.now()}`,
+            name: '',
+            calories: 0,
+            protein: 0,
+            carbs: 0,
+            fat: 0,
+            serving_size: 100,
+            serving_unit: '',
+            source: 'custom'
+          });
+          setIsFoodDetailsVisible(true);
+        }}
+      />
     </View>
   );
 };
@@ -692,7 +707,7 @@ const styles = StyleSheet.create({
     marginLeft: 16,
   },
   foodName: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 4,
     textTransform: 'capitalize',
