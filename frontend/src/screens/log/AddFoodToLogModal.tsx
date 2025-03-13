@@ -14,13 +14,26 @@ import { Food } from '../../types/Food';
 import { foodLogService } from '../../services/foodLogService';
 import { foodService } from '../../services/foodService';
 
+// Helper function to round to nearest 0.5
+const roundToNearestHalf = (value: number): number => {
+  return Math.round(value * 2) / 2;
+};
+
+// Helper function to capitalize food name
+const capitalizeFoodName = (name: string): string => {
+  return name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+};
+
 const AddFoodToLogModal: React.FC = () => {
   const theme = useTheme();
   const navigation = useNavigation();
   const route = useRoute();
   const { food: initialFood, mealType: initialMealType, date: initialDate } = (route.params as { food: Food; mealType?: string; date?: string }) || {};
 
-  const [food, setFood] = useState<Food>(initialFood);
+  const [food, setFood] = useState<Food>({
+    ...initialFood,
+    name: capitalizeFoodName(initialFood.name)
+  });
   const [servings, setServings] = useState('1');
   const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>(initialMealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' || 'snack');
   const [date, setDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
@@ -30,13 +43,13 @@ const AddFoodToLogModal: React.FC = () => {
   // Calculate nutrition values based on servings
   const calculateNutrition = (value: number) => {
     const servingsNum = parseFloat(servings) || 1;
-    return Math.round(value * servingsNum);
+    return roundToNearestHalf(value * servingsNum);
   };
 
   // Handle nutrition value changes
   const handleNutritionChange = (field: keyof Food, value: string) => {
     const numValue = parseFloat(value) || 0;
-    setFood(prev => ({ ...prev, [field]: numValue }));
+    setFood(prev => ({ ...prev, [field]: roundToNearestHalf(numValue) }));
     setIsCustom(true);
   };
 
@@ -50,14 +63,21 @@ const AddFoodToLogModal: React.FC = () => {
       if (isCustom) {
         const customFood = {
           ...food,
+          name: capitalizeFoodName(food.name),
           source: 'custom',
           serving_size: food.serving_size,
           serving_unit: food.serving_unit,
+          // Round all nutrition values to nearest 0.5
+          calories: roundToNearestHalf(food.calories),
+          protein: roundToNearestHalf(food.protein),
+          carbs: roundToNearestHalf(food.carbs),
+          fat: roundToNearestHalf(food.fat),
         };
 
         if (food.is_custom) {
           // Update existing custom food
           await foodService.updateCustomFood(parseInt(food.id), customFood);
+          foodToLog = { ...foodToLog, name: capitalizeFoodName(food.name) };
         } else {
           // Create new custom food
           const newFood = await foodService.createCustomFood(customFood);
@@ -70,7 +90,10 @@ const AddFoodToLogModal: React.FC = () => {
         servings: parseFloat(servings),
         meal_type: mealType,
         log_date: date,
-        food_item: foodToLog,
+        food_item: {
+          ...foodToLog,
+          name: capitalizeFoodName(foodToLog.name)
+        },
       });
       navigation.goBack();
     } catch (error) {
@@ -83,7 +106,7 @@ const AddFoodToLogModal: React.FC = () => {
   return (
     <Portal>
       <Dialog visible={true} onDismiss={() => navigation.goBack()} style={styles.dialog}>
-        <Dialog.Title>Add {food.name} to Log</Dialog.Title>
+        <Dialog.Title>Add {capitalizeFoodName(food.name)} to Log</Dialog.Title>
         <Dialog.Content>
           <ScrollView>
             <View style={styles.content}>
@@ -123,7 +146,7 @@ const AddFoodToLogModal: React.FC = () => {
                 <View style={styles.nutritionItem}>
                   <Text style={styles.nutritionLabel}>Calories</Text>
                   <TextInput
-                    value={food.calories.toString()}
+                    value={calculateNutrition(food.calories).toString()}
                     onChangeText={(value) => handleNutritionChange('calories', value)}
                     keyboardType="numeric"
                     style={styles.nutritionInput}
@@ -132,7 +155,7 @@ const AddFoodToLogModal: React.FC = () => {
                 <View style={styles.nutritionItem}>
                   <Text style={styles.nutritionLabel}>Protein</Text>
                   <TextInput
-                    value={food.protein.toString()}
+                    value={calculateNutrition(food.protein).toString()}
                     onChangeText={(value) => handleNutritionChange('protein', value)}
                     keyboardType="numeric"
                     style={styles.nutritionInput}
@@ -141,7 +164,7 @@ const AddFoodToLogModal: React.FC = () => {
                 <View style={styles.nutritionItem}>
                   <Text style={styles.nutritionLabel}>Carbs</Text>
                   <TextInput
-                    value={food.carbs.toString()}
+                    value={calculateNutrition(food.carbs).toString()}
                     onChangeText={(value) => handleNutritionChange('carbs', value)}
                     keyboardType="numeric"
                     style={styles.nutritionInput}
@@ -150,7 +173,7 @@ const AddFoodToLogModal: React.FC = () => {
                 <View style={styles.nutritionItem}>
                   <Text style={styles.nutritionLabel}>Fat</Text>
                   <TextInput
-                    value={food.fat.toString()}
+                    value={calculateNutrition(food.fat).toString()}
                     onChangeText={(value) => handleNutritionChange('fat', value)}
                     keyboardType="numeric"
                     style={styles.nutritionInput}

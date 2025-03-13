@@ -20,6 +20,7 @@ import { foodService, FoodItem } from '../../services/foodService';
 import { Food } from '../../types/Food';
 import EmptyState from '../../components/common/EmptyState';
 import { LogStackParamList } from '../../navigation/LogStackNavigator';
+import { foodLogService } from '../../services/foodLogService';
 
 const mapFoodItemToFood = (item: FoodItem): Food => ({
   id: item.id.toString(),
@@ -77,6 +78,11 @@ const SearchFoodForLogScreen: React.FC = () => {
   // Get mealType and date from route params
   const { mealType, date } = route.params as { mealType: string; date: string };
 
+  // Helper function to capitalize food name
+  const capitalizeFoodName = (name: string): string => {
+    return name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+  };
+
   // Fetch foods function
   const fetchFoods = useCallback(async (query: string = '', forceRefresh: boolean = false) => {
     try {
@@ -87,17 +93,47 @@ const SearchFoodForLogScreen: React.FC = () => {
       if (query.trim()) {
         results = await foodService.searchFood(query);
       } else {
-        const customFoods = await foodService.getCustomFoods();
+        // Get both custom foods and food logs
+        const [customFoods, recentLogs] = await Promise.all([
+          foodService.getCustomFoods(),
+          foodLogService.getLogs(new Date().toISOString().split('T')[0])
+        ]);
+
+        // Create a map of food IDs to their last used date
+        const foodLastUsed = new Map();
+        recentLogs.forEach(log => {
+          const currentDate = new Date(log.created_at || '').getTime();
+          const existingDate = foodLastUsed.get(log.food_item_id);
+          if (!existingDate || currentDate > existingDate) {
+            foodLastUsed.set(log.food_item_id, currentDate);
+          }
+        });
+
+        // Sort custom foods by last used date
+        const sortedCustomFoods = customFoods.sort((a, b) => {
+          const aLastUsed = foodLastUsed.get(a.id) || new Date(a.updated_at || a.created_at || '').getTime();
+          const bLastUsed = foodLastUsed.get(b.id) || new Date(b.updated_at || b.created_at || '').getTime();
+          return bLastUsed - aLastUsed;
+        });
+
         results = {
-          foods: customFoods.map(item => mapFoodItemToFood(item)),
-          total: customFoods.length,
+          foods: sortedCustomFoods.map(item => ({
+            ...mapFoodItemToFood(item),
+            name: capitalizeFoodName(item.name)
+          })),
+          total: sortedCustomFoods.length,
           page: 1,
           limit: 20
         };
       }
 
-      setFoods(results.foods || []);
-      setFilteredFoods(results.foods || []);
+      const mappedFoods = (results.foods || []).map(food => ({
+        ...food,
+        name: capitalizeFoodName(food.name)
+      }));
+
+      setFoods(mappedFoods);
+      setFilteredFoods(mappedFoods);
     } catch (error) {
       console.error('Error fetching foods:', error);
       Alert.alert(

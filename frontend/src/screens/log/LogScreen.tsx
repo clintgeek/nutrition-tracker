@@ -20,6 +20,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { foodLogService } from '../../services/foodLogService';
+import { goalService } from '../../services/goalService';
 import { FoodLog } from '../../types/FoodLog';
 import { formatDate, getTodayDate } from '../../utils/dateUtils';
 import EmptyState from '../../components/common/EmptyState';
@@ -35,12 +36,28 @@ const LogScreen: React.FC = () => {
     carbs: 0,
     fat: 0,
   });
+  const [calorieGoal, setCalorieGoal] = useState(2000); // Default value
   const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
 
   const theme = useTheme();
   const navigation = useNavigation<StackNavigationProp<any>>();
+
+  // Load calorie goal
+  useEffect(() => {
+    const loadCalorieGoal = async () => {
+      try {
+        const currentGoal = await goalService.getCurrentGoal();
+        if (currentGoal) {
+          setCalorieGoal(currentGoal.daily_calorie_target);
+        }
+      } catch (error) {
+        console.error('Error loading calorie goal:', error);
+      }
+    };
+    loadCalorieGoal();
+  }, []);
 
   const fetchLogs = async () => {
     try {
@@ -276,7 +293,12 @@ const LogScreen: React.FC = () => {
         <Card.Content style={styles.summaryContent}>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Calories</Text>
-            <Text style={styles.summaryValue}>{Math.round(nutritionSummary.calories)}</Text>
+            <Text style={[
+              styles.summaryValue,
+              nutritionSummary.calories > calorieGoal && { color: theme.colors.error }
+            ]}>
+              {Math.round(nutritionSummary.calories)} / {calorieGoal}
+            </Text>
           </View>
 
           <View style={styles.summaryItem}>

@@ -16,7 +16,7 @@ import {
   Portal,
   Dialog,
 } from 'react-native-paper';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { useRoute } from '@react-navigation/core';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -29,6 +29,15 @@ import EmptyState from '../../components/common/EmptyState';
 import EditableTextInput from '../../components/common/EditableTextInput';
 import { formatBarcodeForDisplay } from '../../utils/validation';
 import { FoodStackParamList } from '../../navigation/FoodStackNavigator';
+import { getSourceIcon, getSourceColor } from '../../utils/foodUtils';
+
+type RouteParams = {
+  scannedFood?: Food;
+  refresh?: boolean;
+  fromLog?: boolean;
+  mealType?: string;
+  date?: string;
+};
 
 const mapFoodItemToFood = (item: FoodItem): Food => ({
   id: item.id.toString(),
@@ -47,36 +56,11 @@ const mapFoodItemToFood = (item: FoodItem): Food => ({
   updated_at: item.updated_at || new Date().toISOString()
 });
 
-const getSourceIcon = (source: string) => {
-  switch (source?.toLowerCase()) {
-    case 'usda':
-      return 'leaf';  // Leaf icon for USDA
-    case 'openfoodfacts':
-      return 'database';  // Database icon for OpenFoodFacts
-    case 'custom':
-      return 'food-apple';  // Apple icon for custom foods (matching the tab icon)
-    default:
-      return 'food';
-  }
-};
-
-const getSourceColor = (source: string, theme: any) => {
-  switch (source?.toLowerCase()) {
-    case 'usda':
-      return '#4CAF50';  // Green for USDA
-    case 'openfoodfacts':
-      return '#2196F3';  // Blue for OpenFoodFacts
-    case 'custom':
-      return '#FF9800';  // Orange for custom foods (matching the food database card)
-    default:
-      return theme.colors.primary;
-  }
-};
-
 const FoodScreen: React.FC = () => {
   const theme = useTheme();
   const navigation = useNavigation();
   const route = useRoute();
+  const { fromLog } = (route.params as RouteParams) || {};
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -104,21 +88,26 @@ const FoodScreen: React.FC = () => {
         console.log('Fetching custom foods (no query)');
         const customFoods = await foodService.getCustomFoods();
         console.log('Received custom foods:', customFoods);
-        results = {
-          foods: customFoods.map(item => {
+        const sortedFoods = customFoods
+          .map(item => {
             const mapped = mapFoodItemToFood(item);
             console.log('Mapped food item:', { original: item, mapped });
             return mapped;
-          }),
+          })
+          .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+
+        results = {
+          foods: sortedFoods,
           total: customFoods.length,
           page: 1,
           limit: 20
         };
       }
 
-      console.log('Setting foods state with:', results.foods);
-      setFoods(results.foods || []);
-      setFilteredFoods(results.foods || []);
+      const sortedResults = query.trim() ? results.foods : results.foods.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+      console.log('Setting foods state with:', sortedResults);
+      setFoods(sortedResults || []);
+      setFilteredFoods(sortedResults || []);
     } catch (error) {
       console.error('Error fetching foods:', error);
       // Show error to user
@@ -160,36 +149,22 @@ const FoodScreen: React.FC = () => {
   }, [navigation]);
 
   // Enhanced focus effect logging
-  useFocusEffect(
-    useCallback(() => {
-      console.log('\n👀 Food Screen Focused');
-      console.log('Current state:', {
-        searchQuery
-      });
+  useEffect(() => {
+    const params = route.params as { scannedFood?: Food; refresh?: boolean } | undefined;
+    console.log('Focus effect params:', params);
 
-      const params = route.params as { scannedFood?: Food; refresh?: boolean } | undefined;
-      console.log('Focus effect params:', params);
-
-      if (params?.scannedFood) {
-        console.log('Showing scanned food:', params.scannedFood);
-        setSelectedFood(params.scannedFood);
-        setIsFoodDetailsVisible(true);
-        navigation.setParams({ scannedFood: undefined });
-      }
-      if (params?.refresh) {
-        console.log('Refreshing food list due to route param');
-        fetchFoods(searchQuery, true);
-        navigation.setParams({ refresh: undefined });
-      }
-
-      return () => {
-        console.log('\n👋 Food Screen Lost Focus');
-        console.log('State at blur:', {
-          searchQuery
-        });
-      };
-    }, [route.params, navigation, fetchFoods, searchQuery])
-  );
+    if (params?.scannedFood) {
+      console.log('Showing scanned food:', params.scannedFood);
+      setSelectedFood(params.scannedFood);
+      setIsFoodDetailsVisible(true);
+      navigation.setParams({ scannedFood: undefined });
+    }
+    if (params?.refresh) {
+      console.log('Refreshing food list due to route param');
+      fetchFoods(searchQuery, true);
+      navigation.setParams({ refresh: undefined });
+    }
+  }, [route.params, navigation, fetchFoods, searchQuery]);
 
   // Initial load
   useEffect(() => {
@@ -221,9 +196,14 @@ const FoodScreen: React.FC = () => {
 
   // Handle adding food to log
   const handleAddToLog = (food: Food) => {
+    const { mealType, date } = route.params as { mealType?: string; date?: string };
     navigation.navigate('LogStack', {
       screen: 'AddFoodToLogModal',
-      params: { food }
+      params: {
+        food,
+        mealType: mealType || 'snack',
+        date: date || new Date().toISOString().split('T')[0]
+      }
     });
   };
 
@@ -420,13 +400,15 @@ const FoodScreen: React.FC = () => {
               </View>
             </View>
 
-            {/* Show add button when adding to log, delete button otherwise */}
-            <TouchableOpacity
-              onPress={() => handleAddToLog(item)}
-              style={styles.actionButton}
-            >
-              <MaterialCommunityIcons name="plus-circle" size={24} color={theme.colors.primary} />
-            </TouchableOpacity>
+            {/* Only show add button when coming from log screen */}
+            {fromLog && (
+              <TouchableOpacity
+                onPress={() => handleAddToLog(item)}
+                style={styles.actionButton}
+              >
+                <MaterialCommunityIcons name="plus-circle" size={24} color={theme.colors.primary} />
+              </TouchableOpacity>
+            )}
           </Card.Content>
         </Card>
       </TouchableOpacity>
@@ -497,6 +479,18 @@ const FoodScreen: React.FC = () => {
               setIsFoodDetailsVisible(false);
               setSelectedFood(null);
             }}>Cancel</Button>
+            {selectedFood?.source === 'custom' && (
+              <Button
+                onPress={() => {
+                  setFoodToDelete(selectedFood);
+                  setIsDeleteModalVisible(true);
+                  setIsFoodDetailsVisible(false);
+                }}
+                textColor={theme.colors.error}
+              >
+                Delete
+              </Button>
+            )}
             <Button onPress={handleSaveFood} mode="contained">
               Save
             </Button>

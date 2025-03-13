@@ -240,6 +240,11 @@ const transformToFood = (data: any): Food => ({
   is_deleted: data.is_deleted || false
 });
 
+// Helper function to capitalize food name
+const capitalizeFoodName = (name: string): string => {
+  return name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+};
+
 // Food service
 export const foodService = {
   // Search for foods
@@ -395,7 +400,11 @@ export const foodService = {
   async createCustomFood(foodData: CreateFoodDTO): Promise<Food> {
     try {
       console.log('Creating custom food with data:', foodData);
-      const response = await apiService.post<FoodApiResponse>('/foods/custom', foodData);
+      const capitalizedFoodData = {
+        ...foodData,
+        name: capitalizeFoodName(foodData.name)
+      };
+      const response = await apiService.post<FoodApiResponse>('/foods/custom', capitalizedFoodData);
       return response.food;
     } catch (error) {
       console.error('Error creating custom food:', error);
@@ -410,7 +419,7 @@ export const foodService = {
 
       // Transform the data to match database column names
       const transformedData = {
-        name: foodData.name,
+        name: foodData.name ? capitalizeFoodName(foodData.name) : undefined,
         calories_per_serving: foodData.calories,
         protein_grams: foodData.protein,
         carbs_grams: foodData.carbs,
