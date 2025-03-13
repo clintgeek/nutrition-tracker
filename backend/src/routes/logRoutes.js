@@ -7,6 +7,7 @@ const {
   createLog,
   updateLog,
   deleteLog,
+  getRecentByMealType,
 } = require('../controllers/logController');
 const { authenticate } = require('../middleware/auth');
 
@@ -35,6 +36,13 @@ router.get('/summary', getLogSummary);
  * @access Private
  */
 router.get('/daily-summary', getDailySummary);
+
+/**
+ * @route GET /api/logs/recent/:mealType
+ * @desc Get recent food items by meal type
+ * @access Private
+ */
+router.get('/recent/:mealType', getRecentByMealType);
 
 /**
  * @route POST /api/logs

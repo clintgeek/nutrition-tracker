@@ -79,14 +79,19 @@ const FoodStackNavigator: React.FC = () => {
       <Stack.Screen
         name="FoodSearch"
         component={FoodSearchScreen}
-        options={{
-          title: 'Search Foods',
-          header: (props) => (
-            <CustomHeader
-              title="Search Foods"
-              showBackButton={props.back !== undefined}
-            />
-          )
+        options={({ route }) => {
+          const params = route.params as FoodStackParamList['FoodSearch'];
+          const isAddingToLog = params?.addToLog;
+
+          return {
+            title: isAddingToLog ? 'Add Food To Your Log' : 'Search Foods',
+            header: (props) => (
+              <CustomHeader
+                title={isAddingToLog ? 'Add Food To Your Log' : 'Search Foods'}
+                showBackButton={props.back !== undefined}
+              />
+            )
+          };
         }}
       />
       <Stack.Screen

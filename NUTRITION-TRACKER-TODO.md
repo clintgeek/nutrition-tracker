@@ -3,14 +3,10 @@
 ## Additional Enhancements
 
 ## Bugs
-- [x] HTML title is broken again
-- [x] Food search isn't working
-- [x] Food search is complaining that you have to type at least two characters and resulting in a Failed to fetch foods. Please try again. error message on screen
-- [x] Add Custom food is not working
 
 ### Feature Additions
 - [x] Break up food log into Breakfast, Lunch, Dinner, Snacks each with an add food button that adds food to that category
-- [ ] recommend recent foods/meals on log page
+- [x] recommend recent foods/meals on log page
 - [ ] track weight and weight goals
 - [ ] show weight loss progress
 - [ ] Add user profile management
@@ -20,7 +16,6 @@
 - [ ] allow setting of default page in user profile settings
 - [ ] implement handling of recipies in the food database
 - [ ] Add barcode scanning with food lookup
-- [ ] Add barcode scanning for food log
 - [ ] Create data visualization for nutrition trends
 - [ ] implement "milestones" as badges for various things like each 5 pounds lost or every 30 days logged
 - [ ] Make the web page "installable" in the chrome browser

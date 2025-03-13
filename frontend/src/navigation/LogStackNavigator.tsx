@@ -4,13 +4,18 @@ import { useTheme } from 'react-native-paper';
 
 import LogScreen from '../screens/log/LogScreen';
 import AddLogScreen from '../screens/log/AddLogScreen';
+import AddFoodToLogModal from '../screens/log/AddFoodToLogModal';
+import SearchFoodForLogScreen from '../screens/log/SearchFoodForLogScreen';
 import CustomHeader from '../components/CustomHeader';
+import { Food } from '../types/Food';
 
 // Define the stack navigator param list
 export type LogStackParamList = {
   LogList: undefined;
   LogDetails: { logId: string };
   AddLog: { date: string; mealType?: string };
+  AddFoodToLogModal: { food: Food; mealType?: string; date?: string };
+  SearchFoodForLog: { mealType: string; date: string };
 };
 
 // Create the stack navigator
@@ -56,6 +61,27 @@ const LogStackNavigator: React.FC = () => {
               showBackButton={props.back !== undefined}
             />
           )
+        }}
+      />
+      <Stack.Screen
+        name="SearchFoodForLog"
+        component={SearchFoodForLogScreen}
+        options={{
+          title: 'Search Foods',
+          header: (props) => (
+            <CustomHeader
+              title="Search Foods"
+              showBackButton={props.back !== undefined}
+            />
+          )
+        }}
+      />
+      <Stack.Screen
+        name="AddFoodToLogModal"
+        component={AddFoodToLogModal}
+        options={{
+          presentation: 'modal',
+          headerShown: false,
         }}
       />
     </Stack.Navigator>

@@ -24,7 +24,6 @@ import axios from 'axios';
 import debounce from 'lodash/debounce';
 
 import { foodService, FoodItem } from '../../services/foodService';
-import { foodLogService } from '../../services/foodLogService';
 import { Food, CreateFoodDTO } from '../../types/Food';
 import EmptyState from '../../components/common/EmptyState';
 import EditableTextInput from '../../components/common/EditableTextInput';
@@ -87,25 +86,6 @@ const FoodScreen: React.FC = () => {
   const [isFoodDetailsVisible, setIsFoodDetailsVisible] = useState(false);
   const [foodToDelete, setFoodToDelete] = useState<Food | null>(null);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
-  const [isAddingToLog, setIsAddingToLog] = useState(false);
-  const [logDate, setLogDate] = useState<string | undefined>(undefined);
-  const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('snack');
-  const [isAddingToLogModalVisible, setIsAddingToLogModalVisible] = useState(false);
-  const [servings, setServings] = useState('1');
-  const [foodToAddToLog, setFoodToAddToLog] = useState<Food | null>(null);
-
-  // Check if we're adding to the log
-  useEffect(() => {
-    if (route.params) {
-      const { addToLog, logDate: date, mealType: meal, servings: initialServings } = route.params as any;
-      setIsAddingToLog(!!addToLog);
-      setLogDate(date);
-      setMealType(meal || 'snack');
-      if (initialServings) {
-        setServings(initialServings.toString());
-      }
-    }
-  }, [route.params]);
 
   // Fetch foods function
   const fetchFoods = useCallback(async (query: string = '', forceRefresh: boolean = false) => {
@@ -153,6 +133,64 @@ const FoodScreen: React.FC = () => {
     }
   }, []);
 
+  // Add mount logging
+  useEffect(() => {
+    console.log('\n========== FOOD SCREEN ==========');
+    console.log('MOUNT EVENT');
+    console.log('Initial route.params:', JSON.stringify(route.params, null, 2));
+    console.log('Initial navigation state:', JSON.stringify(navigation.getParent()?.getState(), null, 2));
+    console.log('================================\n');
+
+    // Cleanup logging
+    return () => {
+      console.log('\n🔴 FoodScreen Unmounting');
+      console.log('Final route.params:', JSON.stringify(route.params, null, 2));
+      console.log('Final navigation state:', JSON.stringify(navigation.getParent()?.getState(), null, 2));
+      console.log('================================\n');
+    };
+  }, []);
+
+  // Log navigation events
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('state', (e) => {
+      console.log('\n🔄 Food Screen Navigation State Change:', JSON.stringify(e.data, null, 2));
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  // Enhanced focus effect logging
+  useFocusEffect(
+    useCallback(() => {
+      console.log('\n👀 Food Screen Focused');
+      console.log('Current state:', {
+        searchQuery
+      });
+
+      const params = route.params as { scannedFood?: Food; refresh?: boolean } | undefined;
+      console.log('Focus effect params:', params);
+
+      if (params?.scannedFood) {
+        console.log('Showing scanned food:', params.scannedFood);
+        setSelectedFood(params.scannedFood);
+        setIsFoodDetailsVisible(true);
+        navigation.setParams({ scannedFood: undefined });
+      }
+      if (params?.refresh) {
+        console.log('Refreshing food list due to route param');
+        fetchFoods(searchQuery, true);
+        navigation.setParams({ refresh: undefined });
+      }
+
+      return () => {
+        console.log('\n👋 Food Screen Lost Focus');
+        console.log('State at blur:', {
+          searchQuery
+        });
+      };
+    }, [route.params, navigation, fetchFoods, searchQuery])
+  );
+
   // Initial load
   useEffect(() => {
     console.log('Initial food load');
@@ -168,53 +206,26 @@ const FoodScreen: React.FC = () => {
     [fetchFoods]
   );
 
-  // Cleanup debounced function on unmount
-  useEffect(() => {
-    return () => {
-      debouncedSearch.cancel();
-    };
-  }, [debouncedSearch]);
+  // Handle search query change
+  const handleSearchQueryChange = (query: string) => {
+    console.log('Search query changed:', query);
+    setSearchQuery(query);
+    debouncedSearch(query);
+  };
 
-  // Handle search query changes
-  useEffect(() => {
-    console.log('Search query changed:', searchQuery);
-    if (searchQuery.trim()) {
-      debouncedSearch(searchQuery);
-    } else {
-      console.log('Empty search query, loading custom foods');
-      fetchFoods('');
-    }
-  }, [searchQuery, debouncedSearch, fetchFoods]);
+  // Handle refresh
+  const handleRefresh = useCallback(() => {
+    console.log('Manual refresh triggered');
+    fetchFoods(searchQuery, true);
+  }, [fetchFoods, searchQuery]);
 
-  // Handle route params (scanned food and refresh)
-  useFocusEffect(
-    useCallback(() => {
-      const params = route.params as { scannedFood?: Food; refresh?: boolean } | undefined;
-      console.log('Route params changed:', params);
-
-      if (params?.scannedFood) {
-        console.log('Showing scanned food:', params.scannedFood);
-        setSelectedFood(params.scannedFood);
-        setIsFoodDetailsVisible(true);
-        navigation.setParams({ scannedFood: undefined });
-      }
-      if (params?.refresh) {
-        console.log('Refreshing food list due to route param');
-        fetchFoods(searchQuery, true);
-        navigation.setParams({ refresh: undefined });
-      }
-    }, [route.params, navigation, fetchFoods, searchQuery])
-  );
-
-  // Reset isAddingToLog when screen loses focus
-  useFocusEffect(
-    React.useCallback(() => {
-      return () => {
-        // This runs when the screen loses focus
-        setIsAddingToLog(false);
-      };
-    }, [])
-  );
+  // Handle adding food to log
+  const handleAddToLog = (food: Food) => {
+    navigation.navigate('LogStack', {
+      screen: 'AddFoodToLogModal',
+      params: { food }
+    });
+  };
 
   const handleSaveFood = async () => {
     if (!selectedFood) return;
@@ -255,35 +266,11 @@ const FoodScreen: React.FC = () => {
         savedFoodId = result.id;
       }
 
-      // If we're adding to log, create the log entry
-      if (isAddingToLog && logDate && mealType) {
-        try {
-          await foodLogService.createLog({
-            food_item_id: savedFoodId,
-            log_date: logDate,
-            meal_type: mealType,
-            servings: parseFloat(servings) || 1,
-          });
-          console.log('Food added to log successfully');
-
-          // Close the dialog and navigate back to the log screen
-          setIsFoodDetailsVisible(false);
-          setSelectedFood(null);
-          navigation.navigate('LogStack', {
-            screen: 'LogScreen',
-            params: { date: logDate }
-          });
-        } catch (logError) {
-          console.error('Error adding food to log:', logError);
-          Alert.alert('Error', 'Food was saved but could not be added to your log.');
-        }
-      } else {
-        // Just saving the food, stay on food screen
-        setIsFoodDetailsVisible(false);
-        setSelectedFood(null);
-        fetchFoods(searchQuery, true);
-        Alert.alert('Success', 'Food saved successfully!');
-      }
+      // Just saving the food, stay on food screen
+      setIsFoodDetailsVisible(false);
+      setSelectedFood(null);
+      fetchFoods(searchQuery, true);
+      Alert.alert('Success', 'Food saved successfully!');
     } catch (error) {
       console.error('Error saving food:', error);
       alert('Failed to save food. Please try again.');
@@ -319,33 +306,6 @@ const FoodScreen: React.FC = () => {
     } catch (error) {
       console.error('Error deleting food:', error);
       alert('Failed to delete food. Please try again.');
-    }
-  };
-
-  // Function to add a food directly to the log
-  const handleAddToLog = async (food: Food) => {
-    setFoodToAddToLog(food);
-    setServings('1');
-    setIsAddingToLogModalVisible(true);
-  };
-
-  // Function to confirm adding to log
-  const confirmAddToLog = async () => {
-    if (!foodToAddToLog || !logDate || !mealType) return;
-
-    try {
-      await foodLogService.createLog({
-        food_item_id: parseInt(foodToAddToLog.id),
-        log_date: logDate,
-        meal_type: mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack',
-        servings: parseFloat(servings) || 1,
-      });
-
-      setIsAddingToLogModalVisible(false);
-      Alert.alert('Success', `${foodToAddToLog.name} added to your food log.`);
-    } catch (error) {
-      console.error('Error adding food to log:', error);
-      Alert.alert('Error', 'Failed to add food to your log. Please try again.');
     }
   };
 
@@ -391,17 +351,6 @@ const FoodScreen: React.FC = () => {
             style={[styles.input, styles.servingUnitInput]}
           />
         </View>
-        {isAddingToLog && (
-          <View style={styles.servingContainer}>
-            <EditableTextInput
-              label="Number of Servings"
-              value={servings}
-              onChangeText={setServings}
-              keyboardType="numeric"
-              style={[styles.input, styles.servingSizeInput]}
-            />
-          </View>
-        )}
         <EditableTextInput
           label="Calories (per serving)"
           value={selectedFood.calories?.toString() || '0'}
@@ -472,21 +421,12 @@ const FoodScreen: React.FC = () => {
             </View>
 
             {/* Show add button when adding to log, delete button otherwise */}
-            {isAddingToLog ? (
-              <TouchableOpacity
-                onPress={() => handleAddToLog(item)}
-                style={styles.actionButton}
-              >
-                <MaterialCommunityIcons name="plus-circle" size={24} color={theme.colors.primary} />
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                onPress={() => handleDeleteFood(item)}
-                style={styles.actionButton}
-              >
-                <MaterialCommunityIcons name="delete" size={24} color={theme.colors.error} />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              onPress={() => handleAddToLog(item)}
+              style={styles.actionButton}
+            >
+              <MaterialCommunityIcons name="plus-circle" size={24} color={theme.colors.primary} />
+            </TouchableOpacity>
           </Card.Content>
         </Card>
       </TouchableOpacity>
@@ -498,7 +438,7 @@ const FoodScreen: React.FC = () => {
       <View style={styles.searchContainer}>
         <Searchbar
           placeholder="Search foods..."
-          onChangeText={setSearchQuery}
+          onChangeText={handleSearchQueryChange}
           value={searchQuery}
           style={styles.searchBar}
           icon="magnify"
@@ -525,7 +465,7 @@ const FoodScreen: React.FC = () => {
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
-              onRefresh={() => fetchFoods(searchQuery, true)}
+              onRefresh={handleRefresh}
             />
           }
         >
@@ -577,45 +517,6 @@ const FoodScreen: React.FC = () => {
             <Button onPress={confirmDelete} mode="contained" textColor={theme.colors.error}>
               Delete
             </Button>
-          </Dialog.Actions>
-        </Dialog>
-
-        {/* Add to Log Modal */}
-        <Dialog
-          visible={isAddingToLogModalVisible}
-          onDismiss={() => setIsAddingToLogModalVisible(false)}
-        >
-          <Dialog.Title>Add to Food Log</Dialog.Title>
-          <Dialog.Content>
-            <Text style={styles.modalText}>
-              {foodToAddToLog?.name}
-            </Text>
-            <Text style={styles.modalLabel}>Servings:</Text>
-            <EditableTextInput
-              value={servings}
-              onChangeText={setServings}
-              keyboardType="numeric"
-              style={styles.servingInput}
-              label="Servings"
-            />
-            <Text style={styles.modalLabel}>Meal:</Text>
-            <View style={styles.mealTypeContainer}>
-              {['breakfast', 'lunch', 'dinner', 'snack'].map((type) => (
-                <Chip
-                  key={type}
-                  selected={mealType === type}
-                  onPress={() => setMealType(type as 'breakfast' | 'lunch' | 'dinner' | 'snack')}
-                  style={styles.mealTypeChip}
-                  selectedColor={theme.colors.primary}
-                >
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
-                </Chip>
-              ))}
-            </View>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setIsAddingToLogModalVisible(false)}>Cancel</Button>
-            <Button onPress={confirmAddToLog}>Add</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -785,26 +686,6 @@ const styles = StyleSheet.create({
   actionButton: {
     margin: 0,
     padding: 0,
-  },
-  modalText: {
-    fontSize: 16,
-    marginBottom: 16,
-  },
-  modalLabel: {
-    fontSize: 14,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  servingInput: {
-    marginBottom: 16,
-  },
-  mealTypeContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 8,
-  },
-  mealTypeChip: {
-    margin: 4,
   },
 });
 

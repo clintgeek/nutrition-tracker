@@ -298,6 +298,41 @@ class FoodLog {
       client.release();
     }
   }
+
+  // Get recent food items by meal type
+  static async getRecentByMealType(userId, mealType, limit = 3) {
+    const client = await getClient();
+
+    try {
+      const result = await client.query(
+        `SELECT DISTINCT ON (fl.food_item_id)
+          fl.food_item_id,
+          fi.name as food_name,
+          fi.calories_per_serving,
+          fi.protein_grams,
+          fi.carbs_grams,
+          fi.fat_grams,
+          fi.serving_size,
+          fi.serving_unit,
+          fl.created_at
+        FROM food_logs fl
+        JOIN food_items fi ON fl.food_item_id = fi.id
+        WHERE fl.user_id = $1
+        AND fl.meal_type = $2
+        AND fi.is_deleted = false
+        ORDER BY fl.food_item_id, fl.created_at DESC
+        LIMIT $3`,
+        [userId, mealType, limit]
+      );
+
+      return result.rows;
+    } catch (err) {
+      logger.error(`Error getting recent foods by meal type: ${err.message}`);
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
 }
 
 module.exports = FoodLog;

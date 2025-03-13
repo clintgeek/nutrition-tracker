@@ -227,6 +227,28 @@ const deleteLog = asyncHandler(async (req, res) => {
   res.json({ message: 'Food log deleted' });
 });
 
+/**
+ * Get recent food items by meal type
+ * @route GET /api/logs/recent/:mealType
+ */
+const getRecentByMealType = asyncHandler(async (req, res) => {
+  const { mealType } = req.params;
+  const userId = req.user.id;
+
+  // Validate meal type
+  if (!['breakfast', 'lunch', 'dinner', 'snack'].includes(mealType)) {
+    return res.status(400).json({ message: 'Invalid meal type' });
+  }
+
+  try {
+    const recentFoods = await FoodLog.getRecentByMealType(userId, mealType);
+    res.json({ foods: recentFoods });
+  } catch (error) {
+    logger.error(`Error getting recent foods: ${error.message}`);
+    res.status(500).json({ message: 'Error getting recent foods' });
+  }
+});
+
 module.exports = {
   getLogs,
   getLogSummary,
@@ -234,4 +256,5 @@ module.exports = {
   createLog,
   updateLog,
   deleteLog,
+  getRecentByMealType,
 };

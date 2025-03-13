@@ -424,7 +424,7 @@ class FoodApiService {
             action: 'process',
             json: 1,
             page_size: 25,
-            fields: 'code,product_name,brands,nutriments,serving_size,serving_quantity'
+            fields: 'code,product_name,brands,nutriments,serving_size,serving_quantity,nutrition_data_per'
           }
         }
       );
@@ -432,19 +432,69 @@ class FoodApiService {
       const data = response.data;
 
       if (data.products && data.products.length > 0) {
-        const transformedResults = data.products.map(product => ({
-          name: product.product_name || '',
-          barcode: product.code || null,
-          brand: product.brands || null,
-          calories: parseFloat(product.nutriments?.energy_kcal_100g || product.nutriments?.energy_kcal || 0),
-          protein: parseFloat(product.nutriments?.proteins_100g || 0),
-          carbs: parseFloat(product.nutriments?.carbohydrates_100g || 0),
-          fat: parseFloat(product.nutriments?.fat_100g || 0),
-          serving_size: parseFloat(product.serving_quantity || 100),
-          serving_unit: 'g',
-          source: 'openfoodfacts',
-          source_id: product.code
-        }));
+        const transformedResults = data.products.map(product => {
+          // Get nutrition values, converting to per 100g if needed
+          const getNutrientValue = (keys, defaultValue = 0) => {
+            for (const key of keys) {
+              const value = product.nutriments[key];
+              if (value !== undefined && value !== null) {
+                // If the value is per serving, convert to per 100g
+                if (product.nutrition_data_per === 'serving') {
+                  const servingSize = parseFloat(product.serving_quantity) || 100;
+                  return (parseFloat(value) * 100) / servingSize;
+                }
+                return parseFloat(value);
+              }
+            }
+            return defaultValue;
+          };
+
+          // Try multiple possible field names for each nutrient
+          const calories = getNutrientValue([
+            'energy-kcal_100g',
+            'energy-kcal',
+            'energy_100g',
+            'energy'
+          ]);
+
+          const protein = getNutrientValue([
+            'proteins_100g',
+            'proteins',
+            'protein_100g',
+            'protein'
+          ]);
+
+          const carbs = getNutrientValue([
+            'carbohydrates_100g',
+            'carbohydrates',
+            'carbs_100g',
+            'carbs'
+          ]);
+
+          const fat = getNutrientValue([
+            'fat_100g',
+            'fat',
+            'fats_100g',
+            'fats'
+          ]);
+
+          const result = {
+            name: product.product_name || '',
+            barcode: product.code || null,
+            brand: product.brands || null,
+            calories: calories,
+            protein: protein,
+            carbs: carbs,
+            fat: fat,
+            serving_size: parseFloat(product.serving_quantity || 100),
+            serving_unit: 'g',
+            source: 'openfoodfacts',
+            source_id: product.code
+          };
+
+          logger.debug('Transformed OpenFoodFacts food:', result);
+          return result;
+        });
 
         // Filter out items without basic nutritional info
         const validResults = transformedResults.filter(item =>
@@ -452,6 +502,9 @@ class FoodApiService {
         );
 
         logger.info(`Found ${validResults.length} valid foods in OpenFoodFacts for "${query}"`);
+        if (validResults.length > 0) {
+          logger.debug('Sample food item:', validResults[0]);
+        }
 
         // Cache the transformed data
         setCacheData(cacheKey, validResults);
@@ -568,27 +621,73 @@ class FoodApiService {
       logger.info(`Fetching from OpenFoodFacts for barcode: ${barcode}`);
 
       const response = await fetchWithTimeout(
-        `${OPENFOODFACTS_API_URL}/api/v0/product/${barcode}.json`
-      );
+        `${OPENFOODFACTS_API_URL}/api/v0/product/${barcode}.json`      );
       const data = response.data;
 
       if (data.status === 1 && data.product) {
         logger.info('Food found in OpenFoodFacts');
+
+        // Get nutrition values, converting to per 100g if needed
+        const getNutrientValue = (keys, defaultValue = 0) => {
+          for (const key of keys) {
+            const value = data.product.nutriments[key];
+            if (value !== undefined && value !== null) {
+              // If the value is per serving, convert to per 100g
+              if (data.product.nutrition_data_per === 'serving') {
+                const servingSize = parseFloat(data.product.serving_quantity) || 100;
+                return (parseFloat(value) * 100) / servingSize;
+              }
+              return parseFloat(value);
+            }
+          }
+          return defaultValue;
+        };
+
+        // Try multiple possible field names for each nutrient
+        const calories = getNutrientValue([
+          'energy-kcal_100g',
+          'energy-kcal',
+          'energy_100g',
+          'energy'
+        ]);
+
+        const protein = getNutrientValue([
+          'proteins_100g',
+          'proteins',
+          'protein_100g',
+          'protein'
+        ]);
+
+        const carbs = getNutrientValue([
+          'carbohydrates_100g',
+          'carbohydrates',
+          'carbs_100g',
+          'carbs'
+        ]);
+
+        const fat = getNutrientValue([
+          'fat_100g',
+          'fat',
+          'fats_100g',
+          'fats'
+        ]);
 
         // Transform to our format
         const transformedData = {
           name: data.product.product_name || '',
           barcode: data.product.code,
           brand: data.product.brands || null,
-          calories: parseFloat(data.product.nutriments?.energy_kcal_100g || data.product.nutriments?.energy_kcal || 0),
-          protein: parseFloat(data.product.nutriments?.proteins_100g || 0),
-          carbs: parseFloat(data.product.nutriments?.carbohydrates_100g || 0),
-          fat: parseFloat(data.product.nutriments?.fat_100g || 0),
+          calories: calories,
+          protein: protein,
+          carbs: carbs,
+          fat: fat,
           serving_size: parseFloat(data.product.serving_quantity || 100),
           serving_unit: 'g',
           source: 'openfoodfacts',
           source_id: data.product.code
         };
+
+        logger.debug('Transformed OpenFoodFacts food by barcode:', transformedData);
 
         // Cache the result
         setCacheData(`barcode:${barcode}`, transformedData);

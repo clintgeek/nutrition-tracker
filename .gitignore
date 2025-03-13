@@ -6,6 +6,7 @@
 .env.production
 .env.*
 !.env.example
+CURSOR-CONTEXT.md
 
 # Dependency directories
 node_modules/

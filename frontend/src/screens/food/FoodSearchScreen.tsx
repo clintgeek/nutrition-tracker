@@ -20,7 +20,8 @@ import {
   Chip,
   Avatar,
   Portal,
-  Dialog
+  Dialog,
+  FAB
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import axios from 'axios';
@@ -30,19 +31,21 @@ import { foodLogService } from '../../services/foodLogService';
 
 // API response interface
 interface FoodApiResponse {
-  message: string;
-  food: {
-    id: number;
-    name: string;
-    calories_per_serving: number;
-    protein_grams: number;
-    carbs_grams: number;
-    fat_grams: number;
-    serving_size: string;
-    serving_unit: string;
-    source: string;
-    source_id: string;
-  };
+  data: {
+    message: string;
+    food: {
+      id: number;
+      name: string;
+      calories_per_serving: number;
+      protein_grams: number;
+      carbs_grams: number;
+      fat_grams: number;
+      serving_size: string;
+      serving_unit: string;
+      source: string;
+      source_id: string;
+    };
+  }
 }
 
 // API search response interface
@@ -52,10 +55,10 @@ interface ApiSearchResponse {
     source_id: string;
     name: string;
     brand?: string;
-    calories?: number;
-    protein?: number;
-    carbs?: number;
-    fat?: number;
+    calories_per_serving?: number;
+    protein_grams?: number;
+    carbs_grams?: number;
+    fat_grams?: number;
     serving_size?: string;
     serving_unit?: string;
     source: string;
@@ -130,28 +133,69 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
   const theme = useTheme();
   const { token } = useAuth();
   const initialQuery = route.params?.searchQuery || '';
-  const [searchQuery, setSearchQuery] = useState(initialQuery);
-  const [loading, setLoading] = useState(false);
-  const [searchResults, setSearchResults] = useState<SimplifiedFoodItem[]>([]);
-  const [selectedFood, setSelectedFood] = useState<SimplifiedFoodItem | null>(null);
 
-  // Add to log state
-  const [showAddToLogModal, setShowAddToLogModal] = useState(false);
-  const [logDate, setLogDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('snack');
-  const [servings, setServings] = useState('1');
-  const [addingToLog, setAddingToLog] = useState(false);
+  // Derive addToLog state from route params using useMemo
+  const addToLogMode = React.useMemo(() => {
+    const mode = {
+      isAddingToLog: !!route.params?.addToLog,
+      logDate: route.params?.logDate || new Date().toISOString().split('T')[0],
+      mealType: route.params?.mealType || 'snack'
+    };
+    return mode;
+  }, [route.params?.addToLog, route.params?.logDate, route.params?.mealType]);
 
-  // Check if we're adding to the log
-  useEffect(() => {
-    if (route.params) {
-      const { addToLog, logDate: date, mealType: meal } = route.params as any;
-      if (addToLog) {
-        setLogDate(date || new Date().toISOString().split('T')[0]);
-        setMealType((meal || 'snack') as 'breakfast' | 'lunch' | 'dinner' | 'snack');
+  // Move navigation state updates to useLayoutEffect
+  React.useLayoutEffect(() => {
+    const parent = navigation.getParent();
+
+    if (addToLogMode.isAddingToLog) {
+      navigation.setOptions({
+        title: 'Add Food To Your Log'
+      });
+
+      if (parent) {
+        parent.setOptions({
+          tabBarState: {
+            activeTab: 'Log'
+          }
+        });
+      }
+    } else {
+      navigation.setOptions({
+        title: 'Search Foods'
+      });
+
+      if (parent) {
+        parent.setOptions({
+          tabBarState: {
+            activeTab: 'Foods'
+          }
+        });
       }
     }
-  }, [route.params]);
+
+    // Cleanup navigation state when unmounting
+    return () => {
+      if (parent) {
+        parent.setOptions({
+          tabBarState: {
+            activeTab: 'Foods'
+          }
+        });
+      }
+    };
+  }, [addToLogMode, navigation]);
+
+  // Update state when route params change
+  useEffect(() => {
+    setIsAddingToLog(addToLogMode.isAddingToLog);
+    setLogDate(addToLogMode.logDate);
+    setMealType(addToLogMode.mealType);
+
+    if (addToLogMode.isAddingToLog && !searchQuery.trim()) {
+      searchFoods();
+    }
+  }, [addToLogMode]);
 
   // Set token in apiService when it changes
   useEffect(() => {
@@ -167,11 +211,75 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
     }
   }, []);
 
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
+  const [loading, setLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<SimplifiedFoodItem[]>([]);
+  const [selectedFood, setSelectedFood] = useState<SimplifiedFoodItem | null>(null);
+
+  // Add to log state - initialize from memoized values
+  const [showAddToLogModal, setShowAddToLogModal] = useState(false);
+  const [logDate, setLogDate] = useState<string>(addToLogMode.logDate);
+  const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>(addToLogMode.mealType);
+  const [servings, setServings] = useState('1');
+  const [isAddingToLog, setIsAddingToLog] = useState(addToLogMode.isAddingToLog);
+
+  // Add debounced search
+  React.useEffect(() => {
+    if (searchQuery.length >= 2) {
+      const timer = setTimeout(() => {
+        searchFoods();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchQuery]);
+
   // Function to search for foods
   const searchFoods = async () => {
-    // Require at least 2 characters for search
+    // If we're adding to log and there's no search query, get all foods sorted by recent use
+    if (isAddingToLog && !searchQuery.trim()) {
+      setLoading(true);
+      setSearchResults([]);
+
+      try {
+        const response = await apiService.get<ApiSearchResponse>('/foods/recent', {
+          params: {
+            limit: 50
+          }
+        });
+
+        console.log('Recent foods response:', response);
+
+        if (response?.foods) {
+          const searchResults = response.foods.map(food => ({
+            id: food.id || food.source_id,
+            name: food.name,
+            brand: food.brand,
+            calories: food.calories_per_serving || 0,
+            protein: food.protein_grams || 0,
+            carbs: food.carbs_grams || 0,
+            fat: food.fat_grams || 0,
+            servingSize: food.serving_size ? parseFloat(food.serving_size) : undefined,
+            servingSizeUnit: food.serving_unit,
+            source: food.source
+          }));
+
+          console.log('Transformed search results:', searchResults);
+          setSearchResults(searchResults);
+        } else {
+          console.log('No foods found in response:', response);
+          setSearchResults([]);
+        }
+      } catch (error) {
+        console.error('Error getting recent foods:', error);
+        alert('Error loading foods. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Regular search logic for when there's a search query
     if (!searchQuery.trim() || searchQuery.trim().length < 2) {
-      alert('Please enter at least 2 characters to search');
       return;
     }
 
@@ -179,7 +287,7 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
     setSearchResults([]);
 
     try {
-      const response = await apiService.get<ApiSearchResponse>('/api/foods/search', {
+      const response = await apiService.get<ApiSearchResponse>('/foods/search', {
         params: {
           query: searchQuery,
           page: 1,
@@ -187,19 +295,27 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
         }
       });
 
-      if (response.foods) {
-        setSearchResults(response.foods.map(food => ({
+      console.log('Search response:', response);
+
+      if (response?.foods) {
+        const searchResults = response.foods.map(food => ({
           id: food.id || food.source_id,
           name: food.name,
           brand: food.brand,
-          calories: food.calories || 0,
-          protein: food.protein || 0,
-          carbs: food.carbs || 0,
-          fat: food.fat || 0,
+          calories: food.calories_per_serving || 0,
+          protein: food.protein_grams || 0,
+          carbs: food.carbs_grams || 0,
+          fat: food.fat_grams || 0,
           servingSize: food.serving_size ? parseFloat(food.serving_size) : undefined,
           servingSizeUnit: food.serving_unit,
           source: food.source
-        })));
+        }));
+
+        console.log('Transformed search results:', searchResults);
+        setSearchResults(searchResults);
+      } else {
+        console.log('No foods found in response:', response);
+        setSearchResults([]);
       }
     } catch (error) {
       console.error('Error searching foods:', error);
@@ -237,7 +353,7 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
       // Make API call to save the food using apiService
       const response = await apiService.post<FoodApiResponse>('/foods/custom', foodData);
 
-      if (response?.food && response.food.id) {
+      if (response?.data?.food && response.data.food.id) {
         // Show success message
         alert(`${food.name} has been added to your food database!`);
 
@@ -266,14 +382,14 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
   const addFoodToLog = async () => {
     if (!selectedFood) return;
 
-    setAddingToLog(true);
-
     try {
       // Ensure we have a token
       if (!token) {
         Alert.alert('Authentication Required', 'Please log in to add foods to your log.');
         return;
       }
+
+      setIsAddingToLog(true);
 
       // First import the food to get a proper ID
       const foodData = {
@@ -291,20 +407,27 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
       // Make API call to save the food
       const response = await apiService.post<FoodApiResponse>('/foods/custom', foodData);
 
-      if (response?.food && response.food.id) {
+      if (response?.data?.food && response.data.food.id) {
         // Now add to the log
         await foodLogService.createLog({
-          food_item_id: Number(response.food.id),
+          food_item_id: Number(response.data.food.id),
           log_date: logDate,
           meal_type: mealType,
           servings: parseFloat(servings) || 1,
         });
 
-        // Show success message
+        // Show success message and navigate back
         Alert.alert(
           'Success',
           `${selectedFood.name} has been added to your log!`,
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
+          [{
+            text: 'OK',
+            onPress: () => {
+              setShowAddToLogModal(false);
+              setSelectedFood(null);
+              navigation.goBack();
+            }
+          }]
         );
       } else {
         throw new Error('Failed to save food item: Invalid response format');
@@ -313,8 +436,7 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
       console.error('Error adding food to log:', error);
       Alert.alert('Error', 'Failed to add food to your log. Please try again.');
     } finally {
-      setAddingToLog(false);
-      setShowAddToLogModal(false);
+      setIsAddingToLog(false);
     }
   };
 
@@ -357,6 +479,20 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
       </Card>
     </TouchableOpacity>
   );
+
+  // Add cleanup for add-to-log mode when screen is unfocused
+  React.useEffect(() => {
+    const unsubscribe = navigation.addListener('blur', () => {
+      // Reset the add-to-log mode when leaving the screen
+      setIsAddingToLog(false);
+      setLogDate(new Date().toISOString().split('T')[0]);
+      setMealType('snack');
+      setSelectedFood(null);
+      setShowAddToLogModal(false);
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   return (
     <View style={styles.container}>
@@ -405,22 +541,34 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
 
       {selectedFood && (
         <View style={styles.actionContainer}>
-          <Button
-            mode="contained"
-            onPress={() => importFood(selectedFood)}
-            style={styles.actionButton}
-          >
-            Import {selectedFood.name}
-          </Button>
+          {!isAddingToLog && (
+            <Button
+              mode="contained"
+              onPress={() => importFood(selectedFood)}
+              style={styles.actionButton}
+            >
+              Import {selectedFood.name}
+            </Button>
+          )}
           <Button
             mode="contained"
             onPress={() => setShowAddToLogModal(true)}
-            style={[styles.actionButton, { marginTop: 8 }]}
+            style={[styles.actionButton, { marginTop: !isAddingToLog ? 8 : 0 }]}
             icon="notebook"
           >
             Add to Log
           </Button>
         </View>
+      )}
+
+      {!isAddingToLog && (
+        <Portal>
+          <FAB
+            icon="plus"
+            style={styles.fab}
+            onPress={() => navigation.navigate('AddFood')}
+          />
+        </Portal>
       )}
 
       <Portal>
@@ -430,36 +578,109 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
           style={styles.modalContainer}
         >
           <Dialog.Title>Add to Food Log</Dialog.Title>
-          <Dialog.Content>
-            <Text style={styles.modalText}>
-              Add {selectedFood?.name} to your log for {new Date(logDate).toLocaleDateString()}
-            </Text>
+          <Dialog.ScrollArea>
+            <ScrollView>
+              <Dialog.Content>
+                <Text style={styles.modalText}>
+                  Add {selectedFood?.name} to your log for {new Date(logDate).toLocaleDateString()}
+                </Text>
 
-            <View style={styles.mealTypeContainer}>
-              {['breakfast', 'lunch', 'dinner', 'snack'].map((type) => (
-                <Chip
-                  key={type}
-                  selected={mealType === type}
-                  onPress={() => setMealType(type as 'breakfast' | 'lunch' | 'dinner' | 'snack')}
-                  style={styles.mealTypeChip}
-                  selectedColor={theme.colors.primary}
-                >
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
-                </Chip>
-              ))}
-            </View>
+                <View style={styles.mealTypeContainer}>
+                  {['breakfast', 'lunch', 'dinner', 'snack'].map((type) => (
+                    <Chip
+                      key={type}
+                      selected={mealType === type}
+                      onPress={() => setMealType(type as 'breakfast' | 'lunch' | 'dinner' | 'snack')}
+                      style={styles.mealTypeChip}
+                      selectedColor={theme.colors.primary}
+                    >
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </Chip>
+                  ))}
+                </View>
 
-            <View style={styles.servingsContainer}>
-              <Text style={styles.servingsLabel}>Servings:</Text>
-              <RNTextInput
-                value={servings}
-                onChangeText={setServings}
-                keyboardType="numeric"
-                style={styles.servingsInput}
-                maxLength={4}
-              />
-            </View>
-          </Dialog.Content>
+                <View style={styles.servingsContainer}>
+                  <Text style={styles.servingsLabel}>Servings:</Text>
+                  <RNTextInput
+                    value={servings}
+                    onChangeText={setServings}
+                    keyboardType="numeric"
+                    style={styles.servingsInput}
+                    maxLength={4}
+                  />
+                </View>
+
+                <Divider style={styles.divider} />
+
+                <Text style={styles.nutritionTitle}>Nutrition Information (per serving)</Text>
+
+                <View style={styles.nutritionContainer}>
+                  <View style={styles.nutritionRow}>
+                    <Text style={styles.nutritionLabel}>Calories:</Text>
+                    <RNTextInput
+                      value={selectedFood?.calories.toString()}
+                      onChangeText={(value) => setSelectedFood(prev => prev ? {...prev, calories: parseFloat(value) || 0} : null)}
+                      keyboardType="numeric"
+                      style={styles.nutritionInput}
+                      maxLength={6}
+                    />
+                  </View>
+
+                  <View style={styles.nutritionRow}>
+                    <Text style={styles.nutritionLabel}>Protein (g):</Text>
+                    <RNTextInput
+                      value={selectedFood?.protein.toString()}
+                      onChangeText={(value) => setSelectedFood(prev => prev ? {...prev, protein: parseFloat(value) || 0} : null)}
+                      keyboardType="numeric"
+                      style={styles.nutritionInput}
+                      maxLength={6}
+                    />
+                  </View>
+
+                  <View style={styles.nutritionRow}>
+                    <Text style={styles.nutritionLabel}>Carbs (g):</Text>
+                    <RNTextInput
+                      value={selectedFood?.carbs.toString()}
+                      onChangeText={(value) => setSelectedFood(prev => prev ? {...prev, carbs: parseFloat(value) || 0} : null)}
+                      keyboardType="numeric"
+                      style={styles.nutritionInput}
+                      maxLength={6}
+                    />
+                  </View>
+
+                  <View style={styles.nutritionRow}>
+                    <Text style={styles.nutritionLabel}>Fat (g):</Text>
+                    <RNTextInput
+                      value={selectedFood?.fat.toString()}
+                      onChangeText={(value) => setSelectedFood(prev => prev ? {...prev, fat: parseFloat(value) || 0} : null)}
+                      keyboardType="numeric"
+                      style={styles.nutritionInput}
+                      maxLength={6}
+                    />
+                  </View>
+
+                  <View style={styles.nutritionRow}>
+                    <Text style={styles.nutritionLabel}>Serving Size:</Text>
+                    <View style={styles.servingSizeContainer}>
+                      <RNTextInput
+                        value={selectedFood?.servingSize?.toString() || '100'}
+                        onChangeText={(value) => setSelectedFood(prev => prev ? {...prev, servingSize: parseFloat(value) || 0} : null)}
+                        keyboardType="numeric"
+                        style={[styles.nutritionInput, styles.servingSizeInput]}
+                        maxLength={6}
+                      />
+                      <RNTextInput
+                        value={selectedFood?.servingSizeUnit || 'g'}
+                        onChangeText={(value) => setSelectedFood(prev => prev ? {...prev, servingSizeUnit: value} : null)}
+                        style={[styles.nutritionInput, styles.servingUnitInput]}
+                        maxLength={10}
+                      />
+                    </View>
+                  </View>
+                </View>
+              </Dialog.Content>
+            </ScrollView>
+          </Dialog.ScrollArea>
           <Dialog.Actions>
             <Button onPress={() => setShowAddToLogModal(false)}>
               Cancel
@@ -467,8 +688,8 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
             <Button
               mode="contained"
               onPress={addFoodToLog}
-              loading={addingToLog}
-              disabled={addingToLog}
+              loading={isAddingToLog}
+              disabled={isAddingToLog}
             >
               Add to Log
             </Button>
@@ -575,6 +796,7 @@ const styles = StyleSheet.create({
     padding: 20,
     margin: 20,
     borderRadius: 8,
+    maxHeight: '80%',
   },
   modalText: {
     marginBottom: 16,
@@ -590,7 +812,7 @@ const styles = StyleSheet.create({
   servingsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   servingsLabel: {
     marginRight: 8,
@@ -603,6 +825,55 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 4,
     paddingHorizontal: 8,
+  },
+  divider: {
+    marginVertical: 16,
+  },
+  nutritionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  nutritionContainer: {
+    marginBottom: 12,
+  },
+  nutritionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  nutritionLabel: {
+    fontSize: 16,
+    flex: 1,
+  },
+  nutritionInput: {
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    width: 100,
+    textAlign: 'right',
+  },
+  servingSizeContainer: {
+    flexDirection: 'row',
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  servingSizeInput: {
+    width: 60,
+    marginRight: 8,
+  },
+  servingUnitInput: {
+    width: 60,
+    textAlign: 'left',
+  },
+  fab: {
+    position: 'absolute',
+    margin: 16,
+    right: 0,
+    bottom: 0,
   },
 });
 

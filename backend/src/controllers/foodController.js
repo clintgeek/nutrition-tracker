@@ -4,6 +4,7 @@ const FoodApiService = require('../utils/foodApiService');
 const nutritionixService = require('../utils/nutritionixService');
 const logger = require('../config/logger');
 const { asyncHandler } = require('../middleware/errorHandler');
+const db = require('../config/db');
 
 /**
  * Debug endpoint to check raw API results
@@ -363,6 +364,82 @@ const getCustomFoods = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Get recently used food items
+ * @route GET /api/foods/recent
+ */
+const getRecentFoods = asyncHandler(async (req, res) => {
+  const limit = parseInt(req.query.limit) || 50;
+
+  try {
+    let query;
+    let params;
+
+    logger.info(`getRecentFoods called - User authenticated: ${!!req.user}, User ID: ${req.user?.id}`);
+
+    if (req.user && req.user.id) {
+      // If authenticated, get user-specific foods
+      query = `
+        WITH LastUsed AS (
+          SELECT food_item_id,
+                 MAX(created_at) as last_used
+          FROM food_logs
+          WHERE user_id = $1
+          GROUP BY food_item_id
+        )
+        SELECT DISTINCT f.*, lu.last_used
+        FROM food_items f
+        LEFT JOIN LastUsed lu ON f.id = lu.food_item_id
+        WHERE f.is_deleted = FALSE
+          AND (f.user_id = $1 OR f.user_id IS NULL)
+        ORDER BY lu.last_used DESC NULLS LAST, f.created_at DESC
+        LIMIT $2
+      `;
+      params = [req.user.id, limit];
+      logger.info('Using authenticated query with params:', params);
+    } else {
+      // If not authenticated, get only public foods
+      query = `
+        SELECT DISTINCT f.*
+        FROM food_items f
+        WHERE f.is_deleted = FALSE
+          AND f.user_id IS NULL
+        ORDER BY f.created_at DESC
+        LIMIT $1
+      `;
+      params = [limit];
+      logger.info('Using public foods query with params:', params);
+    }
+
+    logger.info('Executing query:', { query, params });
+    const result = await db.query(query, params);
+    logger.info(`Query results: ${result.rows.length} rows found`);
+
+    if (result.rows.length === 0) {
+      logger.info('No food items found in query result');
+    } else {
+      logger.info('Raw database results:', JSON.stringify(result.rows, null, 2));
+      logger.info('First food item raw:', result.rows[0]);
+    }
+
+    const foods = result.rows.map(row => {
+      const transformed = FoodItem.transformToFrontend(row);
+      logger.info('Raw row:', row);
+      logger.info('Transformed food item:', transformed);
+      return transformed;
+    });
+
+    res.json({
+      foods,
+      total: foods.length
+    });
+  } catch (error) {
+    logger.error(`Error getting recent foods: ${error.message}`);
+    logger.error('Stack trace:', error.stack);
+    res.status(500).json({ message: 'Error getting recent foods', error: error.message });
+  }
+});
+
 module.exports = {
   searchFood,
   getFoodByBarcode,
@@ -371,4 +448,5 @@ module.exports = {
   deleteCustomFood,
   getCustomFoods,
   debugSearch,
+  getRecentFoods
 };

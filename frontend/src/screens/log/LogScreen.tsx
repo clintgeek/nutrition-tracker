@@ -104,15 +104,10 @@ const LogScreen: React.FC = () => {
     }
   };
 
-  const navigateToAddLog = (mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
-    // Navigate to FoodScreen with a parameter indicating we're adding to the log
-    navigation.navigate('FoodStack', {
-      screen: 'FoodList',
-      params: {
-        addToLog: true,
-        logDate: selectedDate,
-        mealType: mealType
-      }
+  const navigateToAddLog = (mealType: string) => {
+    navigation.navigate('SearchFoodForLog', {
+      mealType,
+      date: selectedDate
     });
   };
 

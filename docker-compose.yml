@@ -7,7 +7,7 @@ services:
       args:
         - NODE_OPTIONS=--max_old_space_size=4096
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - EXPO_NO_DOCTOR=1
       - EXPO_DEBUG=true
     ports:

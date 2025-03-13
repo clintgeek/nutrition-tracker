@@ -421,4 +421,27 @@ export const foodLogService = {
       console.error('Error marking logs as synced:', error);
     }
   },
+
+  // Get recent food items by meal type
+  getRecentByMealType: async (mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack'): Promise<FoodItem[]> => {
+    try {
+      const response = await apiService.get<{ foods: FoodItem[] }>(`/logs/recent/${mealType}`);
+      return response.foods;
+    } catch (error) {
+      console.error('Error getting recent foods:', error);
+      return [];
+    }
+  },
+
+  // Get recent foods from logs
+  getRecentFoods: async (limit: number = 10): Promise<FoodLog[]> => {
+    try {
+      // Try to get recent foods from API
+      return apiService.get<{ logs: FoodLog[] }>(`/logs/recent?limit=${limit}`).then((response) => response.logs);
+    } catch (error) {
+      // If API call fails, return empty array
+      console.error('Error getting recent foods:', error);
+      return [];
+    }
+  },
 };

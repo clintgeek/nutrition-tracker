@@ -20,10 +20,10 @@ class FoodItem {
       name: dbItem.name,
       barcode: dbItem.barcode,
       brand: dbItem.brand,
-      calories: dbItem.calories_per_serving,
-      protein: dbItem.protein_grams,
-      carbs: dbItem.carbs_grams,
-      fat: dbItem.fat_grams,
+      calories: dbItem.calories_per_serving || 0,
+      protein: dbItem.protein_grams || 0,
+      carbs: dbItem.carbs_grams || 0,
+      fat: dbItem.fat_grams || 0,
       serving_size: dbItem.serving_size,
       serving_unit: dbItem.serving_unit,
       source: dbItem.source,
@@ -31,7 +31,8 @@ class FoodItem {
       user_id: dbItem.user_id,
       created_at: dbItem.created_at,
       updated_at: dbItem.updated_at,
-      is_deleted: dbItem.is_deleted || false
+      is_deleted: dbItem.is_deleted || false,
+      last_used: dbItem.last_used
     };
   }
 

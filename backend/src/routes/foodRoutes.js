@@ -1,5 +1,6 @@
 const express = require('express');
 const { check } = require('express-validator');
+const logger = require('../config/logger');
 const {
   searchFood,
   getFoodByBarcode,
@@ -8,10 +9,14 @@ const {
   deleteCustomFood,
   getCustomFoods,
   debugSearch,
+  getRecentFoods,
 } = require('../controllers/foodController');
 const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Debug logging for route registration
+logger.info('Registering food routes...');
 
 // Validation middleware for regular food updates
 const validateFoodUpdate = [
@@ -28,6 +33,14 @@ const validateFoodUpdate = [
 const validateSoftDelete = [
   check('is_deleted', 'is_deleted must be a boolean').isBoolean()
 ];
+
+// Debug middleware to log all requests
+const logRequests = (req, res, next) => {
+  logger.info(`Food route accessed: ${req.method} ${req.originalUrl}`);
+  next();
+};
+
+router.use(logRequests);
 
 /**
  * @route GET /api/foods/search
@@ -49,6 +62,16 @@ router.get('/debug-search', debugSearch);
  * @access Public
  */
 router.get('/barcode/:barcode', getFoodByBarcode);
+
+/**
+ * @route GET /api/foods/recent
+ * @desc Get recently used food items
+ * @access Private
+ */
+router.get('/recent', (req, res, next) => {
+  logger.info('Recent foods route accessed');
+  next();
+}, getRecentFoods);
 
 // All routes below require authentication
 router.use(authenticate);
