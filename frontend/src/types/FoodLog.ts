@@ -1,24 +1,13 @@
 import { Food } from './Food';
 
 export interface FoodLog {
-  id?: number;
-  user_id?: string | number;
-  food_item_id?: number;
-  log_date: string;
-  meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-  servings: number;
-  sync_id?: string;
-  is_deleted?: boolean;
-  created_at?: string;
-  updated_at?: string;
-  // Additional fields from join
-  food_name?: string;
-  calories_per_serving?: number;
-  protein_grams?: number;
-  carbs_grams?: number;
-  fat_grams?: number;
-  serving_size?: string;
-  serving_unit?: string;
+  id: string;
+  user_id: string;
+  food: Food;
+  serving_size: number;
+  calories: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface FoodLogSummary {

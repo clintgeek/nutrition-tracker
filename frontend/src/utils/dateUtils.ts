@@ -2,7 +2,15 @@
  * Format a date string (YYYY-MM-DD) to a more readable format (e.g., "Jan 1, 2023")
  */
 export const formatDate = (dateString: string): string => {
-  const date = new Date(dateString);
+  // Parse the date string manually to avoid timezone issues
+  const [yearStr, monthStr, dayStr] = dateString.split('-');
+  const year = parseInt(yearStr);
+  const month = parseInt(monthStr) - 1; // JavaScript months are 0-indexed
+  const day = parseInt(dayStr);
+
+  // Create date with explicit year, month, day in local timezone
+  const date = new Date(year, month, day, 12, 0, 0);
+
   return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -35,7 +43,13 @@ export const formatDayOfWeek = (dateString: string): string => {
  */
 export const getTodayDate = (): string => {
   const today = new Date();
-  return today.toISOString().split('T')[0];
+
+  // Get the date in local timezone instead of UTC
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
 };
 
 /**
@@ -44,7 +58,13 @@ export const getTodayDate = (): string => {
 export const getDateDaysAgo = (days: number): string => {
   const date = new Date();
   date.setDate(date.getDate() - days);
-  return date.toISOString().split('T')[0];
+
+  // Get the date in local timezone
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
 };
 
 /**
@@ -53,7 +73,13 @@ export const getDateDaysAgo = (days: number): string => {
 export const getDateDaysFromNow = (days: number): string => {
   const date = new Date();
   date.setDate(date.getDate() + days);
-  return date.toISOString().split('T')[0];
+
+  // Get the date in local timezone
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
 };
 
 /**
@@ -65,7 +91,13 @@ export const getLastNDays = (n: number): Array<{ date: string; label: string }> 
   for (let i = 0; i < n; i++) {
     const date = new Date();
     date.setDate(date.getDate() - i);
-    const dateString = date.toISOString().split('T')[0];
+
+    // Get the date in local timezone
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
+
     const label = date.toLocaleDateString('en-US', { weekday: 'short' });
     dates.push({ date: dateString, label });
   }

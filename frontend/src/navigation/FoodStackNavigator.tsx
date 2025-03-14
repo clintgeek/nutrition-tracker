@@ -6,6 +6,8 @@ import FoodScreen from '../screens/food/FoodScreen';
 import AddFoodScreen from '../screens/food/AddFoodScreen';
 import FoodSearchScreen from '../screens/food/FoodSearchScreen';
 import BarcodeScanner from '../screens/food/BarcodeScanner';
+import { RecipeDetailScreen } from '../screens/recipes/RecipeDetailScreen';
+import { SearchFoodForRecipeScreen } from '../screens/recipes/SearchFoodForRecipeScreen';
 import CustomHeader from '../components/CustomHeader';
 import { Food } from '../types/Food';
 import { RootStackParamList } from './AppNavigator';
@@ -29,6 +31,8 @@ export type FoodStackParamList = {
     servings?: number;
   };
   BarcodeScanner: undefined;
+  RecipeDetail: { recipeId: number | 'new'; selectedIngredient?: Food };
+  SearchFoodForRecipe: { recipeId: number | 'new' };
 };
 
 // Create the stack navigator
@@ -102,6 +106,32 @@ const FoodStackNavigator: React.FC = () => {
           header: (props) => (
             <CustomHeader
               title="Scan Barcode"
+              showBackButton={props.back !== undefined}
+            />
+          )
+        }}
+      />
+      <Stack.Screen
+        name="RecipeDetail"
+        component={RecipeDetailScreen}
+        options={({ route }) => ({
+          title: route.params.recipeId === 'new' ? 'New Recipe' : 'Recipe Details',
+          header: (props) => (
+            <CustomHeader
+              title={route.params.recipeId === 'new' ? 'New Recipe' : 'Recipe Details'}
+              showBackButton={props.back !== undefined}
+            />
+          )
+        })}
+      />
+      <Stack.Screen
+        name="SearchFoodForRecipe"
+        component={SearchFoodForRecipeScreen}
+        options={{
+          title: 'Add Ingredient',
+          header: (props) => (
+            <CustomHeader
+              title="Add Ingredient"
               showBackButton={props.back !== undefined}
             />
           )

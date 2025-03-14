@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { Card, Title, Text, ProgressBar, useTheme, Button } from 'react-native-paper';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackScreenProps } from '../../types/navigation';
 import { goalService, Goal } from '../../services/goalService';
 import { summaryService, DailySummary } from '../../services/summaryService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -22,7 +22,7 @@ interface NutritionSummary {
 
 const TodaySummary: React.FC = () => {
   const theme = useTheme();
-  const navigation = useNavigation<StackNavigationProp<any>>();
+  const navigation = useNavigation<RootStackScreenProps<'Main'>['navigation']>();
   const isFocused = useIsFocused();
   const { token } = useAuth();
   const [summary, setSummary] = useState<NutritionSummary>({
@@ -254,7 +254,10 @@ const TodaySummary: React.FC = () => {
         <View style={styles.calorieSection}>
           <View style={styles.calorieHeader}>
             <Text style={styles.calorieLabel}>Calories</Text>
-            <Text style={styles.calorieValue}>
+            <Text style={[
+              styles.calorieValue,
+              summary.calories.consumed > summary.calories.goal && { color: theme.colors.error }
+            ]}>
               {Math.round(summary.calories.consumed)} / {Math.round(summary.calories.goal)}
             </Text>
           </View>

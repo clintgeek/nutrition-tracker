@@ -2,15 +2,15 @@ import React from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Text, Card, Title, Paragraph, useTheme, Avatar } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackScreenProps } from '../types/navigation';
 
 // Import the TodaySummary component
 import TodaySummary from '../components/home/TodaySummary';
 
-const HomeScreen: React.FC = () => {
+type Props = RootStackScreenProps<'Main'>;
+
+const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const theme = useTheme();
-  const navigation = useNavigation<StackNavigationProp<any>>();
 
   const navigateToSummary = () => {
     // For now, this will just stay on the home screen

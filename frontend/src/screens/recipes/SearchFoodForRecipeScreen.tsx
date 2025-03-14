@@ -1,41 +1,24 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Alert, ScrollView, RefreshControl } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import {
   Searchbar,
   Text,
   Card,
   Title,
-  Divider,
   ActivityIndicator,
   Avatar,
   useTheme,
 } from 'react-native-paper';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { LogStackParamList, RootStackScreenProps } from '../../types/navigation';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp, useRoute } from '@react-navigation/core';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import debounce from 'lodash/debounce';
 
 import { foodService, FoodItem } from '../../services/foodService';
-import { Food } from '../../types/Food';
+import { Food } from '../../types';
+import { RecipeStackParamList } from '../../types/navigation';
 import EmptyState from '../../components/common/EmptyState';
-import { foodLogService } from '../../services/foodLogService';
-
-const mapFoodItemToFood = (item: FoodItem): Food => ({
-  id: item.id.toString(),
-  name: item.name,
-  barcode: item.barcode,
-  brand: item.brand,
-  calories: item.calories,
-  protein: item.protein,
-  carbs: item.carbs,
-  fat: item.fat,
-  serving_size: item.serving_size,
-  serving_unit: item.serving_unit,
-  is_custom: item.source === 'custom',
-  source: item.source,
-  created_at: item.created_at || new Date().toISOString(),
-  updated_at: item.updated_at || new Date().toISOString()
-});
 
 const getSourceIcon = (source: string) => {
   switch (source?.toLowerCase()) {
@@ -63,18 +46,45 @@ const getSourceColor = (source: string, theme: any) => {
   }
 };
 
-type Props = RootStackScreenProps<'LogStack'>;
+const mapFoodItemToFood = (item: FoodItem): Food => ({
+  id: item.id.toString(),
+  name: item.name,
+  barcode: item.barcode,
+  brand: item.brand,
+  calories: item.calories,
+  protein: item.protein,
+  carbs: item.carbs,
+  fat: item.fat,
+  serving_size: item.serving_size,
+  serving_unit: item.serving_unit,
+  is_custom: item.source === 'custom',
+  source: item.source === 'custom' ? 'custom' : 'usda',
+  created_at: item.created_at || new Date().toISOString(),
+  updated_at: item.updated_at || new Date().toISOString()
+});
 
-const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
+export function SearchFoodForRecipeScreen() {
   const theme = useTheme();
-  const navigation = useNavigation<Props['navigation']>();
+  const navigation = useNavigation<NativeStackNavigationProp<RecipeStackParamList>>();
+  const route = useRoute<RouteProp<RecipeStackParamList, 'SearchFoodForRecipe'>>();
+
+  console.log('SearchFoodForRecipeScreen mounted');
+  console.log('Route params:', route.params);
+
+  // Add a focus listener to detect when the screen becomes active
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('SearchFoodForRecipeScreen focused');
+      console.log('Route params on focus:', route.params);
+    });
+
+    return unsubscribe;
+  }, [navigation, route]);
+
+  const { recipeId } = route.params as RecipeStackParamList['SearchFoodForRecipe'];
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [foods, setFoods] = useState<Food[]>([]);
-  const [filteredFoods, setFilteredFoods] = useState<Food[]>([]);
-
-  const { mealType, date } = route.params;
 
   // Helper function to capitalize food name
   const capitalizeFoodName = (name: string): string => {
@@ -82,56 +92,45 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
   };
 
   // Fetch foods function
-  const fetchFoods = useCallback(async (query: string = '', forceRefresh: boolean = false) => {
+  const fetchFoods = useCallback(async (query: string = '') => {
     try {
-      setIsLoading(!forceRefresh);
-      if (forceRefresh) setIsRefreshing(true);
+      setIsLoading(true);
 
       let results;
       if (query.trim()) {
         results = await foodService.searchFood(query);
       } else {
-        // Get both custom foods and food logs
-        const [customFoods, recentLogs] = await Promise.all([
-          foodService.getCustomFoods(),
-          foodLogService.getLogs(new Date().toISOString().split('T')[0])
-        ]);
+        // Get custom foods
+        const customFoods = await foodService.getCustomFoods();
 
-        // Create a map of food IDs to their last used date
-        const foodLastUsed = new Map();
-        recentLogs.forEach(log => {
-          const currentDate = new Date(log.created_at || '').getTime();
-          const existingDate = foodLastUsed.get(log.food_item_id);
-          if (!existingDate || currentDate > existingDate) {
-            foodLastUsed.set(log.food_item_id, currentDate);
-          }
-        });
-
-        // Sort custom foods by last used date
-        const sortedCustomFoods = customFoods.sort((a, b) => {
-          const aLastUsed = foodLastUsed.get(a.id) || new Date(a.updated_at || a.created_at || '').getTime();
-          const bLastUsed = foodLastUsed.get(b.id) || new Date(b.updated_at || b.created_at || '').getTime();
-          return bLastUsed - aLastUsed;
-        });
+        // Sort custom foods alphabetically
+        const sortedCustomFoods = customFoods.sort((a, b) =>
+          a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+        );
 
         results = {
-          foods: sortedCustomFoods.map(item => ({
-            ...mapFoodItemToFood(item),
-            name: capitalizeFoodName(item.name)
-          })),
+          foods: sortedCustomFoods,
           total: sortedCustomFoods.length,
           page: 1,
           limit: 20
         };
       }
 
+      // Map foods using the helper function and ensure all fields have defaults
       const mappedFoods = (results.foods || []).map(food => ({
-        ...food,
-        name: capitalizeFoodName(food.name)
+        ...mapFoodItemToFood(food),
+        name: capitalizeFoodName(food.name),
+        calories: food.calories || 0,
+        protein: food.protein || 0,
+        carbs: food.carbs || 0,
+        fat: food.fat || 0,
+        serving_size: food.serving_size || 100,
+        serving_unit: food.serving_unit || 'g',
+        is_custom: food.source === 'custom',
+        source: food.source === 'custom' ? 'custom' : 'usda'
       }));
 
       setFoods(mappedFoods);
-      setFilteredFoods(mappedFoods);
     } catch (error) {
       console.error('Error fetching foods:', error);
       Alert.alert(
@@ -141,7 +140,6 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
       );
     } finally {
       setIsLoading(false);
-      setIsRefreshing(false);
     }
   }, []);
 
@@ -164,25 +162,61 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
     debouncedSearch(query);
   };
 
-  // Handle refresh
-  const handleRefresh = useCallback(() => {
-    fetchFoods(searchQuery, true);
-  }, [fetchFoods, searchQuery]);
+  // Handle selecting a food item
+  const handleSelectFood = async (food: Food) => {
+    try {
+      // If the food is not custom, create a custom copy
+      if (!food.is_custom) {
+        const customFood = await foodService.createCustomFood({
+          name: food.name,
+          brand: food.brand,
+          calories: food.calories || 0,
+          protein: food.protein || 0,
+          carbs: food.carbs || 0,
+          fat: food.fat || 0,
+          serving_size: food.serving_size || 100,
+          serving_unit: food.serving_unit || 'g',
+          source: 'custom'
+        });
 
-  // Handle adding food to log
-  const handleAddToLog = (food: Food) => {
-    navigation.navigate('AddFoodToLogModal', {
-      food,
-      mealType,
-      date
-    });
+        // Ensure all fields are properly set
+        food = {
+          ...customFood,
+          id: customFood.id.toString(),
+          name: capitalizeFoodName(customFood.name),
+          calories: customFood.calories || food.calories || 0,
+          protein: customFood.protein || food.protein || 0,
+          carbs: customFood.carbs || food.carbs || 0,
+          fat: customFood.fat || food.fat || 0,
+          serving_size: customFood.serving_size || food.serving_size || 100,
+          serving_unit: customFood.serving_unit || food.serving_unit || 'g',
+          is_custom: true,
+          source: 'custom',
+          created_at: customFood.created_at || new Date().toISOString(),
+          updated_at: customFood.updated_at || new Date().toISOString()
+        };
+      }
+
+      // Navigate back to recipe detail with the selected food and original recipeId
+      navigation.navigate('RecipeDetail', {
+        recipeId: typeof recipeId === 'string' ? 'new' : Number(recipeId),
+        selectedIngredient: food
+      });
+    } catch (error) {
+      console.error('Error handling food selection:', error);
+      Alert.alert(
+        'Error',
+        'Failed to add food to recipe. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const renderFoodItem = ({ item }: { item: Food }) => {
     const sourceColor = getSourceColor(item.source || '', theme);
 
     return (
-      <TouchableOpacity onPress={() => handleAddToLog(item)}>
+      <TouchableOpacity onPress={() => handleSelectFood(item)}>
         <Card style={styles.foodCard}>
           <Card.Content style={styles.foodCardContent}>
             <Avatar.Icon
@@ -216,7 +250,7 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
             </View>
 
             <TouchableOpacity
-              onPress={() => handleAddToLog(item)}
+              onPress={() => handleSelectFood(item)}
               style={styles.actionButton}
             >
               <MaterialCommunityIcons name="plus-circle" size={24} color={theme.colors.primary} />
@@ -245,27 +279,23 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={styles.loadingText}>Loading foods...</Text>
         </View>
-      ) : (
+      ) : foods.length > 0 ? (
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollViewContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
-            />
-          }
         >
-          {filteredFoods.map((item, index) => (
-            <View key={item.id || index}>
-              {renderFoodItem({ item })}
-            </View>
-          ))}
+          {foods.map((food) => renderFoodItem({ item: food }))}
         </ScrollView>
+      ) : (
+        <EmptyState
+          icon="food-apple"
+          title="No foods found"
+          message={searchQuery ? "Try a different search term" : "Search for foods to add to your recipe"}
+        />
       )}
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -273,20 +303,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     padding: 16,
     backgroundColor: '#fff',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    zIndex: 1,
+    elevation: 2,
   },
   searchBar: {
-    flex: 1,
-    marginRight: 8,
     elevation: 0,
   },
   scrollView: {
@@ -295,64 +316,52 @@ const styles = StyleSheet.create({
   scrollViewContent: {
     padding: 16,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-  },
   foodCard: {
     marginBottom: 16,
     elevation: 2,
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   foodCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
   },
   foodInfo: {
     flex: 1,
     marginLeft: 16,
   },
   foodName: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
     marginBottom: 4,
-    textTransform: 'capitalize',
   },
   brandText: {
     fontSize: 14,
-    color: '#757575',
-    marginBottom: 4,
+    color: '#666',
+    marginBottom: 8,
   },
   macroContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    marginTop: 8,
   },
   macroItem: {
-    flexDirection: 'column',
-    alignItems: 'center',
+    marginRight: 16,
   },
   macroValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   macroLabel: {
-    fontSize: 14,
-    color: '#757575',
+    fontSize: 12,
+    color: '#666',
   },
   actionButton: {
-    margin: 0,
-    padding: 0,
+    padding: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#666',
   },
 });
-
-export default SearchFoodForLogScreen;
