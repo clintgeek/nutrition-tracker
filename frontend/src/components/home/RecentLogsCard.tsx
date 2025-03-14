@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
 import { Card, Title, Text, Divider, Avatar, useTheme } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackScreenProps } from '../../types/navigation';
 
 import { FoodLog } from '../../types/FoodLog';
 import { formatDate } from '../../utils/dateUtils';
@@ -13,7 +13,7 @@ interface RecentLogsCardProps {
 
 const RecentLogsCard: React.FC<RecentLogsCardProps> = ({ recentLogs }) => {
   const theme = useTheme();
-  const navigation = useNavigation<StackNavigationProp<any>>();
+  const navigation = useNavigation<RootStackScreenProps<'Main'>['navigation']>();
 
   const navigateToLogDetails = (logId: string) => {
     navigation.navigate('LogDetails', { logId });

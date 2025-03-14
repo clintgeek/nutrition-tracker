@@ -76,4 +76,5 @@
   - [ ] Implement React.memo for pure components
   - [ ] Use useMemo and useCallback hooks for expensive calculations
 
+## Recipie Notes
 

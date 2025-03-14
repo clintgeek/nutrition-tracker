@@ -1,25 +1,22 @@
 export interface Food {
-  id: string;
+  id: string | number;
   name: string;
-  brand?: string;
-  barcode?: string;
   calories: number;
+  serving_size: number;
+  serving_unit: string;
   protein: number;
   carbs: number;
   fat: number;
-  serving_size: number;
-  serving_unit: string;
-  fiber?: number;
-  sugar?: number;
-  sodium?: number;
-  image_url?: string;
-  is_custom?: boolean;
-  user_id?: string;
   created_at?: string;
   updated_at?: string;
+  is_custom?: boolean;
+  user_id?: string;
   sync_status?: 'synced' | 'pending' | 'failed';
-  source?: string;
+  source: 'custom' | 'usda' | 'recipe';
+  barcode?: string;
+  brand?: string;
   source_id?: string;
+  sync_id?: string;
   is_deleted?: boolean;
 }
 
@@ -34,7 +31,7 @@ export interface CreateFoodDTO {
   fat: number;
   serving_size: number;
   serving_unit: string;
-  source: string;
+  source: 'custom' | 'usda' | 'recipe';
   source_id?: string;
 }
 

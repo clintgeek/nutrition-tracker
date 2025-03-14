@@ -15,17 +15,21 @@ import {
   Dialog
 } from 'react-native-paper';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LogStackParamList } from '../../types/navigation';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { foodLogService } from '../../services/foodLogService';
 import { goalService } from '../../services/goalService';
-import { FoodLog } from '../../types/FoodLog';
+import { FoodLog } from '../../services/foodLogService';
 import { formatDate, getTodayDate } from '../../utils/dateUtils';
 import EmptyState from '../../components/common/EmptyState';
 
+type LogScreenNavigationProp = NativeStackNavigationProp<LogStackParamList>;
+
 const LogScreen: React.FC = () => {
+  const navigation = useNavigation<LogScreenNavigationProp>();
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [logs, setLogs] = useState<FoodLog[]>([]);
@@ -42,7 +46,6 @@ const LogScreen: React.FC = () => {
   const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
 
   const theme = useTheme();
-  const navigation = useNavigation<StackNavigationProp<any>>();
 
   // Load calorie goal
   useEffect(() => {
@@ -59,11 +62,11 @@ const LogScreen: React.FC = () => {
     loadCalorieGoal();
   }, []);
 
-  const fetchLogs = async () => {
+  const fetchLogs = async (dateToFetch = selectedDate) => {
     try {
       setIsLoading(true);
-      console.log('Fetching logs for date:', selectedDate);
-      const logsData = await foodLogService.getLogs(selectedDate);
+      console.log('Fetching logs for date:', dateToFetch);
+      const logsData = await foodLogService.getLogs(dateToFetch);
       console.log('API Response:', {
         success: !!logsData,
         logCount: logsData?.length || 0
@@ -107,16 +110,25 @@ const LogScreen: React.FC = () => {
     }
   };
 
+  // Fetch logs when selectedDate changes
+  useEffect(() => {
+    console.log('Date changed, fetching logs for:', selectedDate);
+    fetchLogs();
+  }, [selectedDate]);
+
+  // Also fetch logs when the screen comes into focus
   useFocusEffect(
     useCallback(() => {
+      console.log('Screen focused, refreshing logs');
       fetchLogs();
-    }, [selectedDate])
+    }, [])
   );
 
   const handleDateChange = (event: any, date?: Date) => {
     setShowDatePicker(false);
     if (date) {
       const formattedDate = date.toISOString().split('T')[0];
+      console.log('Date picker changed to:', formattedDate);
       setSelectedDate(formattedDate);
     }
   };

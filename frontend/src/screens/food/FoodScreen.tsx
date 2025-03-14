@@ -16,7 +16,7 @@ import {
   Portal,
   Dialog,
 } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useRoute } from '@react-navigation/core';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -51,7 +51,7 @@ const mapFoodItemToFood = (item: FoodItem): Food => ({
   serving_size: item.serving_size,
   serving_unit: item.serving_unit,
   is_custom: item.source === 'custom',
-  source: item.source,
+  source: item.source as 'custom' | 'usda' | 'recipe',
   created_at: item.created_at || new Date().toISOString(),
   updated_at: item.updated_at || new Date().toISOString()
 });
@@ -70,6 +70,7 @@ const FoodScreen: React.FC = () => {
   const [isFoodDetailsVisible, setIsFoodDetailsVisible] = useState(false);
   const [foodToDelete, setFoodToDelete] = useState<Food | null>(null);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
 
   // Fetch foods function
   const fetchFoods = useCallback(async (query: string = '', forceRefresh: boolean = false) => {
@@ -172,6 +173,18 @@ const FoodScreen: React.FC = () => {
     fetchFoods();
   }, [fetchFoods]);
 
+  // Add useFocusEffect to refresh the food list every time the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('Food screen focused - refreshing food list');
+      fetchFoods(searchQuery, true);
+      return () => {
+        // Cleanup function when screen loses focus
+        console.log('Food screen lost focus');
+      };
+    }, [fetchFoods, searchQuery])
+  );
+
   // Create a memoized debounced search function
   const debouncedSearch = useMemo(
     () => debounce((query: string) => {
@@ -221,7 +234,7 @@ const FoodScreen: React.FC = () => {
         serving_unit: selectedFood.serving_unit || '',
         barcode: selectedFood.barcode,
         brand: selectedFood.brand,
-        source: 'custom',  // Always set source to custom for saved foods
+        source: 'custom',
         source_id: selectedFood.source_id,
       };
 
@@ -230,7 +243,7 @@ const FoodScreen: React.FC = () => {
       if (selectedFood.id && selectedFood.source === 'custom') {
         // Update existing custom food
         console.log('Updating existing custom food:', selectedFood.id);
-        const id = parseInt(selectedFood.id);
+        const id = parseInt(selectedFood.id.toString());
         if (isNaN(id)) {
           throw new Error('Invalid food ID');
         }
@@ -279,7 +292,7 @@ const FoodScreen: React.FC = () => {
     if (!foodToDelete) return;
 
     try {
-      await foodService.deleteFood(parseInt(foodToDelete.id, 10));
+      await foodService.deleteFood(parseInt(foodToDelete.id.toString(), 10));
       await fetchFoods(searchQuery, true);
       setIsDeleteModalVisible(false);
       setFoodToDelete(null);
@@ -515,23 +528,30 @@ const FoodScreen: React.FC = () => {
         </Dialog>
       </Portal>
 
-      <FAB
+      <FAB.Group
+        open={fabOpen}
+        visible={true}
+        icon={fabOpen ? 'close' : 'plus'}
+        actions={[
+          {
+            icon: 'food-apple',
+            label: 'Add Food',
+            onPress: () => {
+              setFabOpen(false);
+              navigation.navigate('AddFood');
+            },
+          },
+          {
+            icon: 'barcode',
+            label: 'Scan Barcode',
+            onPress: () => {
+              setFabOpen(false);
+              navigation.navigate('BarcodeScanner');
+            },
+          },
+        ]}
+        onStateChange={({ open }) => setFabOpen(open)}
         style={styles.fab}
-        icon="plus"
-        onPress={() => {
-          setSelectedFood({
-            id: `new-${Date.now()}`,
-            name: '',
-            calories: 0,
-            protein: 0,
-            carbs: 0,
-            fat: 0,
-            serving_size: 100,
-            serving_unit: '',
-            source: 'custom'
-          });
-          setIsFoodDetailsVisible(true);
-        }}
       />
     </View>
   );

@@ -9,6 +9,7 @@ import HomeScreen from '../screens/HomeScreen';
 import FoodStackNavigator from './FoodStackNavigator';
 import LogStackNavigator from './LogStackNavigator';
 import GoalsStackNavigator from './GoalsStackNavigator';
+import RecipeStackNavigator from './RecipeStackNavigator';
 import CustomHeader from '../components/CustomHeader';
 
 // Define the tab navigator param list
@@ -17,7 +18,7 @@ export type MainTabParamList = {
   LogStack: undefined;
   FoodStack: undefined;
   GoalsStack: undefined;
-  Settings: undefined;
+  RecipeStack: undefined;
 };
 
 // Create the tab navigator
@@ -68,6 +69,16 @@ const MainTabNavigator: React.FC = () => {
           tabBarLabel: 'Foods',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="food-apple" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="RecipeStack"
+        component={RecipeStackNavigator}
+        options={{
+          tabBarLabel: 'Recipes',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="book-open-variant" color={color} size={size} />
           ),
         }}
       />
