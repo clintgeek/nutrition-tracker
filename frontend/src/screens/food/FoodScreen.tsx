@@ -542,14 +542,6 @@ const FoodScreen: React.FC = () => {
             },
           },
           {
-            icon: 'book-open',
-            label: 'Create Recipe',
-            onPress: () => {
-              setFabOpen(false);
-              navigation.navigate('RecipeDetail', { recipeId: 'new' });
-            },
-          },
-          {
             icon: 'barcode',
             label: 'Scan Barcode',
             onPress: () => {

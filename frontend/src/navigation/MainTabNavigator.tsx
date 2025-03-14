@@ -73,22 +73,22 @@ const MainTabNavigator: React.FC = () => {
         }}
       />
       <Tab.Screen
-        name="GoalsStack"
-        component={GoalsStackNavigator}
-        options={{
-          tabBarLabel: 'Goals',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="flag" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tab.Screen
         name="RecipeStack"
         component={RecipeStackNavigator}
         options={{
           tabBarLabel: 'Recipes',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="book-open-variant" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="GoalsStack"
+        component={GoalsStackNavigator}
+        options={{
+          tabBarLabel: 'Goals',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="flag" color={color} size={size} />
           ),
         }}
       />

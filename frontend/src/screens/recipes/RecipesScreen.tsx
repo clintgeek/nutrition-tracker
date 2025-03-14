@@ -1,122 +1,274 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList } from 'react-native';
-import { FAB, Text, Card, useTheme, Portal } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, StyleSheet, FlatList, TouchableOpacity, Alert, ScrollView, RefreshControl } from 'react-native';
+import {
+  Searchbar,
+  FAB,
+  Text,
+  Card,
+  Title,
+  Divider,
+  ActivityIndicator,
+  Avatar,
+  useTheme,
+  Button,
+  Portal,
+  Dialog,
+} from 'react-native-paper';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { Recipe } from '../../types';
 import { RecipeStackParamList } from '../../types/navigation';
 import { recipeService } from '../../services/recipeService';
-import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { ErrorMessage } from '../../components/common/ErrorMessage';
+import EmptyState from '../../components/common/EmptyState';
 import { formatNumber } from '../../utils/formatters';
 
+type RecipesScreenNavigationProp = NativeStackNavigationProp<RecipeStackParamList>;
+
 export function RecipesScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<RecipeStackParamList>>();
+  const navigation = useNavigation<RecipesScreenNavigationProp>();
   const theme = useTheme();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [filteredRecipes, setFilteredRecipes] = useState<Recipe[]>([]);
+  const [recipeToDelete, setRecipeToDelete] = useState<Recipe | null>(null);
+  const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
 
+  // Load recipes on mount and when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadRecipes();
+    }, [])
+  );
+
+  // Filter recipes when search query changes
   useEffect(() => {
-    loadRecipes();
-  }, []);
+    if (!searchQuery.trim()) {
+      setFilteredRecipes(recipes);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const filtered = recipes.filter(recipe =>
+        recipe.name.toLowerCase().includes(query) ||
+        (recipe.description && recipe.description.toLowerCase().includes(query))
+      );
+      setFilteredRecipes(filtered);
+    }
+  }, [searchQuery, recipes]);
 
-  const loadRecipes = async () => {
+  const loadRecipes = async (forceRefresh = false) => {
     try {
-      setLoading(true);
-      setError(null);
+      if (forceRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
       const data = await recipeService.getRecipes();
-      setRecipes(data);
+
+      // Sort recipes alphabetically
+      const sortedRecipes = [...data].sort((a, b) =>
+        a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+      );
+
+      setRecipes(sortedRecipes);
+      setFilteredRecipes(sortedRecipes);
     } catch (err) {
-      setError('Failed to load recipes');
       console.error('Error loading recipes:', err);
+      Alert.alert('Error', 'Failed to load recipes. Please try again.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const handleRecipePress = (recipeId: number) => {
-    navigation.navigate('RecipeDetail', { recipeId });
+  const handleRefresh = () => {
+    loadRecipes(true);
   };
 
-  const renderRecipeItem = ({ item }: { item: Recipe }) => (
-    <Card
-      style={styles.recipeCard}
-      onPress={() => handleRecipePress(item.id)}
-    >
-      <Card.Content>
-        <Text variant="titleLarge" style={styles.recipeName}>
-          {item.name}
-        </Text>
-        <Text variant="bodyMedium" style={styles.servings}>
-          {item.servings} serving{item.servings !== 1 ? 's' : ''}
-        </Text>
-        <View style={styles.nutritionGrid}>
-          <View style={styles.nutritionItem}>
-            <Text variant="labelSmall">Calories</Text>
-            <Text variant="bodyLarge">
-              {formatNumber(item.total_calories / item.servings)}
-            </Text>
-          </View>
-          <View style={styles.nutritionItem}>
-            <Text variant="labelSmall">Protein</Text>
-            <Text variant="bodyLarge">
-              {formatNumber(item.total_protein_grams / item.servings)}g
-            </Text>
-          </View>
-          <View style={styles.nutritionItem}>
-            <Text variant="labelSmall">Carbs</Text>
-            <Text variant="bodyLarge">
-              {formatNumber(item.total_carbs_grams / item.servings)}g
-            </Text>
-          </View>
-          <View style={styles.nutritionItem}>
-            <Text variant="labelSmall">Fat</Text>
-            <Text variant="bodyLarge">
-              {formatNumber(item.total_fat_grams / item.servings)}g
-            </Text>
-          </View>
-        </View>
-      </Card.Content>
-    </Card>
-  );
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+  };
 
-  if (loading) {
-    return <LoadingSpinner />;
-  }
+  const handleRecipePress = (recipe: Recipe) => {
+    navigation.navigate('RecipeDetail', { recipeId: recipe.id });
+  };
 
-  if (error) {
-    return <ErrorMessage message={error} onRetry={loadRecipes} />;
+  const handleDeleteRecipe = (recipe: Recipe) => {
+    setRecipeToDelete(recipe);
+    setIsDeleteModalVisible(true);
+  };
+
+  const confirmDeleteRecipe = async () => {
+    if (!recipeToDelete) return;
+
+    try {
+      await recipeService.deleteRecipe(recipeToDelete.id);
+      setIsDeleteModalVisible(false);
+      setRecipeToDelete(null);
+
+      // Refresh the list
+      loadRecipes(true);
+      Alert.alert('Success', 'Recipe deleted successfully');
+    } catch (error) {
+      console.error('Error deleting recipe:', error);
+      Alert.alert('Error', 'Failed to delete recipe. Please try again.');
+    }
+  };
+
+  const renderRecipeItem = ({ item }: { item: Recipe }) => {
+    const caloriesPerServing = Math.round(item.total_calories / item.servings);
+    const proteinPerServing = Math.round(item.total_protein_grams / item.servings);
+    const carbsPerServing = Math.round(item.total_carbs_grams / item.servings);
+    const fatPerServing = Math.round(item.total_fat_grams / item.servings);
+
+    return (
+      <TouchableOpacity onPress={() => handleRecipePress(item)}>
+        <Card style={styles.recipeCard}>
+          <Card.Content style={styles.recipeCardContent}>
+            <Avatar.Icon
+              size={40}
+              icon="book-open"
+              style={{ backgroundColor: theme.colors.primary }}
+              color="#fff"
+            />
+            <View style={styles.recipeInfo}>
+              <Title style={styles.recipeName}>{item.name}</Title>
+              {item.description && (
+                <Text style={styles.description} numberOfLines={1}>
+                  {item.description}
+                </Text>
+              )}
+
+              <View style={styles.macroContainer}>
+                <View style={styles.macroItem}>
+                  <Text style={styles.macroValue}>{caloriesPerServing}</Text>
+                  <Text style={styles.macroLabel}>Calories</Text>
+                </View>
+                <View style={styles.macroItem}>
+                  <Text style={styles.macroValue}>{proteinPerServing}g</Text>
+                  <Text style={styles.macroLabel}>Protein</Text>
+                </View>
+                <View style={styles.macroItem}>
+                  <Text style={styles.macroValue}>{carbsPerServing}g</Text>
+                  <Text style={styles.macroLabel}>Carbs</Text>
+                </View>
+                <View style={styles.macroItem}>
+                  <Text style={styles.macroValue}>{fatPerServing}g</Text>
+                  <Text style={styles.macroLabel}>Fat</Text>
+                </View>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => handleDeleteRecipe(item)}
+              style={styles.actionButton}
+            >
+              <MaterialCommunityIcons name="delete" size={24} color={theme.colors.error} />
+            </TouchableOpacity>
+          </Card.Content>
+        </Card>
+      </TouchableOpacity>
+    );
+  };
+
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Loading recipes...</Text>
+      </View>
+    );
   }
 
   return (
     <View style={styles.container}>
-      {recipes.length > 0 ? (
-        <FlatList
-          data={recipes}
-          renderItem={renderRecipeItem}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.list}
+      <View style={styles.searchContainer}>
+        <Searchbar
+          placeholder="Search recipes..."
+          onChangeText={handleSearchChange}
+          value={searchQuery}
+          style={styles.searchBar}
+          icon="magnify"
+          clearIcon="close"
         />
+      </View>
+
+      {filteredRecipes.length > 0 ? (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollViewContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+            />
+          }
+        >
+          {filteredRecipes.map((item, index) => (
+            <View key={item.id || index}>
+              {renderRecipeItem({ item })}
+            </View>
+          ))}
+        </ScrollView>
       ) : (
-        <View style={styles.emptyContainer}>
-          <Text variant="titleMedium" style={styles.emptyText}>
-            No recipes yet
-          </Text>
-          <Text variant="bodyMedium" style={styles.emptySubtext}>
-            Create your first recipe by tapping the + button
-          </Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={styles.emptyContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+            />
+          }
+        >
+          <EmptyState
+            icon="book-open"
+            title="No Recipes Found"
+            message={searchQuery ? "Try a different search term" : "Create your first recipe by tapping the + button"}
+          />
+        </ScrollView>
       )}
 
       <Portal>
-        <FAB
-          icon="plus"
-          style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-          onPress={() => navigation.navigate('RecipeDetail', { recipeId: 'new' })}
-        />
+        <Dialog
+          visible={isDeleteModalVisible}
+          onDismiss={() => setIsDeleteModalVisible(false)}
+        >
+          <Dialog.Title>Delete Recipe</Dialog.Title>
+          <Dialog.Content>
+            <Text>
+              Are you sure you want to delete "{recipeToDelete?.name}"? This action cannot be undone.
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setIsDeleteModalVisible(false)}>Cancel</Button>
+            <Button onPress={confirmDeleteRecipe} textColor={theme.colors.error}>
+              Delete
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
       </Portal>
+
+      <FAB.Group
+        open={fabOpen}
+        visible={true}
+        icon={fabOpen ? 'close' : 'plus'}
+        actions={[
+          {
+            icon: 'book-open',
+            label: 'Create Recipe',
+            onPress: () => {
+              setFabOpen(false);
+              navigation.navigate('RecipeDetail', { recipeId: 'new' });
+            },
+          }
+        ]}
+        onStateChange={({ open }) => setFabOpen(open)}
+        style={styles.fab}
+      />
     </View>
   );
 }
@@ -126,40 +278,91 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  list: {
+  searchContainer: {
     padding: 16,
+    backgroundColor: '#fff',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    zIndex: 1,
+  },
+  searchBar: {
+    elevation: 0,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    padding: 16,
+    paddingBottom: 80, // Add padding for FAB
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
   },
   recipeCard: {
     marginBottom: 16,
     elevation: 2,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  recipeCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  recipeInfo: {
+    flex: 1,
+    marginLeft: 16,
   },
   recipeName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    textTransform: 'capitalize',
+  },
+  description: {
+    fontSize: 14,
+    color: '#757575',
     marginBottom: 4,
   },
-  servings: {
-    marginBottom: 12,
-    color: '#666',
-  },
-  nutritionGrid: {
+  macroContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 8,
+    justifyContent: 'space-between',
+    marginTop: 4,
   },
-  nutritionItem: {
-    width: '25%',
+  macroItem: {
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  macroValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  macroLabel: {
+    fontSize: 14,
+    color: '#757575',
+  },
+  actionButton: {
+    margin: 0,
+    padding: 0,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
-  },
-  emptyText: {
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    textAlign: 'center',
-    color: '#666',
+    minHeight: 400,
   },
   fab: {
     position: 'absolute',
