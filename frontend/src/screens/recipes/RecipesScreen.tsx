@@ -7,7 +7,6 @@ import {
   Card,
   Title,
   Divider,
-  ActivityIndicator,
   Avatar,
   useTheme,
   Button,
@@ -23,6 +22,7 @@ import { RecipeStackParamList } from '../../types/navigation';
 import { recipeService } from '../../services/recipeService';
 import EmptyState from '../../components/common/EmptyState';
 import { formatNumber } from '../../utils/formatters';
+import { SkeletonCard, LoadingOverlay } from '../../components/common';
 
 type RecipesScreenNavigationProp = NativeStackNavigationProp<RecipeStackParamList>;
 
@@ -37,6 +37,7 @@ export function RecipesScreen() {
   const [recipeToDelete, setRecipeToDelete] = useState<Recipe | null>(null);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Load recipes on mount and when screen comes into focus
   useFocusEffect(
@@ -106,16 +107,18 @@ export function RecipesScreen() {
     if (!recipeToDelete) return;
 
     try {
+      setIsDeleting(true);
       await recipeService.deleteRecipe(recipeToDelete.id);
+
+      // Refresh recipes after deletion
+      await loadRecipes();
       setIsDeleteModalVisible(false);
       setRecipeToDelete(null);
-
-      // Refresh the list
-      loadRecipes(true);
-      Alert.alert('Success', 'Recipe deleted successfully');
     } catch (error) {
       console.error('Error deleting recipe:', error);
       Alert.alert('Error', 'Failed to delete recipe. Please try again.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -178,8 +181,9 @@ export function RecipesScreen() {
   if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.loadingText}>Loading recipes...</Text>
+        <SkeletonCard style={{ width: '100%', marginBottom: 12 }} />
+        <SkeletonCard style={{ width: '100%', marginBottom: 12 }} />
+        <SkeletonCard style={{ width: '100%', marginBottom: 12 }} />
       </View>
     );
   }
@@ -205,6 +209,7 @@ export function RecipesScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
+              colors={[theme.colors.primary]}
             />
           }
         >
@@ -221,13 +226,16 @@ export function RecipesScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
+              colors={[theme.colors.primary]}
             />
           }
         >
           <EmptyState
-            icon="book-open"
+            icon="book-open-page-variant"
             title="No Recipes Found"
-            message={searchQuery ? "Try a different search term" : "Create your first recipe by tapping the + button"}
+            message={searchQuery ? "Try a different search term" : "Add your first recipe"}
+            actionLabel="Create Recipe"
+            onAction={() => navigation.navigate('CreateRecipe')}
           />
         </ScrollView>
       )}
@@ -252,23 +260,7 @@ export function RecipesScreen() {
         </Dialog>
       </Portal>
 
-      <FAB.Group
-        open={fabOpen}
-        visible={true}
-        icon={fabOpen ? 'close' : 'plus'}
-        actions={[
-          {
-            icon: 'book-open',
-            label: 'Create Recipe',
-            onPress: () => {
-              setFabOpen(false);
-              navigation.navigate('RecipeDetail', { recipeId: 'new' });
-            },
-          }
-        ]}
-        onStateChange={({ open }) => setFabOpen(open)}
-        style={styles.fab}
-      />
+      <LoadingOverlay visible={isDeleting} message="Deleting recipe..." />
     </View>
   );
 }
@@ -302,9 +294,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
   },
   recipeCard: {
     marginBottom: 16,

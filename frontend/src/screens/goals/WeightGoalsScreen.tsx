@@ -16,6 +16,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { format } from 'date-fns';
+import { LoadingSpinner, SkeletonLoader, SkeletonCard, LoadingOverlay } from '../../components/common';
 
 // Conditionally import DateTimePicker based on platform
 let DateTimePicker: any = () => null;
@@ -322,11 +323,28 @@ const WeightGoalsScreen: React.FC = () => {
     return null;
   };
 
+  // Add LoadingOverlay for saving and adding operations
+  const renderLoadingOverlays = () => (
+    <>
+      <LoadingOverlay
+        visible={saving}
+        message="Saving weight goal..."
+      />
+      <LoadingOverlay
+        visible={addingLog}
+        message="Adding weight log..."
+      />
+    </>
+  );
+
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.loadingText}>Loading weight data...</Text>
+      <View style={styles.container}>
+        <SkeletonCard style={styles.card} />
+        <SkeletonCard style={styles.card} />
+        <View style={styles.loadingOverlay}>
+          <LoadingSpinner message="Loading weight data..." />
+        </View>
       </View>
     );
   }
@@ -559,6 +577,8 @@ const WeightGoalsScreen: React.FC = () => {
           </Dialog.Actions>
         </Dialog>
       </Portal>
+
+      {renderLoadingOverlays()}
     </ScrollView>
   );
 };
@@ -740,6 +760,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingTop: 0,
     paddingBottom: 8,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
   },
 });
 

@@ -8,7 +8,6 @@ import {
   Title,
   Paragraph,
   Divider,
-  ActivityIndicator,
   Avatar,
   Chip,
   useTheme,
@@ -30,6 +29,7 @@ import EditableTextInput from '../../components/common/EditableTextInput';
 import { formatBarcodeForDisplay } from '../../utils/validation';
 import { FoodStackParamList } from '../../navigation/FoodStackNavigator';
 import { getSourceIcon, getSourceColor } from '../../utils/foodUtils';
+import { LoadingSpinner, SkeletonCard, LoadingOverlay } from '../../components/common';
 
 type RouteParams = {
   scannedFood?: Food;
@@ -71,6 +71,7 @@ const FoodScreen: React.FC = () => {
   const [foodToDelete, setFoodToDelete] = useState<Food | null>(null);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState({});
 
   // Fetch foods function
   const fetchFoods = useCallback(async (query: string = '', forceRefresh: boolean = false) => {
@@ -111,12 +112,7 @@ const FoodScreen: React.FC = () => {
       setFilteredFoods(sortedResults || []);
     } catch (error) {
       console.error('Error fetching foods:', error);
-      // Show error to user
-      Alert.alert(
-        'Error',
-        'Failed to load foods. Please try again.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Error', 'Failed to fetch foods. Please try again.');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -450,26 +446,34 @@ const FoodScreen: React.FC = () => {
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Loading foods...</Text>
+          <SkeletonCard style={{ width: '100%' }} />
+          <SkeletonCard style={{ width: '100%' }} />
+          <SkeletonCard style={{ width: '100%' }} />
+          <SkeletonCard style={{ width: '100%' }} />
         </View>
       ) : (
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollViewContent}
+        <FlatList
+          data={filteredFoods}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderFoodItem}
+          contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
-              onRefresh={handleRefresh}
+              onRefresh={() => fetchFoods('', true)}
+              colors={[theme.colors.primary]}
             />
           }
-        >
-          {filteredFoods.map((item, index) => (
-            <View key={item.id || index}>
-              {renderFoodItem({ item })}
-            </View>
-          ))}
-        </ScrollView>
+          ListEmptyComponent={
+            <EmptyState
+              icon="food-apple"
+              title="No Foods Found"
+              message={searchQuery ? "Try a different search term" : "Add your first food item"}
+              actionLabel="Add Food"
+              onAction={() => navigateToAddFood()}
+            />
+          }
+        />
       )}
 
       <Portal>
@@ -553,6 +557,9 @@ const FoodScreen: React.FC = () => {
         onStateChange={({ open }) => setFabOpen(open)}
         style={styles.fab}
       />
+
+      {/* Add loading overlay for delete operation */}
+      <LoadingOverlay visible={Object.values(isDeleting).some(Boolean)} message="Deleting food..." />
     </View>
   );
 };
@@ -700,6 +707,10 @@ const styles = StyleSheet.create({
   actionButton: {
     margin: 0,
     padding: 0,
+  },
+  listContent: {
+    padding: 16,
+    paddingBottom: 80, // Add padding for FAB
   },
 });
 

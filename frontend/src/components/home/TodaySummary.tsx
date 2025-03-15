@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Card, Title, Text, ProgressBar, useTheme, Button } from 'react-native-paper';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { RootStackScreenProps } from '../../types/navigation';
@@ -7,6 +7,7 @@ import { goalService, Goal } from '../../services/goalService';
 import { summaryService, DailySummary } from '../../services/summaryService';
 import { useAuth } from '../../contexts/AuthContext';
 import { setAuthToken } from '../../services/apiService';
+import { SkeletonLoader, LoadingSpinner } from '../common';
 
 interface NutritionSummary {
   calories: {
@@ -47,138 +48,74 @@ const TodaySummary: React.FC = () => {
     }
   }, [token]);
 
-  useEffect(() => {
-    let mounted = true;
-    let retryCount = 0;
-    const maxRetries = 3;
-    let retryTimeout: NodeJS.Timeout | null = null;
+  // Define loadData function
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
 
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        // Ensure we have a token
-        if (!token) {
-          setError('Please log in to view your summary');
-          setIsLoading(false);
-          return;
-        }
-
-        // First fetch goals to establish baseline
-        const currentGoal = await goalService.getCurrentGoal();
-
-        if (!mounted) return;
-
-        // If no goal exists, that's a valid state, not an error
-        if (!currentGoal) {
-          setHasGoals(false);
-          setIsLoading(false);
-          return;
-        }
-
-        const hasValidGoals = !!(currentGoal?.daily_calorie_target && currentGoal.daily_calorie_target > 0);
-        setHasGoals(hasValidGoals);
-
-        if (hasValidGoals) {
-          // Update summary with goals
-          setSummary(prev => ({
-            ...prev,
-            calories: {
-              consumed: prev.calories.consumed,
-              goal: currentGoal.daily_calorie_target,
-            },
-            macros: {
-              protein: {
-                ...prev.macros.protein,
-                goal: currentGoal.protein_target_grams || 0,
-                isSet: !!(currentGoal.protein_target_grams && currentGoal.protein_target_grams > 0)
-              },
-              carbs: {
-                ...prev.macros.carbs,
-                goal: currentGoal.carbs_target_grams || 0,
-                isSet: !!(currentGoal.carbs_target_grams && currentGoal.carbs_target_grams > 0)
-              },
-              fat: {
-                ...prev.macros.fat,
-                goal: currentGoal.fat_target_grams || 0,
-                isSet: !!(currentGoal.fat_target_grams && currentGoal.fat_target_grams > 0)
-              },
-            }
-          }));
-
-          try {
-            // Now fetch today's consumption
-            const today = new Date();
-            const dailySummary = await summaryService.getDailySummary(today);
-
-            if (!mounted) return;
-
-            // Update only consumption values
-            setSummary(prev => ({
-              ...prev,
-              calories: {
-                ...prev.calories,
-                consumed: dailySummary.total_calories || 0,
-              },
-              macros: {
-                protein: {
-                  ...prev.macros.protein,
-                  consumed: dailySummary.total_protein || 0,
-                },
-                carbs: {
-                  ...prev.macros.carbs,
-                  consumed: dailySummary.total_carbs || 0,
-                },
-                fat: {
-                  ...prev.macros.fat,
-                  consumed: dailySummary.total_fat || 0,
-                },
-              }
-            }));
-          } catch (summaryError) {
-            console.error('Error fetching daily summary:', summaryError);
-            // Don't fail the whole component if just the summary fails
-            // We'll show the goals with 0 consumption instead
-          }
-        }
-
-        // Successfully loaded data, reset retry count
-        retryCount = 0;
+      // Ensure we have a token
+      if (!token) {
+        setError('Please log in to view your summary');
         setIsLoading(false);
-      } catch (error) {
-        console.error('Error fetching nutrition data:', error);
-
-        // Only retry a limited number of times
-        if (retryCount < maxRetries && mounted) {
-          retryCount++;
-          console.log(`Retry attempt ${retryCount} of ${maxRetries}`);
-          // Wait before retrying with exponential backoff
-          const retryDelay = Math.min(2000 * Math.pow(2, retryCount - 1), 30000);
-          console.log(`Retrying in ${retryDelay}ms`);
-
-          retryTimeout = setTimeout(loadData, retryDelay);
-          return;
-        }
-
-        if (mounted) {
-          setError('Unable to load nutrition data. Please check your connection and try again.');
-          setIsLoading(false);
-        }
+        return;
       }
-    };
 
+      // First fetch goals to establish baseline
+      const currentGoal = await goalService.getCurrentGoal();
+
+      // If no goal exists, that's a valid state, not an error
+      if (!currentGoal) {
+        setHasGoals(false);
+        setIsLoading(false);
+        return;
+      }
+
+      const hasValidGoals = !!(currentGoal?.daily_calorie_target && currentGoal.daily_calorie_target > 0);
+      setHasGoals(hasValidGoals);
+
+      // Fetch today's summary
+      const today = new Date();
+      const todaySummary = await summaryService.getDailySummary(today);
+
+      // Update the summary state with the fetched data
+      setSummary({
+        calories: {
+          consumed: todaySummary.total_calories || 0,
+          goal: currentGoal.daily_calorie_target || 0,
+        },
+        macros: {
+          protein: {
+            consumed: todaySummary.total_protein || 0,
+            goal: currentGoal.protein_target_grams || 0,
+            isSet: !!(currentGoal.protein_target_grams && currentGoal.protein_target_grams > 0)
+          },
+          carbs: {
+            consumed: todaySummary.total_carbs || 0,
+            goal: currentGoal.carbs_target_grams || 0,
+            isSet: !!(currentGoal.carbs_target_grams && currentGoal.carbs_target_grams > 0)
+          },
+          fat: {
+            consumed: todaySummary.total_fat || 0,
+            goal: currentGoal.fat_target_grams || 0,
+            isSet: !!(currentGoal.fat_target_grams && currentGoal.fat_target_grams > 0)
+          },
+        },
+      });
+    } catch (error) {
+      console.error('Error loading summary data:', error);
+      setError('Failed to load summary data. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add useEffect to call loadData when the component mounts or when isFocused changes
+  useEffect(() => {
     if (isFocused) {
       loadData();
     }
-
-    return () => {
-      mounted = false;
-      if (retryTimeout) {
-        clearTimeout(retryTimeout);
-      }
-    };
-  }, [token, isFocused]);
+  }, [isFocused, token]);
 
   const calculatePercentage = (consumed: number, goal: number) => {
     if (!goal) return 0;
@@ -189,140 +126,116 @@ const TodaySummary: React.FC = () => {
     navigation.navigate('GoalsStack');
   };
 
-  if (isLoading) {
-    return (
-      <Card style={styles.card}>
-        <Card.Content>
-          <Title style={styles.title}>Today's Summary</Title>
-          <ActivityIndicator size="small" color={theme.colors.primary} />
-        </Card.Content>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card style={styles.card}>
-        <Card.Content>
-          <Title style={styles.title}>Today's Summary</Title>
-          <Text style={{ color: theme.colors.error, textAlign: 'center', marginVertical: 16 }}>
-            {error}
-          </Text>
-          <Button
-            mode="contained"
-            onPress={() => {
-              setIsLoading(true);
-              setError(null);
-              // Use setTimeout to prevent immediate re-render
-              setTimeout(() => {
-                window.location.reload();
-              }, 100);
-            }}
-            style={styles.retryButton}
-          >
-            Retry
-          </Button>
-        </Card.Content>
-      </Card>
-    );
-  }
-
-  // Show message when no goals are set
-  if (!hasGoals) {
-    return (
-      <Card style={styles.card}>
-        <Card.Content>
-          <Title style={styles.title}>Today's Summary</Title>
-          <Text style={styles.noGoalsMessage}>
-            You haven't set any nutrition goals yet. Set your goals to start tracking your progress!
-          </Text>
-          <Button
-            mode="contained"
-            onPress={navigateToGoals}
-            style={styles.setGoalsButton}
-          >
-            Set Goals
-          </Button>
-        </Card.Content>
-      </Card>
-    );
-  }
-
   return (
     <Card style={styles.card}>
       <Card.Content>
-        <View style={styles.calorieSection}>
-          <View style={styles.calorieHeader}>
-            <Text style={styles.calorieLabel}>Calories</Text>
-            <Text style={[
-              styles.calorieValue,
-              summary.calories.consumed > summary.calories.goal && { color: theme.colors.error }
-            ]}>
-              {Math.round(summary.calories.consumed)} / {Math.round(summary.calories.goal)}
-            </Text>
+        <Title style={styles.title}>Today's Summary</Title>
+
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <SkeletonLoader width="80%" height={24} style={styles.skeletonTitle} />
+            <SkeletonLoader width="100%" height={20} style={styles.skeletonBar} />
+            <View style={styles.macroSkeletonContainer}>
+              <SkeletonLoader width="30%" height={18} />
+              <SkeletonLoader width="30%" height={18} />
+              <SkeletonLoader width="30%" height={18} />
+            </View>
           </View>
-          <ProgressBar
-            progress={calculatePercentage(summary.calories.consumed, summary.calories.goal)}
-            color={theme.colors.primary}
-            style={styles.progressBar}
-          />
-        </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <Button mode="contained" onPress={loadData} style={styles.retryButton}>
+              Retry
+            </Button>
+          </View>
+        ) : !hasGoals ? (
+          <View style={styles.noGoalsContainer}>
+            <Text style={styles.noGoalsText}>
+              You haven't set any nutrition goals yet.
+            </Text>
+            <Button
+              mode="contained"
+              onPress={navigateToGoals}
+              style={styles.setGoalsButton}
+            >
+              Set Goals
+            </Button>
+          </View>
+        ) : (
+          <>
+            {/* Calories */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Calories</Text>
+                <Text style={styles.sectionValue}>
+                  {summary.calories.consumed} / {summary.calories.goal} kcal
+                </Text>
+              </View>
+              <ProgressBar
+                progress={calculatePercentage(summary.calories.consumed, summary.calories.goal)}
+                color={theme.colors.primary}
+                style={styles.progressBar}
+              />
+            </View>
 
-        <View style={styles.macrosSection}>
-          {(summary.macros.protein.isSet || summary.macros.carbs.isSet || summary.macros.fat.isSet) && (
-            <>
-              <Text style={styles.macrosTitle}>Macronutrients</Text>
+            {/* Macros */}
+            <View style={styles.macrosContainer}>
+              {(summary.macros.protein.isSet || summary.macros.carbs.isSet || summary.macros.fat.isSet) && (
+                <>
+                  <Text style={styles.macrosTitle}>Macronutrients</Text>
 
-              {summary.macros.protein.isSet && (
-                <View style={styles.macroItem}>
-                  <View style={styles.macroHeader}>
-                    <Text style={styles.macroLabel}>Protein</Text>
-                    <Text style={styles.macroValue}>
-                      {Math.round(summary.macros.protein.consumed)}g / {Math.round(summary.macros.protein.goal)}g
-                    </Text>
-                  </View>
-                  <ProgressBar
-                    progress={calculatePercentage(summary.macros.protein.consumed, summary.macros.protein.goal)}
-                    color="#4CAF50"
-                    style={styles.progressBar}
-                  />
-                </View>
+                  {summary.macros.protein.isSet && (
+                    <View style={styles.macroItem}>
+                      <View style={styles.macroHeader}>
+                        <Text style={styles.macroLabel}>Protein</Text>
+                        <Text style={styles.macroValue}>
+                          {Math.round(summary.macros.protein.consumed)}g / {Math.round(summary.macros.protein.goal)}g
+                        </Text>
+                      </View>
+                      <ProgressBar
+                        progress={calculatePercentage(summary.macros.protein.consumed, summary.macros.protein.goal)}
+                        color="#4CAF50"
+                        style={styles.progressBar}
+                      />
+                    </View>
+                  )}
+
+                  {summary.macros.carbs.isSet && (
+                    <View style={styles.macroItem}>
+                      <View style={styles.macroHeader}>
+                        <Text style={styles.macroLabel}>Carbs</Text>
+                        <Text style={styles.macroValue}>
+                          {Math.round(summary.macros.carbs.consumed)}g / {Math.round(summary.macros.carbs.goal)}g
+                        </Text>
+                      </View>
+                      <ProgressBar
+                        progress={calculatePercentage(summary.macros.carbs.consumed, summary.macros.carbs.goal)}
+                        color="#FF9800"
+                        style={styles.progressBar}
+                      />
+                    </View>
+                  )}
+
+                  {summary.macros.fat.isSet && (
+                    <View style={styles.macroItem}>
+                      <View style={styles.macroHeader}>
+                        <Text style={styles.macroLabel}>Fat</Text>
+                        <Text style={styles.macroValue}>
+                          {Math.round(summary.macros.fat.consumed)}g / {Math.round(summary.macros.fat.goal)}g
+                        </Text>
+                      </View>
+                      <ProgressBar
+                        progress={calculatePercentage(summary.macros.fat.consumed, summary.macros.fat.goal)}
+                        color="#E91E63"
+                        style={styles.progressBar}
+                      />
+                    </View>
+                  )}
+                </>
               )}
-
-              {summary.macros.carbs.isSet && (
-                <View style={styles.macroItem}>
-                  <View style={styles.macroHeader}>
-                    <Text style={styles.macroLabel}>Carbs</Text>
-                    <Text style={styles.macroValue}>
-                      {Math.round(summary.macros.carbs.consumed)}g / {Math.round(summary.macros.carbs.goal)}g
-                    </Text>
-                  </View>
-                  <ProgressBar
-                    progress={calculatePercentage(summary.macros.carbs.consumed, summary.macros.carbs.goal)}
-                    color="#FF9800"
-                    style={styles.progressBar}
-                  />
-                </View>
-              )}
-
-              {summary.macros.fat.isSet && (
-                <View style={styles.macroItem}>
-                  <View style={styles.macroHeader}>
-                    <Text style={styles.macroLabel}>Fat</Text>
-                    <Text style={styles.macroValue}>
-                      {Math.round(summary.macros.fat.consumed)}g / {Math.round(summary.macros.fat.goal)}g
-                    </Text>
-                  </View>
-                  <ProgressBar
-                    progress={calculatePercentage(summary.macros.fat.consumed, summary.macros.fat.goal)}
-                    color="#E91E63"
-                    style={styles.progressBar}
-                  />
-                </View>
-              )}
-            </>
-          )}
-        </View>
+            </View>
+          </>
+        )}
       </Card.Content>
     </Card>
   );
@@ -336,26 +249,54 @@ const styles = StyleSheet.create({
   title: {
     marginBottom: 16,
   },
-  calorieSection: {
+  loadingContainer: {
+    padding: 16,
+  },
+  skeletonTitle: {
+    marginBottom: 16,
+  },
+  skeletonBar: {
+    marginBottom: 12,
+  },
+  macroSkeletonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  errorContainer: {
+    padding: 16,
+  },
+  errorText: {
+    color: '#f00',
+    marginBottom: 16,
+  },
+  noGoalsContainer: {
+    padding: 16,
+  },
+  noGoalsText: {
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  section: {
     marginBottom: 24,
   },
-  calorieHeader: {
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  calorieLabel: {
+  sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
   },
-  calorieValue: {
+  sectionValue: {
     fontSize: 16,
   },
   progressBar: {
     height: 10,
     borderRadius: 5,
   },
-  macrosSection: {
+  macrosContainer: {
     marginTop: 8,
   },
   macrosTitle: {
@@ -376,11 +317,6 @@ const styles = StyleSheet.create({
   },
   macroValue: {
     fontSize: 14,
-  },
-  noGoalsMessage: {
-    textAlign: 'center',
-    marginVertical: 16,
-    color: '#666',
   },
   setGoalsButton: {
     marginTop: 8,
