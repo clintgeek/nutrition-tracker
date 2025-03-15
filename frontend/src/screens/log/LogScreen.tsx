@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import {
   Text,
   Card,
@@ -7,7 +7,6 @@ import {
   Divider,
   FAB,
   Chip,
-  ActivityIndicator,
   Avatar,
   useTheme,
   Button,
@@ -25,6 +24,7 @@ import { goalService } from '../../services/goalService';
 import { FoodLog } from '../../services/foodLogService';
 import { formatDate, getTodayDate } from '../../utils/dateUtils';
 import EmptyState from '../../components/common/EmptyState';
+import { SkeletonCard, LoadingOverlay } from '../../components/common';
 
 type LogScreenNavigationProp = NativeStackNavigationProp<LogStackParamList>;
 
@@ -41,7 +41,7 @@ const LogScreen: React.FC = () => {
     fat: 0,
   });
   const [calorieGoal, setCalorieGoal] = useState(2000); // Default value
-  const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
+  const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
 
@@ -164,17 +164,18 @@ const LogScreen: React.FC = () => {
   const handleConfirmDelete = async () => {
     if (!selectedLogId) return;
 
-    setIsDeleting(prev => ({ ...prev, [selectedLogId]: true }));
     try {
+      setIsDeleting(true);
       await foodLogService.deleteLog(selectedLogId);
-      setShowDeleteDialog(false);
-      // Refresh logs
+
+      // Refresh logs after deletion
       await fetchLogs();
+      setShowDeleteDialog(false);
     } catch (error) {
       console.error('Error deleting log:', error);
-      Alert.alert('Error', 'Failed to delete log');
+      Alert.alert('Error', 'Failed to delete log. Please try again.');
     } finally {
-      setIsDeleting(prev => ({ ...prev, [selectedLogId]: false }));
+      setIsDeleting(false);
       setSelectedLogId(null);
     }
   };
@@ -246,7 +247,7 @@ const LogScreen: React.FC = () => {
                     icon="delete"
                     mode="text"
                     compact
-                    loading={isDeleting[log.id || '']}
+                    loading={isDeleting}
                     onPress={() => log.id && handleDeleteLog(Number(log.id))}
                     style={styles.deleteButton}
                     textColor={theme.colors.error}
@@ -332,17 +333,26 @@ const LogScreen: React.FC = () => {
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Loading food logs...</Text>
+          <SkeletonCard style={{ width: '100%', marginBottom: 12 }} />
+          <SkeletonCard style={{ width: '100%', marginBottom: 12 }} />
+          <SkeletonCard style={{ width: '100%', marginBottom: 12 }} />
         </View>
       ) : (
-        <FlatList
-          data={['breakfast', 'lunch', 'dinner', 'snack']}
-          renderItem={({ item }) => renderMealSection(item as 'breakfast' | 'lunch' | 'dinner' | 'snack')}
-          keyExtractor={(item) => item}
-          contentContainerStyle={styles.mealList}
-        />
+        <ScrollView style={styles.scrollView}>
+          <FlatList
+            data={['breakfast', 'lunch', 'dinner', 'snack']}
+            renderItem={({ item }) => renderMealSection(item as 'breakfast' | 'lunch' | 'dinner' | 'snack')}
+            keyExtractor={(item) => item}
+            contentContainerStyle={styles.mealList}
+          />
+        </ScrollView>
       )}
+
+      <FAB
+        style={styles.fab}
+        icon="plus"
+        onPress={() => navigateToAddLog('breakfast')}
+      />
 
       <Portal>
         <Dialog visible={showDeleteDialog} onDismiss={() => setShowDeleteDialog(false)}>
@@ -365,7 +375,7 @@ const LogScreen: React.FC = () => {
             <Button
               mode="contained"
               onPress={handleConfirmDelete}
-              loading={isDeleting[selectedLogId || '']}
+              loading={isDeleting}
               buttonColor={theme.colors.error}
               style={styles.deleteButton}
             >
@@ -374,6 +384,8 @@ const LogScreen: React.FC = () => {
           </Dialog.Actions>
         </Dialog>
       </Portal>
+
+      <LoadingOverlay visible={isDeleting} message="Deleting log..." />
     </View>
   );
 };
@@ -509,6 +521,15 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     minWidth: 120,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  fab: {
+    position: 'absolute',
+    margin: 16,
+    right: 0,
+    bottom: 0,
   },
 });
 

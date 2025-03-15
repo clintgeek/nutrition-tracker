@@ -7,6 +7,7 @@
 - [x] Improved error handling in WeightGoalsScreen for undefined values and invalid dates
 - [x] Enhanced UI for weight tracking with better formatting and visual indicators
 - [x] Fixed drawer navigation system with proper typing and safety checks
+- [x] Improved loading indicators across main screens (FoodScreen, LogScreen, RecipesScreen, TodaySummary)
 
 ## In Progress
 - [ ] Complete weight tracking functionality
@@ -15,11 +16,19 @@
   - [x] Implement weight tracking UI
   - [x] Fix weight goal saving functionality
   - [ ] Improve weight visualization
+    - [ ] **Weight Trend Graph**: Line chart showing weight over time with trend line, color-coded to show progress toward goal
+    - [ ] **Progress Cards**: Visual cards showing key metrics (total weight lost/gained, percentage toward goal, average weekly change, projected goal date)
+    - [ ] **Interactive Calendar View**: Calendar with color intensity showing weight entries, tap on a day to see details
+    - [ ] **Milestone Markers**: Visual indicators for significant milestones (5% lost, 10% lost, etc.)
+    - [ ] **Comparison Visualizations**: Before/after style visualization with equivalent weight objects
+    - [ ] **Multi-metric Tracking**: Add body measurements tracking alongside weight
+    - [ ] **Goal Projection**: Visual projection of expected weight loss/gain based on current trend
+    - [ ] **Contextual Insights**: Highlight correlations between weight changes and food log entries
 
 ## Planned Features
 
 ### High Priority (by complexity)
-- [ ] Improve loading indicators (Low)
+- [x] Improve loading indicators (Low)
 - [ ] Implement success notifications for actions (Low)
 - [ ] Add confirmation dialogs for destructive actions (Low)
 - [ ] Add form validation with helpful error messages (Medium)
