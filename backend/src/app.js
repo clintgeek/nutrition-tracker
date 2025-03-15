@@ -12,6 +12,7 @@ const logRoutes = require('./routes/logRoutes');
 const goalRoutes = require('./routes/goalRoutes');
 const syncRoutes = require('./routes/syncRoutes');
 const recipeRoutes = require('./routes/recipeRoutes');
+const weightRoutes = require('./routes/weightRoutes');
 
 // Create Express app
 const app = express();
@@ -36,6 +37,7 @@ app.use('/api/logs', logRoutes);
 app.use('/api/goals', goalRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/recipes', recipeRoutes);
+app.use('/api/weight', weightRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
