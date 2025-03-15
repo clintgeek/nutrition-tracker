@@ -1,14 +1,105 @@
 # Nutrition Tracker - Todo List & Development Notes
 
+## Recently Completed
+- [x] Fixed weight goals API endpoint issue (changed from `/weight/goals` to `/weight/goal`)
+- [x] Added weight tables to initial database schema for new installations
+- [x] Fixed field naming consistency between frontend and backend for weight tracking
+- [x] Improved error handling in WeightGoalsScreen for undefined values and invalid dates
+- [x] Enhanced UI for weight tracking with better formatting and visual indicators
+- [x] Fixed drawer navigation system with proper typing and safety checks
+
+## In Progress
+- [ ] Complete weight tracking functionality
+  - [x] Create weight logs schema
+  - [x] Create weight goals schema
+  - [x] Implement weight tracking UI
+  - [x] Fix weight goal saving functionality
+  - [ ] Improve weight visualization
+
+## Planned Features
+
+### High Priority (by complexity)
+- [ ] Improve loading indicators (Low)
+- [ ] Implement success notifications for actions (Low)
+- [ ] Add confirmation dialogs for destructive actions (Low)
+- [ ] Add form validation with helpful error messages (Medium)
+- [ ] Complete weight goals and tracking (Medium)
+  - [x] Track weight and weight goals
+  - [x] Show weight loss progress
+  - [ ] Add weight trend visualization
+
+### Medium Priority (by complexity)
+- [ ] Allow setting of default page in user profile settings (Low)
+- [ ] Create data visualization for nutrition trends (Medium)
+- [ ] Rework home to be more of a dashboard (Medium)
+- [ ] Implement handling of recipes in the food database (High)
+- [ ] Add user profile management (High)
+- [ ] Implement OAUTH through Google account (High)
+
+### Future Improvements (by complexity)
+- [ ] Implement swipe between screens for mobile (Low)
+- [ ] Dark mode theme with toggle in hamburger menu (Low)
+- [ ] Implement user avatars (Low)
+- [ ] CSV import functionality for food and weight data (Medium)
+- [ ] Make the web page "installable" in the Chrome browser (Medium)
+- [ ] Implement "milestones" as badges (e.g., each 5 pounds lost, every 30 days logged) (Medium)
+- [ ] Add insights dashboard (most logged foods, total calories, logging streaks, etc.) (Medium)
+- [ ] Add barcode scanning with food lookup (High)
+- [ ] Add meal planning and scheduling (High)
+- [ ] Create an admin interface for user management and system configuration (High)
+- [ ] Integrate with fitness trackers (e.g., Garmin) (High)
+
+## Completed Features
+- [x] Break up food log into Breakfast, Lunch, Dinner, Snacks each with an add food button
+- [x] Recommend recent foods/meals on log page
+- [x] Use favicon.png instead of default
+- [x] Fix Today's summary tile to use actual nutrition counts
+- [x] Add Home button beside logout button in header
+- [x] Include API results in food search
+- [x] Implement food search functionality
+- [x] Create Today's Summary page with calories and macros visualization
+- [x] Use OpenFoodFacts as primary API, fallback to USDA
+- [x] Make food database available to all users
+- [x] Show calories/macros on home screen based on user goals
+
+## Technical Improvements
+
+### Completed
+- [x] Replace mock data with actual database queries
+- [x] Fix database connection issues
+- [x] Update API services to call external APIs
+- [x] Optimize API usage by saving results to database
+- [x] Ensure database tables are created automatically during setup
+- [x] Ensure all controllers properly connect to the database
+- [x] Cache API results to reduce external calls
+- [x] Implement batch processing for database operations
+
+### Planned
+- [ ] Implement SASS for styling
+  - [ ] Convert existing CSS/inline styles to SASS
+  - [ ] Create variables for colors, spacing, and typography
+  - [ ] Implement nested styles for better organization
+  - [ ] Set up proper build process for SASS compilation
+- [ ] Implement smarter caching strategies
+  - [ ] Add TTL for cached items
+  - [ ] Cache partial search results for pagination
+- [ ] Add request throttling for external APIs
+- [ ] Optimize response size and database queries
+- [ ] Reduce unnecessary re-renders in the UI
+- [ ] Add comprehensive error handling throughout the application
+
+## Notes
+- Recipe functionality should include ability to create, save, and log custom recipes
+- Consider implementing a progressive web app (PWA) approach for installability
+- Explore offline functionality for logging when internet connection is unavailable
+
 ## Additional Enhancements
 
 ## Bugs
 
 ### Feature Additions
-- [x] Break up food log into Breakfast, Lunch, Dinner, Snacks each with an add food button that adds food to that category
-- [x] recommend recent foods/meals on log page
-- [ ] track weight and weight goals
-- [ ] show weight loss progress
+- [x] Track weight and weight goals
+- [x] Show weight loss progress
 - [ ] Add user profile management
 - [ ] Implement OAUTH through google account
 - [ ] Implement user avatars
