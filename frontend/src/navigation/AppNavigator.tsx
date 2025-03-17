@@ -2,6 +2,10 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { useAuth } from '../contexts/AuthContext';
+import { TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { DrawerActions } from '@react-navigation/routers';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 // Import screens
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -27,6 +31,30 @@ const Drawer = createDrawerNavigator();
 
 // Main drawer navigator component
 const MainDrawerNavigator = () => {
+  // Function to render header with hamburger menu
+  const renderHeaderWithMenu = (title: string) => {
+    return () => {
+      const navigation = useNavigation();
+
+      const MenuButton = () => (
+        <TouchableOpacity
+          onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+          style={{ marginLeft: 10 }}
+        >
+          <MaterialCommunityIcons name="menu" size={24} color="#fff" />
+        </TouchableOpacity>
+      );
+
+      return (
+        <CustomHeader
+          title={title}
+          showBackButton={false}
+          leftComponent={<MenuButton />}
+        />
+      );
+    };
+  };
+
   return (
     <Drawer.Navigator
       drawerContent={(props) => <DrawerContent {...props} />}
@@ -38,7 +66,10 @@ const MainDrawerNavigator = () => {
         name="MainTabs"
         component={MainTabNavigator}
         options={{
-          title: 'Home'
+          title: 'Home',
+          drawerIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="home" color={color} size={size} />
+          ),
         }}
       />
       <Drawer.Screen
@@ -47,11 +78,9 @@ const MainDrawerNavigator = () => {
         options={{
           title: 'Nutrition Goals',
           headerShown: true,
-          header: () => (
-            <CustomHeader
-              title="Nutrition Goals"
-              showBackButton={true}
-            />
+          header: renderHeaderWithMenu('Nutrition Goals'),
+          drawerIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="target" color={color} size={size} />
           ),
         }}
       />
@@ -61,11 +90,9 @@ const MainDrawerNavigator = () => {
         options={{
           title: 'Weight Goals',
           headerShown: true,
-          header: () => (
-            <CustomHeader
-              title="Weight Goals"
-              showBackButton={true}
-            />
+          header: renderHeaderWithMenu('Weight Goals'),
+          drawerIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="scale-bathroom" color={color} size={size} />
           ),
         }}
       />

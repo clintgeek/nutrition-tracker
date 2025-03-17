@@ -25,9 +25,9 @@ type NavigationProp = DrawerNavigationProp<DrawerParamList>;
 // Define the tab navigator param list
 export type MainTabParamList = {
   Home: undefined;
-  LogStack: undefined;
-  FoodStack: undefined;
-  RecipeStack: undefined;
+  Log: undefined;
+  Food: undefined;
+  Recipe: undefined;
 };
 
 // Create the tab navigator
@@ -66,53 +66,57 @@ const MainTabNavigator: React.FC = () => {
     <Tab.Navigator
       screenOptions={{
         tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.disabled,
+        tabBarInactiveTintColor: '#757575',
         tabBarStyle: {
-          paddingBottom: 5,
+          backgroundColor: '#fff',
+          borderTopWidth: 1,
+          borderTopColor: '#e0e0e0',
           paddingTop: 5,
+          paddingBottom: 5,
           height: 60,
         },
-        headerShown: false, // Hide the header in the tab navigator
+        headerShown: false,
       }}
     >
       <Tab.Screen
         name="Home"
         component={HomeScreen}
         options={{
+          tabBarLabel: 'Home',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="home" color={color} size={size} />
           ),
           headerShown: true,
-          header: () => renderHeader('FitnessGeek')
+          header: () => renderHeader('FitnessGeek'),
         }}
       />
       <Tab.Screen
-        name="LogStack"
+        name="Log"
         component={LogStackNavigator}
         options={{
-          tabBarLabel: 'Log',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="notebook" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="FoodStack"
-        component={FoodStackNavigator}
-        options={{
-          tabBarLabel: 'Foods',
+          tabBarLabel: 'Logs',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="food-apple" color={color} size={size} />
           ),
         }}
       />
       <Tab.Screen
-        name="RecipeStack"
+        name="Food"
+        component={FoodStackNavigator}
+        options={{
+          tabBarLabel: 'Foods',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="food" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Recipe"
         component={RecipeStackNavigator}
         options={{
           tabBarLabel: 'Recipes',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="book-open-variant" color={color} size={size} />
+            <MaterialCommunityIcons name="book-open" color={color} size={size} />
           ),
         }}
       />
