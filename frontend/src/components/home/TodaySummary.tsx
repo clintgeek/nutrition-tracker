@@ -129,8 +129,6 @@ const TodaySummary: React.FC = () => {
   return (
     <Card style={styles.card}>
       <Card.Content>
-        <Title style={styles.title}>Today's Summary</Title>
-
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <SkeletonLoader width="80%" height={24} style={styles.skeletonTitle} />
@@ -166,7 +164,7 @@ const TodaySummary: React.FC = () => {
             {/* Calories */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Calories</Text>
+                <Text style={styles.sectionTitle}>Today's Calories</Text>
                 <Text style={styles.sectionValue}>
                   {summary.calories.consumed} / {summary.calories.goal} kcal
                 </Text>
@@ -245,9 +243,6 @@ const styles = StyleSheet.create({
   card: {
     marginBottom: 16,
     borderRadius: 8,
-  },
-  title: {
-    marginBottom: 16,
   },
   loadingContainer: {
     padding: 16,

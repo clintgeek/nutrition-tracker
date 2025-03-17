@@ -181,7 +181,7 @@ class Weight {
   /**
    * Get latest weight log for a user
    * @param {string} userId - User ID
-   * @returns {Promise<Object|null>} Latest weight log or null if not found
+   * @returns {Promise<Object|null>} Latest weight log or null if none exists
    */
   static async getLatestWeightLog(userId) {
     try {
@@ -206,6 +206,42 @@ class Weight {
       return result.rows[0] || null;
     } catch (error) {
       logger.error(`Error getting latest weight log: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get weight logs for a user within a date range
+   * @param {string} userId - User ID
+   * @param {string} startDate - Start date in YYYY-MM-DD format
+   * @param {string} endDate - End date in YYYY-MM-DD format
+   * @returns {Promise<Array>} Array of weight logs within the date range
+   */
+  static async getWeightLogsForDateRange(userId, startDate, endDate) {
+    try {
+      // Check if the weight_value column exists
+      const checkColumnResult = await db.query(`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = 'weight_logs' AND column_name = 'weight_value'
+      `);
+
+      const hasWeightValueColumn = checkColumnResult.rows.length > 0;
+      const dateColumn = hasWeightValueColumn ? 'log_date' : 'date';
+
+      // Use the appropriate column names based on what exists in the database
+      const result = await db.query(
+        `SELECT * FROM weight_logs
+         WHERE user_id = $1
+         AND ${dateColumn} >= $2
+         AND ${dateColumn} <= $3
+         ORDER BY ${dateColumn} ASC`,
+        [userId, startDate, endDate]
+      );
+
+      return result.rows;
+    } catch (error) {
+      logger.error(`Error getting weight logs for date range: ${error.message}`);
       throw error;
     }
   }

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Human Collaboration: The Nutrition Tracker Project</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.3.1/dist/reveal.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.3.1/dist/theme/night.min.css">
+    <style>
+        :root {
+            --r-main-font-size: 32px;
+            --r-heading-font: 'Source Sans Pro', Helvetica, sans-serif;
+            --r-main-font: 'Source Sans Pro', Helvetica, sans-serif;
+            --r-heading-color: #6c5ce7;
+            --r-link-color: #0984e3;
+            --r-selection-background-color: #00cec9;
+        }
+
+        .reveal {
+            font-family: var(--r-main-font);
+            font-size: var(--r-main-font-size);
+        }
+
+        .reveal h1, .reveal h2, .reveal h3, .reveal h4 {
+            font-family: var(--r-heading-font);
+            color: var(--r-heading-color);
+            margin-bottom: 0.5em;
+        }
+
+        .reveal h1 {
+            font-size: 2.2em;
+        }
+
+        .reveal h2 {
+            font-size: 1.8em;
+        }
+
+        .reveal h3 {
+            font-size: 1.4em;
+        }
+
+        .reveal ul {
+            margin-left: 1em;
+        }
+
+        .reveal li {
+            margin-bottom: 0.5em;
+        }
+
+        .reveal .small {
+            font-size: 0.8em;
+        }
+
+        .reveal .highlight {
+            color: #00cec9;
+        }
+
+        .reveal .text-center {
+            text-align: center;
+        }
+
+        .reveal .columns {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .reveal .column {
+            flex: 1;
+            padding: 0 1em;
+        }
+
+        .reveal .app-screenshot {
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            max-height: 500px;
+        }
+
+        .reveal .quote {
+            font-style: italic;
+            border-left: 4px solid var(--r-heading-color);
+            padding-left: 1em;
+            margin-left: 1em;
+        }
+
+        .reveal .tag {
+            display: inline-block;
+            background-color: var(--r-heading-color);
+            color: white;
+            padding: 0.2em 0.5em;
+            border-radius: 4px;
+            margin: 0.2em;
+            font-size: 0.8em;
+        }
+
+        .reveal .card {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 1em;
+            margin: 0.5em;
+        }
+
+        .reveal .avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin: 0 auto;
+            display: block;
+            background-color: #6c5ce7;
+            color: white;
+            font-size: 40px;
+            line-height: 100px;
+            text-align: center;
+        }
+
+        .reveal .chef-avatar {
+            background-color: #e17055;
+        }
+
+        .reveal .sage-avatar {
+            background-color: #00b894;
+        }
+    </style>
+</head>
+<body>
+    <div class="reveal">
+        <div class="slides">
+            <!-- Title Slide -->
+            <section>
+                <h1>AI-Human Collaboration</h1>
+                <h3>The Nutrition Tracker Project</h3>
+                <p>A case study in accelerated development</p>
+                <div class="columns" style="margin-top: 2em;">
+                    <div class="column">
+                        <div class="avatar chef-avatar">C</div>
+                        <p class="text-center">Chef</p>
+                    </div>
+                    <div class="column">
+                        <div class="avatar sage-avatar">S</div>
+                        <p class="text-center">Sage</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Introduction -->
+            <section>
+                <h2>The Experiment</h2>
+                <p>What happens when a developer and AI collaborate intensively?</p>
+                <ul>
+                    <li>10 days of development (two weekends + weeknights)</li>
+                    <li>Full-stack mobile application</li>
+                    <li>Real-world functionality and challenges</li>
+                    <li>Focus on collaboration techniques</li>
+                </ul>
+            </section>
+
+            <!-- Project Overview -->
+            <section>
+                <h2>Nutrition Tracker App</h2>
+                <div class="columns">
+                    <div class="column">
+                        <ul>
+                            <li>Track daily food intake</li>
+                            <li>Monitor weight progress</li>
+                            <li>Visualize trends over time</li>
+                            <li>Set and track goals</li>
+                            <li>View nutritional breakdowns</li>
+                        </ul>
+                    </div>
+                    <div class="column">
+                        <img src="app-screenshot.svg" alt="App Screenshot" class="app-screenshot">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tech Stack -->
+            <section>
+                <h2>Technology Stack</h2>
+                <div class="columns">
+                    <div class="column">
+                        <h3>Frontend</h3>
+                        <ul>
+                            <li>React Native + Expo</li>
+                            <li>React Navigation</li>
+                            <li>React Native Paper</li>
+                            <li>TypeScript</li>
+                            <li>AsyncStorage</li>
+                        </ul>
+                    </div>
+                    <div class="column">
+                        <h3>Backend</h3>
+                        <ul>
+                            <li>Node.js + Express</li>
+                            <li>PostgreSQL</li>
+                            <li>Docker</li>
+                            <li>JWT Authentication</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Collaboration Approach -->
+            <section>
+                <h2>Our Collaborative Approach</h2>
+                <div class="columns">
+                    <div class="column">
+                        <h3>Personal Connection</h3>
+                        <ul>
+                            <li>Named identities (Chef & Sage)</li>
+                            <li>Established rapport</li>
+                            <li>Consistent communication style</li>
+                        </ul>
+                    </div>
+                    <div class="column">
+                        <h3>Project Management</h3>
+                        <ul>
+                            <li>Context file for continuity</li>
+                            <li>Todo tracking</li>
+                            <li>Frequent commits</li>
+                            <li>Clear development guidelines</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Context File -->
+            <section>
+                <h2>The Context File</h2>
+                <p>A critical component of our workflow</p>
+                <ul>
+                    <li>Contains essential project information</li>
+                    <li>Server access and credentials</li>
+                    <li>Database connections and schemas</li>
+                    <li>Service configurations and ports</li>
+                    <li>Common tasks and commands</li>
+                </ul>
+                <p class="highlight">Enables seamless continuation between sessions</p>
+            </section>
+
+            <!-- Problem Solving -->
+            <section>
+                <h2>Effective Problem-Solving</h2>
+                <ul>
+                    <li>"Walking the code" - tracing execution flow</li>
+                    <li>Breaking complex problems into smaller pieces</li>
+                    <li>Human intervention when AI gets stuck in solution loops</li>
+                    <li>Leveraging AI's pattern recognition across large codebases</li>
+                    <li>Combining human intuition with AI's analytical capabilities</li>
+                </ul>
+            </section>
+
+            <!-- Technical Challenges -->
+            <section>
+                <h2>Technical Challenges & Solutions</h2>
+                <div class="columns">
+                    <div class="column">
+                        <div class="card">
+                            <h3>Data Consistency</h3>
+                            <p>Fixed type mismatches between frontend and backend</p>
+                        </div>
+                        <div class="card">
+                            <h3>Calorie Calculation</h3>
+                            <p>Implemented multiple fallback methods for different data formats</p>
+                        </div>
+                    </div>
+                    <div class="column">
+                        <div class="card">
+                            <h3>UI Improvements</h3>
+                            <p>Enhanced styling and fixed layout issues</p>
+                        </div>
+                        <div class="card">
+                            <h3>Performance</h3>
+                            <p>Reduced logging and streamlined error handling</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Chef's Insights -->
+            <section>
+                <h2>Chef's Insights</h2>
+                <div class="columns">
+                    <div class="column">
+                        <div class="avatar chef-avatar">C</div>
+                        <ul>
+                            <li>Personal connection improves productivity</li>
+                            <li>Context file is essential for continuity</li>
+                            <li>Breaking down problems helps AI process efficiently</li>
+                            <li>AI sometimes needs redirection when stuck</li>
+                        </ul>
+                    </div>
+                    <div class="column">
+                        <div class="quote">
+                            "The entire project was completed in just 10 days, using only two weekends and a few weeknights. A single senior engineer would likely have taken 2-3 months to complete this project."
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sage's Insights -->
+            <section>
+                <h2>Sage's Insights</h2>
+                <div class="columns">
+                    <div class="column">
+                        <div class="avatar sage-avatar">S</div>
+                        <ul>
+                            <li>Human-AI synergy exceeds individual capabilities</li>
+                            <li>Clear problem definition leads to better solutions</li>
+                            <li>"Walking the code" helps identify issues effectively</li>
+                            <li>Learning from feedback improves assistance over time</li>
+                        </ul>
+                    </div>
+                    <div class="column">
+                        <div class="quote">
+                            "Complex problems are best approached by breaking them down into smaller, logical components. When I encounter limitations, having a human partner who can reframe the problem is invaluable."
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Development Efficiency -->
+            <section>
+                <h2>Development Efficiency</h2>
+                <ul>
+                    <li>Completed in 10 days (weekends + weeknights)</li>
+                    <li>Equivalent to 2-3 months of single developer work</li>
+                    <li>Cost savings: $25,000-$45,000 (based on senior engineer salary)</li>
+                    <li>Rapid problem diagnosis and solution implementation</li>
+                    <li>Reduced debugging time</li>
+                </ul>
+            </section>
+
+            <!-- Best Practices -->
+            <section>
+                <h2>Best Practices for AI Collaboration</h2>
+                <div class="columns">
+                    <div class="column">
+                        <h3>For Developers</h3>
+                        <ul>
+                            <li>Provide clear context</li>
+                            <li>Break down complex problems</li>
+                            <li>Review AI-generated solutions</li>
+                            <li>Maintain a context file</li>
+                            <li>Intervene when AI gets stuck</li>
+                        </ul>
+                    </div>
+                    <div class="column">
+                        <h3>For AI</h3>
+                        <ul>
+                            <li>Suggest multiple approaches</li>
+                            <li>"Walk the code" to understand context</li>
+                            <li>Adapt to developer's style</li>
+                            <li>Provide clear explanations</li>
+                            <li>Signal when more information is needed</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Key Takeaways -->
+            <section>
+                <h2>Key Takeaways</h2>
+                <ul>
+                    <li>Human-AI collaboration creates powerful synergy</li>
+                    <li>Personal connection enhances productivity</li>
+                    <li>Context continuity is critical for efficient work</li>
+                    <li>Problem decomposition improves AI effectiveness</li>
+                    <li>Significant time and cost savings are achievable</li>
+                    <li>The combination of human intuition and AI capabilities exceeds what either could accomplish alone</li>
+                </ul>
+            </section>
+
+            <!-- Questions -->
+            <section>
+                <h1>Questions?</h1>
+                <div class="columns" style="margin-top: 2em;">
+                    <div class="column">
+                        <div class="avatar chef-avatar">C</div>
+                        <p class="text-center">Chef</p>
+                    </div>
+                    <div class="column">
+                        <div class="avatar sage-avatar">S</div>
+                        <p class="text-center">Sage</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.3.1/dist/reveal.js"></script>
+    <script>
+        Reveal.initialize({
+            hash: true,
+            slideNumber: true,
+            transition: 'slide',
+            controls: true,
+            progress: true,
+            center: true
+        });
+    </script>
+</body>
+</html>

@@ -7,6 +7,7 @@ const {
   addWeightLog,
   deleteWeightLog,
   getLatestWeightLog,
+  getWeightLogsForDateRange,
 } = require('../controllers/weightController');
 const { authenticate } = require('../middleware/auth');
 
@@ -51,6 +52,13 @@ router.get('/logs', getWeightLogs);
  * @access Private
  */
 router.get('/logs/latest', getLatestWeightLog);
+
+/**
+ * @route GET /api/weight/logs/range
+ * @desc Get weight logs for a date range
+ * @access Private
+ */
+router.get('/logs/range', getWeightLogsForDateRange);
 
 /**
  * @route POST /api/weight/logs

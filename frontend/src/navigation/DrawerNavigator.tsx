@@ -1,8 +1,11 @@
-import React from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, Alert, Platform } from 'react-native';
 import { DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navigation/drawer';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useTheme, Text, Divider } from 'react-native-paper';
+import { useTheme, Text, Divider, Switch } from 'react-native-paper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CommonActions } from '@react-navigation/core';
+import { StackActions } from '@react-navigation/routers';
 
 import { useAuth } from '../contexts/AuthContext';
 
@@ -12,23 +15,7 @@ const DrawerContent = (props: any) => {
   const { logout } = useAuth();
 
   const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Logout',
-          onPress: async () => {
-            await logout();
-          },
-        },
-      ],
-      { cancelable: true }
-    );
+    await logout();
   };
 
   return (
@@ -37,19 +24,13 @@ const DrawerContent = (props: any) => {
         <View style={styles.logoContainer}>
           <MaterialCommunityIcons name="weight-lifter" size={32} color="white" />
           <Text style={styles.drawerHeaderText}>FitnessGeek</Text>
-          <MaterialCommunityIcons name="code-tags" size={28} color="white" style={{ marginTop: 4 }} />
+          <Text style={[styles.codeTag, { marginTop: 4 }]}>{"</>"}</Text>
         </View>
       </View>
       <Divider />
-      <DrawerItem
-        label="Home"
-        icon={({ color, size }) => (
-          <MaterialCommunityIcons name="home" color={color} size={size} />
-        )}
-        onPress={() => props.navigation.navigate('MainTabs')}
-      />
       <DrawerItemList {...props} />
       <Divider />
+
       <DrawerItem
         label="Logout"
         icon={({ color, size }) => (
@@ -77,6 +58,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
+  codeTag: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  }
 });
 
 export default DrawerContent;
