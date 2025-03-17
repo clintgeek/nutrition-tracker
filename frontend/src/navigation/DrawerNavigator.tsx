@@ -13,9 +13,19 @@ import { useAuth } from '../contexts/AuthContext';
 const DrawerContent = (props: any) => {
   const theme = useTheme();
   const { logout } = useAuth();
+  const { state, navigation } = props;
 
   const handleLogout = async () => {
     await logout();
+  };
+
+  // Navigate to a specific tab in the MainTabs navigator
+  const navigateToTab = (tabName: string) => {
+    // First navigate to MainTabs if not already there
+    navigation.navigate('MainTabs');
+
+    // Then navigate to the specific tab
+    navigation.navigate('MainTabs', { screen: tabName });
   };
 
   return (
@@ -28,7 +38,64 @@ const DrawerContent = (props: any) => {
         </View>
       </View>
       <Divider />
-      <DrawerItemList {...props} />
+
+      {/* Home item */}
+      <DrawerItem
+        label="Home"
+        icon={({ color, size }) => (
+          <MaterialCommunityIcons name="home" color={color} size={size} />
+        )}
+        onPress={() => navigateToTab('Home')}
+        activeTintColor={theme.colors.primary}
+      />
+
+      {/* Custom tab navigation items */}
+      <DrawerItem
+        label="Food Logs"
+        icon={({ color, size }) => (
+          <MaterialCommunityIcons name="food-apple" color={color} size={size} />
+        )}
+        onPress={() => navigateToTab('Log')}
+        activeTintColor={theme.colors.primary}
+      />
+
+      <DrawerItem
+        label="Foods"
+        icon={({ color, size }) => (
+          <MaterialCommunityIcons name="food" color={color} size={size} />
+        )}
+        onPress={() => navigateToTab('Food')}
+        activeTintColor={theme.colors.primary}
+      />
+
+      <DrawerItem
+        label="Recipes"
+        icon={({ color, size }) => (
+          <MaterialCommunityIcons name="book-open" color={color} size={size} />
+        )}
+        onPress={() => navigateToTab('Recipe')}
+        activeTintColor={theme.colors.primary}
+      />
+
+      {/* Nutrition and Weight Goals from the original DrawerItemList */}
+      <DrawerItem
+        label="Nutrition Goals"
+        icon={({ color, size }) => (
+          <MaterialCommunityIcons name="target" color={color} size={size} />
+        )}
+        onPress={() => navigation.navigate('NutritionGoals')}
+        activeTintColor={theme.colors.primary}
+      />
+
+      <DrawerItem
+        label="Weight Goals"
+        icon={({ color, size }) => (
+          <MaterialCommunityIcons name="scale-bathroom" color={color} size={size} />
+        )}
+        onPress={() => navigation.navigate('WeightGoals')}
+        activeTintColor={theme.colors.primary}
+      />
+
       <Divider />
 
       <DrawerItem

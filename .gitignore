@@ -39,3 +39,7 @@ Thumbs.db
 docker-compose.web.yml
 docker-compose.*.yml
 !docker-compose.web.example.yml
+
+# Logs
+logs/
+*.log

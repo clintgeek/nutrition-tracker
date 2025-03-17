@@ -21,6 +21,18 @@ A mobile-friendly nutrition tracking application with food logging, calorie goal
 - **Containerization**: Docker and Docker Compose
 - **Authentication**: JWT-based authentication
 
+## Documentation
+
+Additional documentation is available in the `docs` directory:
+
+- [Project Summary](docs/project-summary.md): Overview of the project structure and components
+- [Nutrition Tracker Context](docs/NUTRITION-TRACKER-CONTEXT.md): Detailed context and background information
+- [Todo List](docs/NUTRITION-TRACKER-TODO.md): Current development tasks and future enhancements
+- [Weight Goals Implementation](docs/WEIGHT-GOALS-IMPLEMENTATION.md): Details on the weight tracking feature
+- [Build Optimization Report](docs/BUILD-OPTIMIZATION-REPORT.md): Performance improvements and optimizations
+- [Deployment Guide](docs/DEPLOYMENT-SIMPLE.md): Instructions for deploying the application
+- [Food Search Enhancement Plan](docs/food-search-enhancement-plan.md): Plans for improving the food search functionality
+
 ## Getting Started
 
 ### Prerequisites
