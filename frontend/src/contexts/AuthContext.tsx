@@ -63,7 +63,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           authService.setToken(storedToken);
         }
       } catch (error) {
-        console.error('Error loading auth data from storage:', error);
+        // Minimal error logging
+        console.error('Auth storage error');
       } finally {
         setLoading(false);
       }
@@ -131,6 +132,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setLoading(true);
 
+      // Call the logout API endpoint
+      await authService.logout();
+
       // Clear from storage
       await AsyncStorage.removeItem(TOKEN_KEY);
       await AsyncStorage.removeItem(USER_KEY);
@@ -138,11 +142,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Clear from state
       setToken(null);
       setUser(null);
-
-      // Clear the token from the auth service
-      authService.clearToken();
     } catch (error) {
       console.error('Logout error:', error);
+      // Still clear local state and storage even if API call fails
+      await AsyncStorage.removeItem(TOKEN_KEY);
+      await AsyncStorage.removeItem(USER_KEY);
+      setToken(null);
+      setUser(null);
     } finally {
       setLoading(false);
     }

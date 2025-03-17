@@ -3,6 +3,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { useTheme } from 'react-native-paper';
 
 import GoalsScreen from '../screens/goals/GoalsScreen';
+import WeightGoalsScreen from '../screens/goals/WeightGoalsScreen';
 import CustomHeader from '../components/CustomHeader';
 
 // Define the stack navigator param list
@@ -10,6 +11,7 @@ export type GoalsStackParamList = {
   GoalsList: undefined;
   GoalDetails: { goalId: string };
   AddGoal: undefined;
+  WeightGoals: undefined;
 };
 
 // Create the stack navigator
@@ -39,6 +41,19 @@ const GoalsStackNavigator: React.FC = () => {
           header: (props) => (
             <CustomHeader
               title="Nutrition Goals"
+              showBackButton={props.back !== undefined}
+            />
+          )
+        }}
+      />
+      <Stack.Screen
+        name="WeightGoals"
+        component={WeightGoalsScreen}
+        options={{
+          title: 'Weight Goals',
+          header: (props) => (
+            <CustomHeader
+              title="Weight Goals"
               showBackButton={props.back !== undefined}
             />
           )

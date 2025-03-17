@@ -102,18 +102,14 @@ const addWeightLog = asyncHandler(async (req, res) => {
 const deleteWeightLog = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  // Check if log exists
-  const existingLog = await Weight.getWeightLogById(id, req.user.id);
-  if (!existingLog) {
+  // Check if log exists and belongs to user
+  const log = await Weight.getWeightLogById(id, req.user.id);
+  if (!log) {
     return res.status(404).json({ message: 'Weight log not found' });
   }
 
   // Delete log
-  const success = await Weight.deleteWeightLog(id, req.user.id);
-
-  if (!success) {
-    return res.status(500).json({ message: 'Failed to delete weight log' });
-  }
+  await Weight.deleteWeightLog(id, req.user.id);
 
   res.json({ message: 'Weight log deleted' });
 });
@@ -132,6 +128,22 @@ const getLatestWeightLog = asyncHandler(async (req, res) => {
   res.json({ log });
 });
 
+/**
+ * Get weight logs for date range
+ * @route GET /api/weight/logs/range
+ */
+const getWeightLogsForDateRange = asyncHandler(async (req, res) => {
+  const { start_date, end_date } = req.query;
+
+  if (!start_date || !end_date) {
+    return res.status(400).json({ message: 'Start date and end date are required' });
+  }
+
+  const logs = await Weight.getWeightLogsForDateRange(req.user.id, start_date, end_date);
+
+  res.json({ logs });
+});
+
 module.exports = {
   getWeightGoal,
   saveWeightGoal,
@@ -139,4 +151,5 @@ module.exports = {
   addWeightLog,
   deleteWeightLog,
   getLatestWeightLog,
+  getWeightLogsForDateRange,
 };

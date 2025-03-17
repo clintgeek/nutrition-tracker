@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Platform } from 'react-native';
 import { useTheme } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -24,7 +24,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
         <View style={styles.titleRow}>
           <MaterialCommunityIcons name="weight-lifter" size={24} color="white" />
           <Text style={styles.title}>FitnessGeek</Text>
-          <MaterialCommunityIcons name="code-tags" size={20} color="white" style={{ marginTop: 4 }} />
+          <Text style={[styles.codeTag, { marginTop: 4 }]}>{"</>"}</Text>
         </View>
       );
     }
@@ -80,6 +80,12 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  codeTag: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   }
 });
 

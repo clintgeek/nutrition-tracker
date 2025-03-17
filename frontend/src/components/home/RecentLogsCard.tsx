@@ -33,14 +33,21 @@ const RecentLogsCard: React.FC<RecentLogsCardProps> = ({ recentLogs }) => {
           </View>
 
           <View style={styles.foodInfo}>
-            <Text style={styles.foodName}>{item.food_name}</Text>
+            <Text style={styles.foodName}>{item.food?.name || item.food_name || 'Unknown Food'}</Text>
             <Text style={styles.foodDetails}>
-              {item.servings} {item.serving_unit || 'servings'} • {formatDate(item.log_date)} • {item.meal_type}
+              {item.serving_size || item.servings || '1'} {item.serving_unit || 'servings'} • {formatDate(item.log_date || item.created_at || new Date().toISOString())} • {item.meal_type || 'meal'}
             </Text>
           </View>
 
           <View style={styles.caloriesContainer}>
-            <Text style={styles.calories}>{Math.round((item.calories_per_serving || 0) * item.servings)}</Text>
+            <Text style={styles.calories}>
+              {Math.round(
+                Number(item.total_calories) ||
+                Number(item.calories) ||
+                (Number(item.calories_per_serving) * Number(item.servings)) ||
+                0
+              )}
+            </Text>
             <Text style={styles.caloriesLabel}>kcal</Text>
           </View>
         </View>
@@ -104,6 +111,7 @@ const styles = StyleSheet.create({
   },
   foodName: {
     fontWeight: 'bold',
+    textTransform: 'capitalize',
     fontSize: 16,
     marginBottom: 4,
   },

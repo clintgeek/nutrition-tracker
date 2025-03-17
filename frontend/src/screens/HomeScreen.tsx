@@ -1,92 +1,293 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Text, Card, Title, Paragraph, useTheme, Avatar } from 'react-native-paper';
+import { Text, Card, Title, Button, useTheme, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RootStackScreenProps } from '../types/navigation';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { format } from 'date-fns';
 
-// Import the TodaySummary component
+// Import components
 import TodaySummary from '../components/home/TodaySummary';
+import { WeightProgressCard, WeightMiniGraph, WeightMetricsCard } from '../components/dashboard';
+import { weightService } from '../services/weightService';
+import { logService } from '../services/logService';
+import { SkeletonLoader } from '../components/common';
+import { useAuth } from '../contexts/AuthContext';
+import { setAuthToken } from '../services/apiService';
+
+// Remove the storage key for weight display preference
+// const SHOW_WEIGHT_VALUES_KEY = 'showWeightValuesOnDashboard';
 
 type Props = RootStackScreenProps<'Main'>;
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const theme = useTheme();
+  const { token } = useAuth();
+  // Remove the state for showing weight values
+  // const [showWeightValues, setShowWeightValues] = useState(false);
+  const [weightStats, setWeightStats] = useState({
+    totalLost: 0,
+    percentComplete: 0,
+    currentStreak: 0,
+    hasMultipleLogs: false,
+    hasWeightGoal: false,
+    weightGoal: null,
+    weightLogs: []
+  });
+  const [recentLogs, setRecentLogs] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [tipOfTheDay, setTipOfTheDay] = useState('');
 
-  const navigateToSummary = () => {
-    // For now, this will just stay on the home screen
-    // In the future, you could create a dedicated summary screen
+  // Set token when it changes
+  useEffect(() => {
+    if (token) {
+      setAuthToken(token);
+    }
+  }, [token]);
+
+  // Load user preference and data
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+
+        // Ensure we have a token
+        if (!token) {
+          setIsLoading(false);
+          return;
+        }
+
+        // Load weight data
+        const weightGoal = await weightService.getWeightGoal();
+        const weightLogs = await weightService.getWeightLogs();
+
+        // Calculate stats
+        if (weightGoal && weightLogs.length > 0) {
+          const startWeight = parseFloat(weightGoal.start_weight.toString());
+          const targetWeight = parseFloat(weightGoal.target_weight.toString());
+          const currentWeight = parseFloat(weightLogs[0].weight_value.toString());
+          const totalLost = startWeight - currentWeight;
+
+          // Calculate percent complete
+          const totalToLose = Math.abs(targetWeight - startWeight);
+          const amountLost = Math.abs(currentWeight - startWeight);
+          const percentComplete = totalToLose > 0 ? Math.min(100, Math.round((amountLost / totalToLose) * 100)) : 0;
+
+          // Check if multiple logs exist
+          const hasMultipleLogs = weightLogs.length > 1;
+
+          setWeightStats({
+            totalLost,
+            percentComplete,
+            currentStreak: calculateStreak(weightLogs),
+            hasMultipleLogs,
+            hasWeightGoal: true,
+            weightGoal,
+            weightLogs
+          });
+        }
+
+        // Load recent food logs
+        try {
+          const recentFoodLogs = await logService.getRecentLogs(5);
+          setRecentLogs(recentFoodLogs || []);
+        } catch (error) {
+          setRecentLogs([]);
+        }
+
+        // Set tip of the day
+        setTipOfTheDay(getTipOfTheDay());
+
+      } catch (error) {
+        // Minimal error logging
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [token]);
+
+  // Calculate logging streak (simplified implementation)
+  const calculateStreak = (logs: any[]) => {
+    return logs.length > 0 ? Math.min(logs.length, 7) : 0;
+  };
+
+  // Get a random tip of the day
+  const getTipOfTheDay = () => {
+    const tips = [
+      "Consistency is key! Try to log your weight at the same time each day for the most accurate tracking.",
+      "Drinking water before meals can help reduce overall calorie intake.",
+      "Focus on progress, not perfection. Small, consistent changes lead to lasting results.",
+      "Adding strength training to your routine helps build muscle, which burns more calories at rest.",
+      "Getting enough sleep is crucial for weight management and overall health.",
+      "Try to eat slowly and mindfully to better recognize when you're full.",
+      "Planning meals ahead of time can help you make healthier choices.",
+      "Remember that weight fluctuates naturally day to day. Look for trends over weeks, not days."
+    ];
+    return tips[Math.floor(Math.random() * tips.length)];
+  };
+
+  const navigateToWeightGoals = () => {
+    navigation.navigate('WeightGoals');
   };
 
   const navigateToFoodLog = () => {
     navigation.navigate('LogStack');
   };
 
-  const navigateToFoodDatabase = () => {
-    navigation.navigate('FoodStack');
-  };
+  // Format date for recent logs
+  const formatLogDate = (dateString: string) => {
+    if (!dateString) return '';
 
-  const navigateToGoals = () => {
-    navigation.navigate('GoalsStack');
+    const date = new Date(dateString);
+    const today = new Date();
+
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today';
+    }
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    }
+
+    return format(date, 'MMM d');
   };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.content}>
         {/* Today's Summary */}
-        <TouchableOpacity onPress={navigateToSummary}>
-          <TodaySummary />
-        </TouchableOpacity>
+        <TodaySummary />
 
-        {/* Food Log */}
-        <TouchableOpacity onPress={navigateToFoodLog}>
-          <Card style={styles.card}>
-            <Card.Content style={styles.cardContent}>
-              <Avatar.Icon
-                size={50}
-                icon="notebook"
-                style={{ backgroundColor: '#4CAF50' }}
-              />
-              <View style={styles.cardTextContent}>
-                <Title style={{ color: '#4CAF50' }}>Food Log</Title>
-                <Paragraph>Log your meals and track your nutrition.</Paragraph>
-              </View>
+        {/* Weight Progress Section with Context */}
+        <View style={styles.weightSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Weight Progress</Text>
+            <TouchableOpacity onPress={navigateToWeightGoals}>
+              <Text style={styles.seeAllLink}>View Details</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Weight Metrics Card */}
+          <WeightMetricsCard
+            weightGoal={!isLoading && weightStats.weightGoal ? weightStats.weightGoal : null}
+            weightLogs={!isLoading && weightStats.weightLogs ? weightStats.weightLogs : []}
+            isLoading={isLoading}
+          />
+
+          {/* Enhanced Weight Graph with Context */}
+          <Card style={styles.graphCard}>
+            <Card.Content>
+              <Text style={styles.graphTitle}>Goal Weight Trend</Text>
+              {isLoading ? (
+                <SkeletonLoader width="100%" height={100} />
+              ) : weightStats.hasMultipleLogs ? (
+                <WeightMiniGraph />
+              ) : (
+                <View style={styles.noGraphContainer}>
+                  <MaterialCommunityIcons name="chart-line" size={40} color="#ccc" />
+                  <Text style={styles.noGraphText}>
+                    {weightStats.weightLogs.length === 1
+                      ? "Add one more weight log to see your trend graph"
+                      : "Add weight logs to see your progress over time"}
+                  </Text>
+                  <Button
+                    mode="contained"
+                    onPress={navigateToWeightGoals}
+                    style={styles.logButton}
+                  >
+                    Log Weight
+                  </Button>
+                </View>
+              )}
             </Card.Content>
           </Card>
-        </TouchableOpacity>
+        </View>
 
-        {/* Food Database */}
-        <TouchableOpacity onPress={navigateToFoodDatabase}>
-          <Card style={styles.card}>
-            <Card.Content style={styles.cardContent}>
-              <Avatar.Icon
-                size={50}
-                icon="food-apple"
-                style={{ backgroundColor: '#FF9800' }}
-              />
-              <View style={styles.cardTextContent}>
-                <Title style={{ color: '#FF9800' }}>Food Database</Title>
-                <Paragraph>Browse and add foods to your database.</Paragraph>
-              </View>
-            </Card.Content>
-          </Card>
-        </TouchableOpacity>
+        {/* Recent Activity Section */}
+        <View style={styles.activitySection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <TouchableOpacity onPress={navigateToFoodLog}>
+              <Text style={styles.seeAllLink}>See All</Text>
+            </TouchableOpacity>
+          </View>
 
-        {/* Goals */}
-        <TouchableOpacity onPress={navigateToGoals}>
-          <Card style={styles.card}>
-            <Card.Content style={styles.cardContent}>
-              <Avatar.Icon
-                size={50}
-                icon="flag"
-                style={{ backgroundColor: '#E91E63' }}
-              />
-              <View style={styles.cardTextContent}>
-                <Title style={{ color: '#E91E63' }}>Goals</Title>
-                <Paragraph>Set and track your nutrition goals.</Paragraph>
-              </View>
-            </Card.Content>
-          </Card>
-        </TouchableOpacity>
+          {isLoading ? (
+            <Card style={styles.activityCard}>
+              <Card.Content>
+                <SkeletonLoader width="100%" height={24} style={styles.skeletonItem} />
+                <SkeletonLoader width="100%" height={24} style={styles.skeletonItem} />
+                <SkeletonLoader width="100%" height={24} style={styles.skeletonItem} />
+              </Card.Content>
+            </Card>
+          ) : recentLogs.length > 0 ? (
+            <Card style={styles.activityCard}>
+              <Card.Content>
+                {recentLogs.map((log, index) => (
+                  <React.Fragment key={log.id || index}>
+                    <View style={styles.activityItem}>
+                      <MaterialCommunityIcons
+                        name="food-apple"
+                        size={24}
+                        color={theme.colors.primary}
+                      />
+                      <View style={styles.activityDetails}>
+                        <Text style={styles.activityName}>{log.food_name || 'Food item'}</Text>
+                        <Text style={styles.activityTime}>{formatLogDate(log.created_at)}</Text>
+                      </View>
+                      <Text style={styles.activityCalories}>
+                        {(() => {
+                          // Try different ways to calculate calories
+                          let calories = 0;
+
+                          if (log.calories_per_serving && log.servings) {
+                            calories = log.calories_per_serving * log.servings;
+                          } else if (log.calories) {
+                            calories = log.calories;
+                          } else if (log.total_calories) {
+                            calories = log.total_calories;
+                          }
+
+                          return Math.round(calories) || 0;
+                        })()} cal
+                      </Text>
+                    </View>
+                    {index < recentLogs.length - 1 && <Divider style={styles.activityDivider} />}
+                  </React.Fragment>
+                ))}
+              </Card.Content>
+            </Card>
+          ) : (
+            <Card style={styles.emptyCard}>
+              <Card.Content style={styles.emptyContent}>
+                <MaterialCommunityIcons name="food" size={40} color="#ccc" />
+                <Text style={styles.emptyText}>No recent food logs</Text>
+                <Button
+                  mode="contained"
+                  onPress={navigateToFoodLog}
+                  style={styles.logButton}
+                >
+                  Log Food
+                </Button>
+              </Card.Content>
+            </Card>
+          )}
+        </View>
+
+        {/* Motivational Tips Section */}
+        {/* <Card style={styles.tipsCard}>
+          <Card.Content>
+            <View style={styles.tipHeader}>
+              <MaterialCommunityIcons name="lightbulb-on" size={24} color="#FFD700" />
+              <Text style={styles.tipTitle}>Tip of the Day</Text>
+            </View>
+            <Text style={styles.tipText}>{tipOfTheDay}</Text>
+          </Card.Content>
+        </Card> */}
       </View>
     </ScrollView>
   );
@@ -101,18 +302,122 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 20,
   },
-  card: {
-    marginBottom: 16,
+  weightSection: {
+    marginBottom: 24,
+    zIndex: 10, // Ensure this section appears above other elements
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  seeAllLink: {
+    color: '#2196F3',
+    fontWeight: '500',
+  },
+  graphCard: {
+    marginVertical: 8,
     elevation: 2,
     borderRadius: 8,
   },
-  cardContent: {
+  graphTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 12,
+    color: '#333',
+  },
+  noGraphContainer: {
+    height: 150,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  noGraphText: {
+    textAlign: 'center',
+    color: '#666',
+    marginVertical: 12,
+  },
+  logButton: {
+    marginTop: 8,
+  },
+  activitySection: {
+    marginBottom: 24,
+  },
+  activityCard: {
+    marginVertical: 8,
+    elevation: 2,
+    borderRadius: 8,
+  },
+  activityItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 12,
   },
-  cardTextContent: {
-    marginLeft: 16,
+  activityDetails: {
     flex: 1,
+    marginLeft: 12,
+  },
+  activityName: {
+    fontSize: 16,
+    fontWeight: '500',
+    textTransform: 'capitalize',
+  },
+  activityTime: {
+    fontSize: 12,
+    color: '#666',
+  },
+  activityCalories: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  activityDivider: {
+    backgroundColor: '#f0f0f0',
+  },
+  emptyCard: {
+    marginVertical: 8,
+    elevation: 2,
+    borderRadius: 8,
+  },
+  emptyContent: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  emptyText: {
+    marginTop: 8,
+    color: '#666',
+    textAlign: 'center',
+  },
+  tipsCard: {
+    marginBottom: 24,
+    elevation: 2,
+    borderRadius: 8,
+    backgroundColor: '#FFF9E6',
+  },
+  tipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  tipTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+    color: '#333',
+  },
+  tipText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#333',
+  },
+  skeletonItem: {
+    marginVertical: 8,
+    borderRadius: 4,
   },
 });
 

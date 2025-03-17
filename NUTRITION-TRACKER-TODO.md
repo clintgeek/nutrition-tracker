@@ -8,6 +8,11 @@
 - [x] Enhanced UI for weight tracking with better formatting and visual indicators
 - [x] Fixed drawer navigation system with proper typing and safety checks
 - [x] Improved loading indicators across main screens (FoodScreen, LogScreen, RecipesScreen, TodaySummary)
+- [x] Created dashboard components for weight visualization (WeightProgressCard, WeightMiniGraph)
+- [x] Fixed calorie display in Recent Activity section
+- [x] Improved graph padding in weight trend visualizations
+- [x] Fixed logout functionality
+- [x] Enhanced weight trend visualization to use goal start date
 
 ## In Progress
 - [ ] Complete weight tracking functionality
@@ -15,15 +20,25 @@
   - [x] Create weight goals schema
   - [x] Implement weight tracking UI
   - [x] Fix weight goal saving functionality
-  - [ ] Improve weight visualization
-    - [ ] **Weight Trend Graph**: Line chart showing weight over time with trend line, color-coded to show progress toward goal
-    - [ ] **Progress Cards**: Visual cards showing key metrics (total weight lost/gained, percentage toward goal, average weekly change, projected goal date)
-    - [ ] **Interactive Calendar View**: Calendar with color intensity showing weight entries, tap on a day to see details
-    - [ ] **Milestone Markers**: Visual indicators for significant milestones (5% lost, 10% lost, etc.)
-    - [ ] **Comparison Visualizations**: Before/after style visualization with equivalent weight objects
-    - [ ] **Multi-metric Tracking**: Add body measurements tracking alongside weight
-    - [ ] **Goal Projection**: Visual projection of expected weight loss/gain based on current trend
-    - [ ] **Contextual Insights**: Highlight correlations between weight changes and food log entries
+  - [x] Improve weight visualization
+    - [x] **Phase 1: Dashboard Integration**
+      - [x] Create `WeightProgressCard` component for dashboard (shows progress without actual weight)
+      - [x] Create `WeightMiniGraph` component (simplified trend without y-axis values)
+      - [x] Update HomeScreen to use dashboard layout with cards
+      - [x] Add user preference for showing/hiding weight values on dashboard
+      - [x] Implement conditional rendering based on user preference
+    - [x] **Phase 2: Detailed Weight Goals Screen**
+      - [x] Implement full `WeightTrendGraph` with actual values and trend line
+      - [x] Add time range filters (week, month, 3 months, year)
+      - [x] Create progress metrics cards (total change, weekly average, projected date)
+      - [x] Add color coding to show progress toward goal
+    - [ ] **Phase 3: Advanced Visualizations** (future)
+      - [ ] Interactive Calendar View with weight entry heatmap
+      - [ ] Milestone Markers for significant achievements
+      - [ ] Comparison Visualizations (equivalent weight objects)
+      - [ ] Multi-metric Tracking with body measurements
+      - [ ] Goal Projection with adjustable parameters
+      - [ ] Contextual Insights connecting weight and nutrition
 
 ## Planned Features
 
@@ -32,15 +47,15 @@
 - [ ] Implement success notifications for actions (Low)
 - [ ] Add confirmation dialogs for destructive actions (Low)
 - [ ] Add form validation with helpful error messages (Medium)
-- [ ] Complete weight goals and tracking (Medium)
+- [x] Complete weight goals and tracking (Medium)
   - [x] Track weight and weight goals
   - [x] Show weight loss progress
-  - [ ] Add weight trend visualization
+  - [x] Add weight trend visualization
 
 ### Medium Priority (by complexity)
 - [ ] Allow setting of default page in user profile settings (Low)
 - [ ] Create data visualization for nutrition trends (Medium)
-- [ ] Rework home to be more of a dashboard (Medium)
+- [x] Rework home to be more of a dashboard (Medium)
 - [ ] Implement handling of recipes in the food database (High)
 - [ ] Add user profile management (High)
 - [ ] Implement OAUTH through Google account (High)
@@ -70,6 +85,8 @@
 - [x] Use OpenFoodFacts as primary API, fallback to USDA
 - [x] Make food database available to all users
 - [x] Show calories/macros on home screen based on user goals
+- [x] Implement weight tracking with goal visualization
+- [x] Enhance home screen with dashboard layout and cards
 
 ## Technical Improvements
 
@@ -82,8 +99,15 @@
 - [x] Ensure all controllers properly connect to the database
 - [x] Cache API results to reduce external calls
 - [x] Implement batch processing for database operations
+- [x] Fix logout functionality with proper token clearing and navigation
 
 ### Planned
+- [ ] Fix linter errors across the application
+  - [ ] Address TypeScript type errors and undefined properties
+  - [ ] Fix duplicate style definitions in component files
+  - [ ] Resolve missing required props warnings
+  - [ ] Standardize import ordering and formatting
+  - [ ] Remove unused imports and variables
 - [ ] Implement SASS for styling
   - [ ] Convert existing CSS/inline styles to SASS
   - [ ] Create variables for colors, spacing, and typography
@@ -101,18 +125,39 @@
 - Recipe functionality should include ability to create, save, and log custom recipes
 - Consider implementing a progressive web app (PWA) approach for installability
 - Explore offline functionality for logging when internet connection is unavailable
+- Consider replacing manual SVG charts with a library like Nivo for better visualizations
 
 ## Additional Enhancements
 
+### New Integrations (Priority Additions)
+- [ ] Weather API Integration: Adjust calorie recommendations based on weather conditions
+- [ ] Recipe APIs: Connect to services like Spoonacular or Edamam for recipe suggestions
+- [ ] AI Image Recognition: Take photos of meals for automatic food identification and logging
+- [ ] Barcode Scanning: Quickly log packaged foods and compare alternatives while shopping
+
+### Meal Planning System
+- [ ] Create comprehensive meal planning functionality
+  - [ ] Recipe management with custom recipes and nutritional calculation
+  - [ ] Meal scheduling calendar with drag-and-drop interface
+  - [ ] Google Calendar integration for meal plan synchronization
+  - [ ] Automatic food logging based on scheduled meals
+  - [ ] Shopping list generation from planned meals
+  - [ ] Family sharing for collaborative meal planning
+  - [ ] Meal rotation suggestions to prevent repetition
+
 ## Bugs
+- [x] Fix calorie display in Recent Activity section showing "0 cal"
+- [x] Fix graph padding in weight trend visualizations
+- [x] Fix logout functionality not working properly
 
 ### Feature Additions
 - [x] Track weight and weight goals
 - [x] Show weight loss progress
+- [x] Add weight trend visualization
 - [ ] Add user profile management
 - [ ] Implement OAUTH through google account
 - [ ] Implement user avatars
-- [ ] Rework home to be more of a dashboard
+- [x] Rework home to be more of a dashboard
 - [ ] allow setting of default page in user profile settings
 - [ ] implement handling of recipies in the food database
 - [ ] Add barcode scanning with food lookup
@@ -138,7 +183,7 @@
 - [ ] Add form validation with helpful error messages
 - [ ] Implement success notifications for actions
 - [ ] Add confirmation dialogs for destructive actions
-- [ ] Improve loading indicators
+- [x] Improve loading indicators
 
 ### Database Connection Fixes
 - [x] Replace mock data in foodController.js with actual database queries
@@ -175,6 +220,4 @@
 - [ ] Reduce unnecessary re-renders in the UI
   - [ ] Implement React.memo for pure components
   - [ ] Use useMemo and useCallback hooks for expensive calculations
-
-## Recipie Notes
 

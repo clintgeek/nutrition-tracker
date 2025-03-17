@@ -71,6 +71,19 @@ export const authService = {
 
   // Logout
   logout: async (): Promise<void> => {
-    return apiService.post<{ message: string }>('/auth/logout').then(() => {});
+    try {
+      // First clear the token locally
+      authService.clearToken();
+
+      // Then try to call the API endpoint
+      try {
+        await apiService.post<{ message: string }>('/auth/logout');
+      } catch (apiError) {
+        // Continue with logout even if API call fails
+      }
+    } catch (error) {
+      // Still return success even if there are errors
+      // This ensures the user can still log out on the client side
+    }
   },
 };

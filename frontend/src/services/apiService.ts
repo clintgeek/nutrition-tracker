@@ -51,10 +51,11 @@ let authToken: string | null = null;
 
 // Set auth token
 export const setAuthToken = (token: string | null): void => {
+  console.log('apiService: setAuthToken called with token:', token ? 'Token exists' : 'No token');
   authToken = token;
 
   // Log token for debugging
-  console.log('Auth token set:', token ? 'Token exists' : 'No token');
+  console.log('apiService: Auth token set:', token ? 'Token exists' : 'No token');
 };
 
 // Request interceptor for adding auth token

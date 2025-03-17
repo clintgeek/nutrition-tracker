@@ -75,7 +75,7 @@ const MainDrawerNavigator = () => {
 
 // App navigator component
 const AppNavigator: React.FC = () => {
-  const { user, loading } = useAuth();
+  const { user, token, loading } = useAuth();
 
   // Show loading screen while checking authentication
   if (loading) {
@@ -87,6 +87,8 @@ const AppNavigator: React.FC = () => {
       screenOptions={{
         headerShown: false,
       }}
+      // Force the navigator to recreate its screens when the user state changes
+      key={user ? 'user' : 'no-user'}
     >
       {user ? (
         // Authenticated routes

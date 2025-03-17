@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, TextInput as RNTextInput, Alert, FlatList, Platform } from 'react-native';
 import {
   Text,
@@ -14,9 +14,11 @@ import {
   Paragraph
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { format } from 'date-fns';
 import { LoadingSpinner, SkeletonLoader, SkeletonCard, LoadingOverlay } from '../../components/common';
+import { weightService, WeightLog, WeightGoal } from '../../services/weightService';
+import { WeightTrendGraph, WeightMetricsCard } from '../../components/dashboard';
 
 // Conditionally import DateTimePicker based on platform
 let DateTimePicker: any = () => null;
@@ -60,19 +62,36 @@ const WebDatePicker = ({ value, onChange, minimumDate, maximumDate }: any) => {
   );
 };
 
-import { weightService, WeightLog, WeightGoal } from '../../services/weightService';
+// Tab interface
+interface Tab {
+  key: string;
+  title: string;
+  icon: string;
+}
 
 const WeightGoalsScreen: React.FC = () => {
   const theme = useTheme();
   const isFocused = useIsFocused();
 
-  // State for weight goal
+  // Tab state
+  const [activeTab, setActiveTab] = useState<string>('overview');
+  const tabs: Tab[] = [
+    { key: 'overview', title: 'Overview', icon: 'scale-bathroom' },
+    { key: 'trends', title: 'Trends', icon: 'chart-line' },
+    { key: 'log', title: 'Log', icon: 'format-list-bulleted' },
+  ];
+
+  // Weight goal state
   const [weightGoal, setWeightGoal] = useState<WeightGoal | null>(null);
   const [targetWeight, setTargetWeight] = useState('');
   const [startWeight, setStartWeight] = useState('');
+  const [startDate, setStartDate] = useState(new Date());
+  const [targetDate, setTargetDate] = useState(new Date());
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showTargetDatePicker, setShowTargetDatePicker] = useState(false);
   const [showGoalForm, setShowGoalForm] = useState(false);
 
-  // State for weight logs
+  // Weight log state
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
   const [currentWeight, setCurrentWeight] = useState('');
   const [logDate, setLogDate] = useState(new Date());
@@ -87,11 +106,11 @@ const WeightGoalsScreen: React.FC = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Load weight goal and logs when screen is focused
-  useEffect(() => {
-    if (isFocused) {
+  useFocusEffect(
+    useCallback(() => {
       loadWeightData();
-    }
-  }, [isFocused]);
+    }, [])
+  );
 
   // Load weight goal and logs
   const loadWeightData = async () => {
@@ -104,6 +123,10 @@ const WeightGoalsScreen: React.FC = () => {
         setWeightGoal(goal);
         setTargetWeight(goal.target_weight?.toString() || '');
         setStartWeight(goal.start_weight?.toString() || '');
+        setStartDate(new Date(goal.start_date));
+        if (goal.target_date) {
+          setTargetDate(new Date(goal.target_date));
+        }
         // Hide goal form when a goal exists
         setShowGoalForm(false);
       } else {
@@ -133,6 +156,29 @@ const WeightGoalsScreen: React.FC = () => {
     }
   };
 
+  // Handle changing weight goal
+  const handleChangeGoal = () => {
+    if (weightGoal) {
+      setTargetWeight(weightGoal.target_weight?.toString() || '');
+      setStartWeight(weightGoal.start_weight?.toString() || '');
+      setStartDate(new Date(weightGoal.start_date));
+      if (weightGoal.target_date) {
+        setTargetDate(new Date(weightGoal.target_date));
+      }
+    } else {
+      setTargetWeight('');
+      setStartWeight('');
+      setStartDate(new Date());
+
+      // Set target date to 3 months from now by default
+      const threeMonthsFromNow = new Date();
+      threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
+      setTargetDate(threeMonthsFromNow);
+    }
+
+    setShowGoalForm(true);
+  };
+
   // Save weight goal
   const saveWeightGoal = async () => {
     try {
@@ -151,8 +197,8 @@ const WeightGoalsScreen: React.FC = () => {
       const goalData: Omit<WeightGoal, 'id' | 'sync_id' | 'created_at' | 'updated_at'> = {
         target_weight: parseFloat(targetWeight),
         start_weight: parseFloat(startWeight),
-        start_date: new Date().toISOString().split('T')[0],
-        target_date: undefined, // Target date is removed
+        start_date: format(startDate, 'yyyy-MM-dd'),
+        target_date: format(targetDate, 'yyyy-MM-dd'),
       };
 
       const newGoal = await weightService.saveWeightGoal(goalData);
@@ -227,9 +273,9 @@ const WeightGoalsScreen: React.FC = () => {
     if (!weightGoal || !weightLogs.length || !weightLogs[0]?.weight_value) return 0;
     if (!weightGoal.start_weight || !weightGoal.target_weight) return 0;
 
-    const currentWeight = weightLogs[0].weight_value;
-    const startWeight = weightGoal.start_weight;
-    const targetWeight = weightGoal.target_weight;
+    const currentWeight = parseFloat(weightLogs[0].weight_value.toString());
+    const startWeight = parseFloat(weightGoal.start_weight.toString());
+    const targetWeight = parseFloat(weightGoal.target_weight.toString());
 
     // If target is to lose weight
     if (targetWeight < startWeight) {
@@ -337,11 +383,408 @@ const WeightGoalsScreen: React.FC = () => {
     </>
   );
 
+  // Render tab content
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'overview':
+        return renderOverviewTab();
+      case 'trends':
+        return renderTrendsTab();
+      case 'log':
+        return renderLogTab();
+      default:
+        return renderOverviewTab();
+    }
+  };
+
+  // Render overview tab
+  const renderOverviewTab = () => {
+    return (
+      <View style={styles.tabContent}>
+        {/* Weight Goal Progress */}
+        {renderWeightGoalProgress()}
+
+        {/* Weight Metrics */}
+        {!loading && weightGoal && weightLogs.length > 0 && (
+          <WeightMetricsCard
+            weightGoal={weightGoal}
+            weightLogs={weightLogs}
+            isLoading={loading}
+          />
+        )}
+
+        {/* Log Weight Form */}
+        {renderLogWeightForm()}
+      </View>
+    );
+  };
+
+  // Render trends tab
+  const renderTrendsTab = () => {
+    return (
+      <View style={styles.tabContent}>
+        {/* Weight Trend Graph */}
+        <WeightTrendGraph
+          timeRange="goal"
+          showActualWeight={true}
+        />
+
+        {/* Weight Metrics */}
+        {!loading && weightGoal && weightLogs.length > 0 && (
+          <WeightMetricsCard
+            weightGoal={weightGoal}
+            weightLogs={weightLogs}
+            isLoading={loading}
+          />
+        )}
+      </View>
+    );
+  };
+
+  // Render log tab
+  const renderLogTab = () => {
+    return (
+      <View style={styles.tabContent}>
+        {/* Log Weight Form */}
+        {renderLogWeightForm()}
+
+        {/* Weight History */}
+        {renderWeightHistory()}
+      </View>
+    );
+  };
+
+  // Render weight goal progress
+  const renderWeightGoalProgress = () => {
+    if (loading) {
+      return (
+        <Card style={styles.goalCard}>
+          <Card.Content>
+            <LoadingSpinner size={40} />
+          </Card.Content>
+        </Card>
+      );
+    }
+
+    if (!weightGoal || showGoalForm) {
+      return (
+        <Card style={styles.goalCard}>
+          <Card.Content>
+            <Title style={styles.sectionTitle}>
+              {weightGoal ? 'Change Weight Goal' : 'Set Weight Goal'}
+            </Title>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Starting Weight</Text>
+              <RNTextInput
+                style={styles.input}
+                value={startWeight}
+                onChangeText={setStartWeight}
+                keyboardType="numeric"
+                placeholder="Enter your current weight"
+              />
+              <Text style={styles.inputUnit}>lbs</Text>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Target Weight</Text>
+              <RNTextInput
+                style={styles.input}
+                value={targetWeight}
+                onChangeText={setTargetWeight}
+                keyboardType="numeric"
+                placeholder="Enter target weight"
+              />
+              <Text style={styles.inputUnit}>lbs</Text>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Start Date</Text>
+              {Platform.OS === 'web' ? (
+                <WebDatePicker
+                  value={startDate}
+                  onChange={(event, selectedDate) => {
+                    if (selectedDate) {
+                      setStartDate(selectedDate);
+                    }
+                  }}
+                  maximumDate={new Date()}
+                />
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => setShowStartDatePicker(true)}
+                  >
+                    <Text>{format(startDate, 'MMM d, yyyy')}</Text>
+                  </TouchableOpacity>
+                  {showStartDatePicker && (
+                    <DateTimePicker
+                      value={startDate}
+                      mode="date"
+                      display="default"
+                      onChange={(event, selectedDate) => {
+                        setShowStartDatePicker(false);
+                        if (selectedDate) {
+                          setStartDate(selectedDate);
+                        }
+                      }}
+                      maximumDate={new Date()}
+                    />
+                  )}
+                </>
+              )}
+            </View>
+
+            {/* Target Date field is hidden but we still save it */}
+            <View style={{ display: 'none' }}>
+              <Text style={styles.inputLabel}>Target Date</Text>
+              {Platform.OS === 'web' ? (
+                <WebDatePicker
+                  value={targetDate}
+                  onChange={(event, selectedDate) => {
+                    if (selectedDate) {
+                      setTargetDate(selectedDate);
+                    }
+                  }}
+                  minimumDate={new Date()}
+                />
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => setShowTargetDatePicker(true)}
+                  >
+                    <Text>{format(targetDate, 'MMM d, yyyy')}</Text>
+                  </TouchableOpacity>
+                  {showTargetDatePicker && (
+                    <DateTimePicker
+                      value={targetDate}
+                      mode="date"
+                      display="default"
+                      onChange={(event, selectedDate) => {
+                        setShowTargetDatePicker(false);
+                        if (selectedDate) {
+                          setTargetDate(selectedDate);
+                        }
+                      }}
+                      minimumDate={new Date()}
+                    />
+                  )}
+                </>
+              )}
+            </View>
+
+            <View style={styles.buttonContainer}>
+              <Button
+                mode="contained"
+                onPress={saveWeightGoal}
+                style={styles.button}
+                disabled={saving || !targetWeight || !startWeight}
+                loading={saving}
+              >
+                Save Goal
+              </Button>
+              {weightGoal && (
+                <Button
+                  mode="outlined"
+                  onPress={() => setShowGoalForm(false)}
+                  style={styles.cancelButton}
+                >
+                  Cancel
+                </Button>
+              )}
+            </View>
+          </Card.Content>
+        </Card>
+      );
+    }
+
+    // Calculate progress
+    const progress = calculateProgress();
+    const progressPercent = Math.round(progress * 100);
+
+    // Get current weight from latest log
+    const currentWeight = weightLogs.length > 0 ? parseFloat(weightLogs[0].weight_value.toString()) : parseFloat(weightGoal.start_weight.toString());
+
+    // Determine if goal is to lose or gain weight
+    const startWeightNum = parseFloat(weightGoal.start_weight.toString());
+    const targetWeightNum = parseFloat(weightGoal.target_weight.toString());
+    const isLoseWeight = targetWeightNum < startWeightNum;
+    const goalType = isLoseWeight ? 'lose' : 'gain';
+
+    // Calculate weight change
+    const totalChange = Math.abs(targetWeightNum - startWeightNum);
+    const currentChange = Math.abs(currentWeight - startWeightNum);
+    const remainingChange = Math.abs(targetWeightNum - currentWeight);
+
+    return (
+      <Card style={styles.goalCard}>
+        <Card.Content>
+          <View style={styles.goalHeader}>
+            <View style={{flex: 1}}></View>
+            <Button
+              mode="text"
+              onPress={handleChangeGoal}
+              style={styles.changeGoalButton}
+            >
+              Change Goal
+            </Button>
+          </View>
+
+          <View style={styles.weightValues}>
+            <View style={styles.weightValue}>
+              <Text style={styles.weightLabel}>Start</Text>
+              <Text style={styles.weightNumber}>{parseFloat(weightGoal.start_weight.toString()).toFixed(1)}</Text>
+              <Text style={styles.weightUnit}>lbs</Text>
+            </View>
+
+            <View style={styles.weightValue}>
+              <Text style={styles.weightLabel}>Current</Text>
+              <Text style={styles.weightNumber}>{parseFloat(currentWeight.toString()).toFixed(1)}</Text>
+              <Text style={styles.weightUnit}>lbs</Text>
+            </View>
+
+            <View style={styles.weightValue}>
+              <Text style={styles.weightLabel}>Target</Text>
+              <Text style={styles.weightNumber}>{parseFloat(weightGoal.target_weight.toString()).toFixed(1)}</Text>
+              <Text style={styles.weightUnit}>lbs</Text>
+            </View>
+          </View>
+
+          <View style={styles.progressContainer}>
+            <ProgressBar
+              progress={progress}
+              color={theme.colors.primary}
+              style={styles.progressBar}
+              testID="progress-bar"
+            />
+          </View>
+
+          {/* <View style={styles.goalSummaryRow}>
+            <Text style={styles.goalSummaryTextLeft}>
+              Goal: {goalType === 'lose' ? 'Lose' : 'Gain'} {totalChange.toFixed(1)} lbs
+            </Text>
+
+            <Text style={styles.goalSummaryTextCenter}>
+              {progressPercent}% Complete
+            </Text>
+
+            <Text style={styles.goalSummaryTextRight}>
+              {currentChange.toFixed(1)} lbs {goalType === 'lose' ? 'lost' : 'gained'}, {remainingChange.toFixed(1)} lbs to go
+            </Text>
+          </View> */}
+        </Card.Content>
+      </Card>
+    );
+  };
+
+  // Render log weight form
+  const renderLogWeightForm = () => {
+    return (
+      <Card style={styles.logCard}>
+        <Card.Content>
+          <Title style={styles.sectionTitle}>Log Your Weight</Title>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Current Weight</Text>
+            <RNTextInput
+              style={styles.input}
+              value={currentWeight}
+              onChangeText={setCurrentWeight}
+              keyboardType="numeric"
+              placeholder="Enter your current weight"
+            />
+            <Text style={styles.inputUnit}>lbs</Text>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Date</Text>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowLogDatePicker(true)}
+            >
+              <Text>{format(logDate, 'MMM d, yyyy')}</Text>
+            </TouchableOpacity>
+            {showLogDatePicker && (
+              <DateTimePicker
+                value={logDate}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowLogDatePicker(false);
+                  if (selectedDate) {
+                    setLogDate(selectedDate);
+                  }
+                }}
+              />
+            )}
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Notes (Optional)</Text>
+            <RNTextInput
+              style={[styles.input, styles.notesInput]}
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="Add notes about this weight entry"
+              multiline
+            />
+          </View>
+
+          <Button
+            mode="contained"
+            onPress={addWeightLog}
+            style={styles.button}
+            disabled={addingLog || !currentWeight}
+            loading={addingLog}
+          >
+            Add Weight Log
+          </Button>
+        </Card.Content>
+      </Card>
+    );
+  };
+
+  // Render weight history
+  const renderWeightHistory = () => {
+    if (loading) {
+      return (
+        <Card style={styles.historyCard}>
+          <Card.Content>
+            <LoadingSpinner size={40} />
+          </Card.Content>
+        </Card>
+      );
+    }
+
+    return (
+      <Card style={styles.historyCard}>
+        <Card.Content>
+          <Title style={styles.sectionTitle}>Weight History</Title>
+
+          {weightLogs.length === 0 ? (
+            <Text style={styles.emptyText}>No weight logs yet. Add your first log above.</Text>
+          ) : (
+            <FlatList
+              data={weightLogs}
+              renderItem={renderWeightLogItem}
+              keyExtractor={(item) => item.id?.toString() || item.log_date}
+              style={styles.logList}
+              scrollEnabled={false}
+              ItemSeparatorComponent={() => <Divider style={styles.divider} />}
+            />
+          )}
+        </Card.Content>
+      </Card>
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.container}>
-        <SkeletonCard style={styles.card} />
-        <SkeletonCard style={styles.card} />
+        <SkeletonCard style={styles.cardStyle} />
+        <SkeletonCard style={styles.cardStyle} />
         <View style={styles.loadingOverlay}>
           <LoadingSpinner message="Loading weight data..." />
         </View>
@@ -350,210 +793,48 @@ const WeightGoalsScreen: React.FC = () => {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        {/* Progress Section */}
-        {weightGoal && (
-          <Card style={styles.card}>
-            <Card.Content>
-              <Title style={styles.sectionTitle}>Weight Goal Progress</Title>
-              <View style={styles.goalInfoRow}>
-                <View style={styles.goalInfoItem}>
-                  <Text style={styles.goalInfoLabel}>Start</Text>
-                  <Text style={styles.goalInfoValue}>
-                    {weightGoal.start_weight ? `${weightGoal.start_weight} lbs` : 'Not set'}
-                  </Text>
-                </View>
-                <View style={styles.goalInfoItem}>
-                  <Text style={styles.goalInfoLabel}>Current</Text>
-                  <Text style={styles.goalInfoValue}>
-                    {weightLogs.length > 0 && weightLogs[0]?.weight_value
-                      ? `${weightLogs[0].weight_value} lbs`
-                      : 'Not logged'}
-                  </Text>
-                </View>
-                <View style={styles.goalInfoItem}>
-                  <Text style={styles.goalInfoLabel}>Target</Text>
-                  <Text style={styles.goalInfoValue}>
-                    {weightGoal.target_weight ? `${weightGoal.target_weight} lbs` : 'Not set'}
-                  </Text>
-                </View>
-              </View>
-              <ProgressBar
-                progress={calculateProgress()}
-                color={theme.colors.primary}
-                style={styles.progressBar}
-              />
-              <Text style={styles.progressText}>
-                <Text style={styles.progressPercentage}>{Math.round(calculateProgress() * 100)}%</Text> Complete
-              </Text>
-            </Card.Content>
-            <Card.Actions style={styles.cardActions}>
-              <Button mode="text" onPress={() => setShowGoalForm(true)}>
-                Edit Goal
-              </Button>
-            </Card.Actions>
-          </Card>
-        )}
-
-        {/* Set Goal Section - Only show if no goal exists or user clicked Change Goal */}
-        {(!weightGoal || showGoalForm) && (
-          <Card style={styles.card}>
-            <Card.Content>
-              <Title style={styles.sectionTitle}>
-                {weightGoal ? 'Change Weight Goal' : 'Set Weight Goal'}
-              </Title>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Starting Weight</Text>
-                <RNTextInput
-                  style={styles.input}
-                  value={startWeight}
-                  onChangeText={setStartWeight}
-                  keyboardType="numeric"
-                  placeholder="Enter your current weight"
-                />
-                <Text style={styles.inputUnit}>lbs</Text>
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Target Weight</Text>
-                <RNTextInput
-                  style={styles.input}
-                  value={targetWeight}
-                  onChangeText={setTargetWeight}
-                  keyboardType="numeric"
-                  placeholder="Enter target weight"
-                />
-                <Text style={styles.inputUnit}>lbs</Text>
-              </View>
-
-              <View style={styles.buttonContainer}>
-                <Button
-                  mode="contained"
-                  onPress={saveWeightGoal}
-                  style={styles.button}
-                  disabled={saving || !targetWeight || !startWeight}
-                  loading={saving}
-                >
-                  Save Goal
-                </Button>
-                {weightGoal && (
-                  <Button
-                    mode="outlined"
-                    onPress={() => setShowGoalForm(false)}
-                    style={styles.cancelButton}
-                  >
-                    Cancel
-                  </Button>
-                )}
-              </View>
-            </Card.Content>
-          </Card>
-        )}
-
-        {/* Log Weight Section */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <Title style={styles.sectionTitle}>Log Your Weight</Title>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Current Weight</Text>
-              <RNTextInput
-                style={styles.input}
-                value={currentWeight}
-                onChangeText={setCurrentWeight}
-                keyboardType="numeric"
-                placeholder="Enter your current weight"
-              />
-              <Text style={styles.inputUnit}>lbs</Text>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Date</Text>
-              {Platform.OS === 'web' ? (
-                // Web date picker is always visible
-                renderDatePicker(
-                  true,
-                  logDate,
-                  (event, selectedDate) => {
-                    if (selectedDate) {
-                      setLogDate(selectedDate);
-                    }
-                  },
-                  undefined,
-                  new Date()
-                )
-              ) : (
-                // Native platforms use a button to show the picker
-                <>
-                  <TouchableOpacity
-                    style={styles.dateInput}
-                    onPress={() => setShowLogDatePicker(true)}
-                  >
-                    <Text>{format(logDate, 'MMM d, yyyy')}</Text>
-                  </TouchableOpacity>
-                  {showLogDatePicker && renderDatePicker(
-                    true,
-                    logDate,
-                    (event, selectedDate) => {
-                      setShowLogDatePicker(false);
-                      if (selectedDate) {
-                        setLogDate(selectedDate);
-                      }
-                    },
-                    undefined,
-                    new Date()
-                  )}
-                </>
-              )}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Notes (Optional)</Text>
-              <RNTextInput
-                style={[styles.input, styles.notesInput]}
-                value={notes}
-                onChangeText={setNotes}
-                placeholder="Add notes about this weight entry"
-                multiline
-              />
-            </View>
-
-            <Button
-              mode="contained"
-              onPress={addWeightLog}
-              style={styles.button}
-              disabled={addingLog || !currentWeight}
-              loading={addingLog}
+    <View style={styles.container}>
+      {/* Tab Bar */}
+      <View style={styles.tabBar}>
+        {tabs.map(tab => (
+          <TouchableOpacity
+            key={tab.key}
+            style={[
+              styles.tab,
+              activeTab === tab.key && styles.activeTab
+            ]}
+            onPress={() => setActiveTab(tab.key)}
+          >
+            <MaterialCommunityIcons
+              name={tab.icon}
+              size={24}
+              color={activeTab === tab.key ? theme.colors.primary : '#666'}
+            />
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === tab.key && styles.activeTabText
+              ]}
             >
-              Add Weight Log
-            </Button>
-          </Card.Content>
-        </Card>
-
-        {/* Weight Logs Section */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <Title style={styles.sectionTitle}>Weight History</Title>
-            {weightLogs.length === 0 ? (
-              <Text style={styles.emptyText}>No weight logs yet. Add your first log above.</Text>
-            ) : (
-              <FlatList
-                data={weightLogs}
-                renderItem={renderWeightLogItem}
-                keyExtractor={(item) => item.id?.toString() || item.log_date}
-                scrollEnabled={false}
-                ItemSeparatorComponent={() => <Divider style={styles.divider} />}
-              />
-            )}
-          </Card.Content>
-        </Card>
+              {tab.title}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
+
+      <ScrollView style={styles.scrollView}>
+        {renderTabContent()}
+      </ScrollView>
+
+      {/* Loading Overlay */}
+      {loading && <LoadingOverlay visible={loading} message="Loading weight data..." />}
 
       {/* Delete Confirmation Dialog */}
       <Portal>
-        <Dialog visible={showDeleteDialog} onDismiss={() => setShowDeleteDialog(false)}>
+        <Dialog
+          visible={showDeleteDialog}
+          onDismiss={() => setShowDeleteDialog(false)}
+        >
           <Dialog.Title>Delete Weight Log</Dialog.Title>
           <Dialog.Content>
             <Paragraph>
@@ -573,13 +854,11 @@ const WeightGoalsScreen: React.FC = () => {
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setShowDeleteDialog(false)}>Cancel</Button>
-            <Button onPress={deleteWeightLog}>Delete</Button>
+            <Button onPress={deleteWeightLog} textColor={theme.colors.error}>Delete</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
-
-      {renderLoadingOverlays()}
-    </ScrollView>
+    </View>
   );
 };
 
@@ -587,19 +866,54 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
+  scrollView: {
+    flex: 1,
+  },
+  tabContent: {
     padding: 16,
   },
-  card: {
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTab: {
+    borderBottomColor: '#2196F3',
+  },
+  tabText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#666',
+  },
+  activeTabText: {
+    color: '#2196F3',
+    fontWeight: 'bold',
+  },
+  goalCard: {
+    marginVertical: 8,
+    elevation: 2,
+    position: 'relative',
+    zIndex: 1,
+    backgroundColor: '#fff',
+  },
+  logCard: {
     marginBottom: 16,
+    elevation: 2,
   },
-  title: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  description: {
-    opacity: 0.7,
-    marginBottom: 8,
+  historyCard: {
+    marginBottom: 16,
+    elevation: 2,
   },
   sectionTitle: {
     fontSize: 18,
@@ -631,17 +945,18 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     width: 30,
   },
-  dateInput: {
-    flex: 1,
-    height: 40,
+  dateButton: {
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 4,
-    paddingHorizontal: 8,
-    justifyContent: 'center',
+    padding: 12,
+    marginBottom: 8,
   },
   button: {
     marginTop: 8,
+  },
+  cancelButton: {
+    marginLeft: 8,
   },
   loadingContainer: {
     flex: 1,
@@ -649,10 +964,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
   },
+  progressContainer: {
+    marginVertical: 16,
+    position: 'relative',
+    zIndex: 1,
+  },
   progressBar: {
-    height: 10,
-    borderRadius: 5,
-    marginBottom: 8,
+    height: 8,
+    borderRadius: 4,
+    position: 'relative',
+    zIndex: 1,
   },
   deleteButton: {
     margin: 0,
@@ -696,9 +1017,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 16,
-  },
-  cancelButton: {
-    marginLeft: 8,
   },
   emptyText: {
     fontStyle: 'italic',
@@ -771,6 +1089,77 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 999,
+  },
+  weightValues: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  weightValue: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  weightLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  weightNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  weightUnit: {
+    fontSize: 12,
+    color: '#666',
+  },
+  goalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  goalDetailsContainer: {
+    marginBottom: 16,
+    alignItems: 'flex-end',
+  },
+  goalText: {
+    fontSize: 14,
+    marginBottom: 4,
+    textAlign: 'right',
+  },
+  progressDetails: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'right',
+  },
+  logList: {
+    marginTop: 8,
+  },
+  cardStyle: {
+    marginBottom: 16,
+    elevation: 2,
+  },
+  goalSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    position: 'relative',
+    zIndex: 2,
+  },
+  goalSummaryTextLeft: {
+    fontSize: 14,
+    flex: 1,
+    textAlign: 'left',
+  },
+  goalSummaryTextCenter: {
+    fontSize: 14,
+    flex: 1,
+    textAlign: 'center',
+  },
+  goalSummaryTextRight: {
+    fontSize: 14,
+    flex: 1,
+    textAlign: 'right',
   },
 });
 

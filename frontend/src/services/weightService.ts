@@ -24,18 +24,25 @@ export interface WeightGoal {
   updated_at?: string;
 }
 
+// Helper function to format date as YYYY-MM-DD
+const formatDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // Weight service
 export const weightService = {
   // Weight Goals
   // -----------
 
   // Get weight goal
-  getWeightGoal: async (): Promise<WeightGoal | null> => {
+  async getWeightGoal(): Promise<WeightGoal | null> {
     try {
-      const response = await apiService.get<{ goal: WeightGoal }>('/weight/goal');
-      return response.goal;
+      const response = await apiService.get<WeightGoal>('/weight/goal');
+      return response;
     } catch (error) {
-      console.error('Error fetching weight goal:', error);
       return null;
     }
   },
@@ -63,13 +70,21 @@ export const weightService = {
     try {
       const response = await apiService.get<{ logs: any[] }>('/weight/logs');
 
+      // Check if logs exist
+      if (!response.logs || response.logs.length === 0) {
+        console.log('No weight logs found in API response');
+        return [];
+      }
+
+      console.log('Raw weight logs from API:', JSON.stringify(response.logs[0]));
+
       // Transform the response to match our interface
       const transformedLogs: WeightLog[] = response.logs.map(log => ({
         id: log.id,
-        weight_value: log.weight || 0,
-        log_date: log.date || '',
+        weight_value: parseFloat(log.weight || log.weight_value || 0),
+        log_date: log.date || log.log_date || '',
         notes: log.notes,
-        sync_id: log.sync_id,
+        sync_id: log.sync_id || uuid.v4(),
         created_at: log.created_at,
         updated_at: log.updated_at
       }));
@@ -81,20 +96,59 @@ export const weightService = {
     }
   },
 
+  // Get weight logs for a date range
+  getWeightLogsForDateRange: async (startDate: Date, endDate: Date): Promise<WeightLog[]> => {
+    try {
+      const formattedStartDate = formatDate(startDate);
+      const formattedEndDate = formatDate(endDate);
+
+      const response = await apiService.get<{ logs: any[] }>(`/weight/logs/range?start_date=${formattedStartDate}&end_date=${formattedEndDate}`);
+
+      // Check if logs exist
+      if (!response.logs || response.logs.length === 0) {
+        console.log('No weight logs found in date range API response');
+        return [];
+      }
+
+      console.log('Raw weight logs from date range API:', JSON.stringify(response.logs[0]));
+
+      // Transform the response to match our interface
+      const transformedLogs: WeightLog[] = response.logs.map(log => ({
+        id: log.id,
+        weight_value: parseFloat(log.weight || log.weight_value || 0),
+        log_date: log.date || log.log_date || '',
+        notes: log.notes,
+        sync_id: log.sync_id || uuid.v4(),
+        created_at: log.created_at,
+        updated_at: log.updated_at
+      }));
+
+      return transformedLogs.sort((a, b) => new Date(a.log_date).getTime() - new Date(b.log_date).getTime());
+    } catch (error) {
+      console.error('Error fetching weight logs for date range:', error);
+      return [];
+    }
+  },
+
   // Get latest weight log
   getLatestWeightLog: async (): Promise<WeightLog | null> => {
     try {
       const response = await apiService.get<{ log: any }>('/weight/logs/latest');
 
-      if (!response.log) return null;
+      if (!response.log) {
+        console.log('No latest weight log found in API response');
+        return null;
+      }
+
+      console.log('Raw latest weight log from API:', JSON.stringify(response.log));
 
       // Transform the response to match our interface
       const transformedLog: WeightLog = {
         id: response.log.id,
-        weight_value: response.log.weight || 0,
-        log_date: response.log.date || '',
+        weight_value: parseFloat(response.log.weight || response.log.weight_value || 0),
+        log_date: response.log.date || response.log.log_date || '',
         notes: response.log.notes,
-        sync_id: response.log.sync_id,
+        sync_id: response.log.sync_id || uuid.v4(),
         created_at: response.log.created_at,
         updated_at: response.log.updated_at
       };
@@ -121,10 +175,10 @@ export const weightService = {
       // Transform the response back to our interface format
       const transformedLog: WeightLog = {
         id: response.log.id,
-        weight_value: response.log.weight || 0,
-        log_date: response.log.date || '',
+        weight_value: parseFloat(response.log.weight || response.log.weight_value || 0),
+        log_date: response.log.date || response.log.log_date || '',
         notes: response.log.notes,
-        sync_id: response.log.sync_id,
+        sync_id: response.log.sync_id || syncId,
         created_at: response.log.created_at,
         updated_at: response.log.updated_at
       };

@@ -10,6 +10,7 @@ const {
   getRecentByMealType,
 } = require('../controllers/logController');
 const { authenticate } = require('../middleware/auth');
+const db = require('../config/db');
 
 const router = express.Router();
 
@@ -43,6 +44,34 @@ router.get('/daily-summary', getDailySummary);
  * @access Private
  */
 router.get('/recent/:mealType', getRecentByMealType);
+
+/**
+ * @route GET /api/logs/recent
+ * @desc Get recent food items
+ * @access Private
+ */
+router.get('/recent', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const limit = parseInt(req.query.limit) || 5;
+
+    // Get recent logs with food name
+    const logs = await db.query(
+      `SELECT l.*, f.name as food_name
+       FROM food_logs l
+       LEFT JOIN food_items f ON l.food_item_id = f.id
+       WHERE l.user_id = $1
+       ORDER BY l.created_at DESC
+       LIMIT $2`,
+      [userId, limit]
+    );
+
+    res.json(logs.rows);
+  } catch (error) {
+    console.error('Error getting recent logs:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 /**
  * @route POST /api/logs
