@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Card, Title, Text, ProgressBar, useTheme } from 'react-native-paper';
 import { Goal } from '../../types/Goal';
+import { formatCalories, formatGrams } from '../../utils/formatters';
 
 interface NutritionSummaryProps {
   nutritionSummary: {
@@ -17,13 +18,10 @@ const NutritionSummaryCard: React.FC<NutritionSummaryProps> = ({ nutritionSummar
   const theme = useTheme();
 
   // Calculate percentages of goals
-  const caloriePercentage = goals ? Math.min(nutritionSummary.calories / goals.calories, 1) : 0;
-  const proteinPercentage = goals ? Math.min(nutritionSummary.protein / goals.protein, 1) : 0;
-  const carbsPercentage = goals ? Math.min(nutritionSummary.carbs / goals.carbs, 1) : 0;
-  const fatPercentage = goals ? Math.min(nutritionSummary.fat / goals.fat, 1) : 0;
-
-  // Format numbers to 1 decimal place
-  const formatNumber = (num: number) => Math.round(num * 10) / 10;
+  const caloriePercentage = goals ? Math.min(nutritionSummary.calories / goals.daily_calorie_target, 1) : 0;
+  const proteinPercentage = goals?.protein_target_grams ? Math.min(nutritionSummary.protein / goals.protein_target_grams, 1) : 0;
+  const carbsPercentage = goals?.carbs_target_grams ? Math.min(nutritionSummary.carbs / goals.carbs_target_grams, 1) : 0;
+  const fatPercentage = goals?.fat_target_grams ? Math.min(nutritionSummary.fat / goals.fat_target_grams, 1) : 0;
 
   return (
     <Card style={styles.card}>
@@ -40,10 +38,10 @@ const NutritionSummaryCard: React.FC<NutritionSummaryProps> = ({ nutritionSummar
             />
             <View style={styles.valueContainer}>
               <Text style={styles.value}>
-                {formatNumber(nutritionSummary.calories)}
+                {formatCalories(nutritionSummary.calories)}
               </Text>
               <Text style={styles.goalValue}>
-                / {goals ? formatNumber(goals.calories) : '—'} kcal
+                / {goals ? formatCalories(goals.daily_calorie_target) : '—'}
               </Text>
             </View>
           </View>
@@ -59,10 +57,10 @@ const NutritionSummaryCard: React.FC<NutritionSummaryProps> = ({ nutritionSummar
             />
             <View style={styles.valueContainer}>
               <Text style={styles.value}>
-                {formatNumber(nutritionSummary.protein)}
+                {formatGrams(nutritionSummary.protein)}
               </Text>
               <Text style={styles.goalValue}>
-                / {goals ? formatNumber(goals.protein) : '—'} g
+                / {goals?.protein_target_grams ? formatGrams(goals.protein_target_grams) : '—'}
               </Text>
             </View>
           </View>
@@ -78,10 +76,10 @@ const NutritionSummaryCard: React.FC<NutritionSummaryProps> = ({ nutritionSummar
             />
             <View style={styles.valueContainer}>
               <Text style={styles.value}>
-                {formatNumber(nutritionSummary.carbs)}
+                {formatGrams(nutritionSummary.carbs)}
               </Text>
               <Text style={styles.goalValue}>
-                / {goals ? formatNumber(goals.carbs) : '—'} g
+                / {goals?.carbs_target_grams ? formatGrams(goals.carbs_target_grams) : '—'}
               </Text>
             </View>
           </View>
@@ -97,10 +95,10 @@ const NutritionSummaryCard: React.FC<NutritionSummaryProps> = ({ nutritionSummar
             />
             <View style={styles.valueContainer}>
               <Text style={styles.value}>
-                {formatNumber(nutritionSummary.fat)}
+                {formatGrams(nutritionSummary.fat)}
               </Text>
               <Text style={styles.goalValue}>
-                / {goals ? formatNumber(goals.fat) : '—'} g
+                / {goals?.fat_target_grams ? formatGrams(goals.fat_target_grams) : '—'}
               </Text>
             </View>
           </View>

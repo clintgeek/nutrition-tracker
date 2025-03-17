@@ -51,7 +51,7 @@ class LogService {
         }
 
         // Calculate total calories
-        const totalCalories = servings * caloriesPerServing;
+        const totalCalories = Math.round(servings * caloriesPerServing);
 
         return {
           id: log.id,
@@ -61,7 +61,7 @@ class LogService {
           serving_size: servings,
           servings: servings,
           calories: totalCalories,
-          calories_per_serving: caloriesPerServing,
+          calories_per_serving: Math.round(caloriesPerServing),
           total_calories: totalCalories,
           protein: 0, // We don't have this data
           carbs: 0,   // We don't have this data

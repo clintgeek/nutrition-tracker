@@ -23,8 +23,8 @@ interface AuthContextData {
   clearError: () => void;
 }
 
-// Create the auth context with a default value
-const AuthContext = createContext<AuthContextData>({
+// Default context value
+const defaultContextValue: AuthContextData = {
   user: null,
   token: null,
   loading: true,
@@ -35,7 +35,10 @@ const AuthContext = createContext<AuthContextData>({
   updateProfile: async () => {},
   updatePassword: async () => {},
   clearError: () => {},
-});
+};
+
+// Create the auth context with a default value
+const AuthContext = createContext<AuthContextData>(defaultContextValue);
 
 // Storage keys
 const TOKEN_KEY = '@NutritionTracker:token';
@@ -52,19 +55,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const loadStoredData = async () => {
       try {
+        // Get token and user data from storage
         const storedToken = await AsyncStorage.getItem(TOKEN_KEY);
         const storedUser = await AsyncStorage.getItem(USER_KEY);
 
         if (storedToken && storedUser) {
-          setToken(storedToken);
-          setUser(JSON.parse(storedUser));
+          try {
+            // Parse user data
+            const parsedUser = JSON.parse(storedUser);
 
-          // Set the token in the auth service
-          authService.setToken(storedToken);
+            // Set state and auth service token
+            setToken(storedToken);
+            setUser(parsedUser);
+            authService.setToken(storedToken);
+          } catch (error) {
+            console.error('Failed to parse user data');
+            AsyncStorage.removeItem(TOKEN_KEY);
+            AsyncStorage.removeItem(USER_KEY);
+          }
         }
       } catch (error) {
-        // Minimal error logging
-        console.error('Auth storage error');
+        console.error('Error loading auth data');
       } finally {
         setLoading(false);
       }
@@ -82,19 +93,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await authService.login(email, password);
       const { token, user } = response;
 
-      // Save to state
       setToken(token);
       setUser(user);
 
-      // Save to storage
       await AsyncStorage.setItem(TOKEN_KEY, token);
       await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
 
-      // Set the token in the auth service
       authService.setToken(token);
     } catch (error: any) {
       setError(error.message || 'Failed to login');
-      console.error('Login error:', error);
     } finally {
       setLoading(false);
     }
@@ -109,19 +116,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await authService.register(name, email, password);
       const { token, user } = response;
 
-      // Save to state
       setToken(token);
       setUser(user);
 
-      // Save to storage
       await AsyncStorage.setItem(TOKEN_KEY, token);
       await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
 
-      // Set the token in the auth service
       authService.setToken(token);
     } catch (error: any) {
       setError(error.message || 'Failed to register');
-      console.error('Register error:', error);
     } finally {
       setLoading(false);
     }
@@ -132,19 +135,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setLoading(true);
 
-      // Call the logout API endpoint
       await authService.logout();
 
-      // Clear from storage
       await AsyncStorage.removeItem(TOKEN_KEY);
       await AsyncStorage.removeItem(USER_KEY);
 
-      // Clear from state
       setToken(null);
       setUser(null);
     } catch (error) {
       console.error('Logout error:', error);
-      // Still clear local state and storage even if API call fails
       await AsyncStorage.removeItem(TOKEN_KEY);
       await AsyncStorage.removeItem(USER_KEY);
       setToken(null);
@@ -166,14 +165,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const updatedUser = await authService.updateProfile(name);
 
-      // Update state
       setUser(updatedUser);
-
-      // Update storage
       await AsyncStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
     } catch (error: any) {
       setError(error.message || 'Failed to update profile');
-      console.error('Update profile error:', error);
     } finally {
       setLoading(false);
     }
@@ -188,7 +183,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await authService.updatePassword(currentPassword, newPassword);
     } catch (error: any) {
       setError(error.message || 'Failed to update password');
-      console.error('Update password error:', error);
     } finally {
       setLoading(false);
     }
@@ -199,21 +193,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
   };
 
+  // Create context value
+  const contextValue: AuthContextData = {
+    user,
+    token,
+    loading,
+    error,
+    login,
+    register,
+    logout,
+    updateProfile,
+    updatePassword,
+    clearError,
+  };
+
+  if (loading) {
+    // Return a loading placeholder when loading
+    return (
+      <AuthContext.Provider value={contextValue}>
+        {null}
+      </AuthContext.Provider>
+    );
+  }
+
+  // Render children when loaded
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        loading,
-        error,
-        login,
-        register,
-        logout,
-        updateProfile,
-        updatePassword,
-        clearError,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

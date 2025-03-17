@@ -166,7 +166,7 @@ const TodaySummary: React.FC = () => {
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Today's Calories</Text>
                 <Text style={styles.sectionValue}>
-                  {summary.calories.consumed} / {summary.calories.goal} kcal
+                  {Math.round(summary.calories.consumed)} / {Math.round(summary.calories.goal)} kcal
                 </Text>
               </View>
               <ProgressBar

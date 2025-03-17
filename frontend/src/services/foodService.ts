@@ -88,7 +88,7 @@ const mapNutritionData = (food: any): {
   };
 
   // Handle calories (different possible field names)
-  nutrition.calories = parseNumericValue(
+  nutrition.calories = Math.round(parseNumericValue(
     food.calories ||
     food.calories_per_serving ||
     food.energy ||
@@ -97,7 +97,7 @@ const mapNutritionData = (food: any): {
     food.nutriments?.energy_kcal ||
     food.nutriments?.calories ||
     0
-  );
+  ));
 
   // Handle protein
   nutrition.protein = parseNumericValue(
