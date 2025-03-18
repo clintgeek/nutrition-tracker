@@ -10,8 +10,9 @@ import {
   useTheme,
 } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp, useRoute } from '@react-navigation/core';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useRoute } from '@react-navigation/core';
+import type { RouteProp } from '@react-navigation/core';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import debounce from 'lodash/debounce';
 
@@ -19,6 +20,9 @@ import { foodService, FoodItem } from '../../services/foodService';
 import { Food } from '../../types';
 import { RecipeStackParamList } from '../../types/navigation';
 import EmptyState from '../../components/common/EmptyState';
+
+type SearchFoodForRecipeScreenNavigationProp = NativeStackNavigationProp<RecipeStackParamList>;
+type SearchFoodForRecipeScreenRouteProp = RouteProp<RecipeStackParamList, 'SearchFoodForRecipe'>;
 
 const getSourceIcon = (source: string) => {
   switch (source?.toLowerCase()) {
@@ -65,8 +69,8 @@ const mapFoodItemToFood = (item: FoodItem): Food => ({
 
 export function SearchFoodForRecipeScreen() {
   const theme = useTheme();
-  const navigation = useNavigation<NativeStackNavigationProp<RecipeStackParamList>>();
-  const route = useRoute<RouteProp<RecipeStackParamList, 'SearchFoodForRecipe'>>();
+  const navigation = useNavigation<SearchFoodForRecipeScreenNavigationProp>();
+  const route = useRoute<SearchFoodForRecipeScreenRouteProp>();
 
   console.log('SearchFoodForRecipeScreen mounted');
   console.log('Route params:', route.params);

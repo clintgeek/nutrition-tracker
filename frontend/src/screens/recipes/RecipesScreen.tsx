@@ -13,8 +13,8 @@ import {
   Portal,
   Dialog,
 } from 'react-native-paper';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { Recipe } from '../../types';
@@ -29,6 +29,7 @@ type RecipesScreenNavigationProp = NativeStackNavigationProp<RecipeStackParamLis
 export function RecipesScreen() {
   const navigation = useNavigation<RecipesScreenNavigationProp>();
   const theme = useTheme();
+  const isFocused = useIsFocused();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,6 +44,9 @@ export function RecipesScreen() {
   useFocusEffect(
     useCallback(() => {
       loadRecipes();
+      return () => {
+        setFabOpen(false);
+      };
     }, [])
   );
 
@@ -201,7 +205,13 @@ export function RecipesScreen() {
         />
       </View>
 
-      {filteredRecipes.length > 0 ? (
+      {loading && !refreshing ? (
+        <View style={styles.loadingContainer}>
+          <SkeletonCard style={{ width: '100%', marginBottom: 12 }} />
+          <SkeletonCard style={{ width: '100%', marginBottom: 12 }} />
+          <SkeletonCard style={{ width: '100%', marginBottom: 12 }} />
+        </View>
+      ) : filteredRecipes.length > 0 ? (
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollViewContent}
@@ -235,7 +245,7 @@ export function RecipesScreen() {
             title="No Recipes Found"
             message={searchQuery ? "Try a different search term" : "Add your first recipe"}
             actionLabel="Create Recipe"
-            onAction={() => navigation.navigate('CreateRecipe')}
+            onAction={() => navigation.navigate('RecipeDetail', { recipeId: 'new' })}
           />
         </ScrollView>
       )}
@@ -261,6 +271,26 @@ export function RecipesScreen() {
       </Portal>
 
       <LoadingOverlay visible={isDeleting} message="Deleting recipe..." />
+
+      {isFocused && (
+        <Portal>
+          <FAB.Group
+            open={fabOpen}
+            visible={true}
+            icon={fabOpen ? 'close' : 'plus'}
+            actions={[
+              {
+                icon: 'plus',
+                label: 'New Recipe',
+                onPress: () => navigation.navigate('RecipeDetail', { recipeId: 'new' })
+              }
+            ]}
+            onStateChange={({ open }) => setFabOpen(open)}
+            style={styles.fab}
+            fabStyle={{ backgroundColor: theme.colors.primary }}
+          />
+        </Portal>
+      )}
     </View>
   );
 }
