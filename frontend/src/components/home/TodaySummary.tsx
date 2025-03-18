@@ -134,7 +134,7 @@ const TodaySummary: React.FC = () => {
   };
 
   const navigateToGoals = () => {
-    navigation.navigate('GoalsStack');
+    navigation.navigate('NutritionGoals');
   };
 
   return (

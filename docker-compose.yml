@@ -31,9 +31,31 @@ services:
       - USDA_API_KEY=${USDA_API_KEY:-}
       - PORT=3000
       - TZ=America/Chicago
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Redis service
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - ./redis/data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nutrition-network
 
   # Database service
   db:
@@ -55,3 +77,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - nutrition-network
+
+networks:
+  nutrition-network:
+    driver: bridge

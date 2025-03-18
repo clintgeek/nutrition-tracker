@@ -12,6 +12,7 @@ const {
   getRecentFoods,
 } = require('../controllers/foodController');
 const { authenticate } = require('../middleware/auth');
+const cacheMiddleware = require('../middleware/cacheMiddleware');
 
 const router = express.Router();
 
@@ -47,21 +48,21 @@ router.use(logRequests);
  * @desc Search food items
  * @access Public
  */
-router.get('/search', searchFood);
+router.get('/search', cacheMiddleware({ ttl: 3600, keyPrefix: 'food-search' }), searchFood);
 
 /**
  * @route GET /api/foods/debug-search
  * @desc Debug endpoint to check raw API results
  * @access Public
  */
-router.get('/debug-search', debugSearch);
+router.get('/debug-search', cacheMiddleware({ ttl: 3600, keyPrefix: 'food-debug-search' }), debugSearch);
 
 /**
  * @route GET /api/foods/barcode/:barcode
  * @desc Get food item by barcode
  * @access Public
  */
-router.get('/barcode/:barcode', getFoodByBarcode);
+router.get('/barcode/:barcode', cacheMiddleware({ ttl: 86400, keyPrefix: 'food-barcode' }), getFoodByBarcode);
 
 /**
  * @route GET /api/foods/recent
@@ -71,7 +72,7 @@ router.get('/barcode/:barcode', getFoodByBarcode);
 router.get('/recent', (req, res, next) => {
   logger.info('Recent foods route accessed');
   next();
-}, getRecentFoods);
+}, cacheMiddleware({ ttl: 300, keyPrefix: 'food-recent' }), getRecentFoods);
 
 // All routes below require authentication
 router.use(authenticate);
@@ -127,6 +128,6 @@ router.delete('/custom/:id', deleteCustomFood);
  * @desc Get custom food items
  * @access Private
  */
-router.get('/custom', getCustomFoods);
+router.get('/custom', cacheMiddleware({ ttl: 300, keyPrefix: 'food-custom' }), getCustomFoods);
 
 module.exports = router;

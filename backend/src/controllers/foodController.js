@@ -5,6 +5,23 @@ const nutritionixService = require('../utils/nutritionixService');
 const logger = require('../config/logger');
 const { asyncHandler } = require('../middleware/errorHandler');
 const db = require('../config/db');
+const redisService = require('../services/redisService');
+
+// Helper function to invalidate food-related caches
+const invalidateFoodCaches = async () => {
+  try {
+    await Promise.all([
+      redisService.del('food-search:*'),
+      redisService.del('food-debug-search:*'),
+      redisService.del('food-barcode:*'),
+      redisService.del('food-recent:*'),
+      redisService.del('food-custom:*')
+    ]);
+    logger.info('Food-related caches invalidated');
+  } catch (error) {
+    logger.error('Error invalidating food caches:', error);
+  }
+};
 
 /**
  * Debug endpoint to check raw API results
@@ -186,6 +203,9 @@ const createCustomFood = asyncHandler(async (req, res) => {
     user_id: req.user.id,
   });
 
+  // Invalidate caches after creating new food
+  await invalidateFoodCaches();
+
   res.status(201).json({
     message: 'Custom food item created',
     food: foodItem,
@@ -229,6 +249,9 @@ const updateCustomFood = asyncHandler(async (req, res) => {
           return res.status(404).json({ message: 'Food item not found or update failed' });
         }
 
+        // Invalidate caches after updating food
+        await invalidateFoodCaches();
+
         logger.debug(`Successfully soft deleted food item ${id}`);
         return res.json({ message: 'Food item updated successfully', food: updatedFood });
       } catch (updateError) {
@@ -253,6 +276,9 @@ const updateCustomFood = asyncHandler(async (req, res) => {
     if (!updatedFood) {
       return res.status(404).json({ message: 'Food item not found or update failed' });
     }
+
+    // Invalidate caches after updating food
+    await invalidateFoodCaches();
 
     logger.debug(`Successfully updated food item ${id}`);
     res.json({ message: 'Food item updated successfully', food: updatedFood });
@@ -327,6 +353,9 @@ const deleteCustomFood = asyncHandler(async (req, res) => {
         details: 'The database operation did not affect any rows'
       });
     }
+
+    // Invalidate caches after deleting food
+    await invalidateFoodCaches();
 
     logger.debug(`Successfully deleted food item ${id}`);
     res.json({
