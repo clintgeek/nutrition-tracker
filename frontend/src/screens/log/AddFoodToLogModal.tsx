@@ -41,15 +41,22 @@ const AddFoodToLogModal: React.FC = () => {
   const [isCustom, setIsCustom] = useState(false);
 
   // Calculate nutrition values based on servings
-  const calculateNutrition = (value: number) => {
+  const calculateNutrition = (value: number, isCalories: boolean = false) => {
     const servingsNum = parseFloat(servings) || 1;
-    return roundToNearestHalf(value * servingsNum);
+    // Use Math.round for calories, roundToNearestHalf for other nutrients
+    return isCalories ?
+      Math.round(value * servingsNum) :
+      roundToNearestHalf(value * servingsNum);
   };
 
   // Handle nutrition value changes
   const handleNutritionChange = (field: keyof Food, value: string) => {
     const numValue = parseFloat(value) || 0;
-    setFood(prev => ({ ...prev, [field]: roundToNearestHalf(numValue) }));
+    // Use Math.round for calories, roundToNearestHalf for other nutrients
+    const processedValue = field === 'calories' ?
+      Math.round(numValue) :
+      roundToNearestHalf(numValue);
+    setFood(prev => ({ ...prev, [field]: processedValue }));
     setIsCustom(true);
   };
 
@@ -146,7 +153,7 @@ const AddFoodToLogModal: React.FC = () => {
                 <View style={styles.nutritionItem}>
                   <Text style={styles.nutritionLabel}>Calories</Text>
                   <TextInput
-                    value={calculateNutrition(food.calories).toString()}
+                    value={calculateNutrition(food.calories, true).toString()}
                     onChangeText={(value) => handleNutritionChange('calories', value)}
                     keyboardType="numeric"
                     style={styles.nutritionInput}

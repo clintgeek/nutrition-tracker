@@ -81,7 +81,7 @@ async function createRecipe(userId, data) {
 
       // Calculate per-serving nutrition
       const perServing = {
-        calories: Math.round((nutritionTotals.calories / recipe.servings) * 100) / 100,
+        calories: Math.round(nutritionTotals.calories / recipe.servings),
         protein: Math.round((nutritionTotals.protein / recipe.servings) * 100) / 100,
         carbs: Math.round((nutritionTotals.carbs / recipe.servings) * 100) / 100,
         fat: Math.round((nutritionTotals.fat / recipe.servings) * 100) / 100
@@ -219,7 +219,7 @@ async function updateRecipe(recipeId, userId, data) {
 
       // Calculate per-serving nutrition
       const perServing = {
-        calories: Math.round((nutritionTotals.calories / recipe.servings) * 100) / 100,
+        calories: Math.round(nutritionTotals.calories / recipe.servings),
         protein: Math.round((nutritionTotals.protein / recipe.servings) * 100) / 100,
         carbs: Math.round((nutritionTotals.carbs / recipe.servings) * 100) / 100,
         fat: Math.round((nutritionTotals.fat / recipe.servings) * 100) / 100
@@ -352,7 +352,7 @@ async function convertToFoodItem(recipeId, userId) {
 
     // Calculate per-serving nutrition
     const perServing = {
-      calories: Math.round((nutritionTotals.calories / recipe.servings) * 100) / 100,
+      calories: Math.round(nutritionTotals.calories / recipe.servings),
       protein: Math.round((nutritionTotals.protein / recipe.servings) * 100) / 100,
       carbs: Math.round((nutritionTotals.carbs / recipe.servings) * 100) / 100,
       fat: Math.round((nutritionTotals.fat / recipe.servings) * 100) / 100

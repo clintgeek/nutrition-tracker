@@ -11,11 +11,13 @@ class Weight {
     try {
       const result = await db.query(
         `SELECT * FROM weight_goals
-         WHERE user_id = $1
+         WHERE user_id = $1 AND is_deleted = false
          ORDER BY created_at DESC
          LIMIT 1`,
         [userId]
       );
+
+      console.log("result: ", result.rows[0]);
 
       return result.rows[0] || null;
     } catch (error) {

@@ -19,8 +19,8 @@ interface SyncContextData {
   getDeviceId: () => Promise<string>;
 }
 
-// Create the sync context with a default value
-const SyncContext = createContext<SyncContextData>({
+// Default context value
+const defaultSyncContext: SyncContextData = {
   isOnline: true,
   isSyncing: false,
   lastSyncTime: null,
@@ -29,37 +29,47 @@ const SyncContext = createContext<SyncContextData>({
   syncNow: async () => {},
   clearSyncError: () => {},
   getDeviceId: async () => '',
-});
+};
+
+// Create the sync context with a default value
+const SyncContext = createContext<SyncContextData>(defaultSyncContext);
 
 // Storage keys
 const DEVICE_ID_KEY = '@NutritionTracker:deviceId';
 const LAST_SYNC_TIME_KEY = '@NutritionTracker:lastSyncTime';
 const LAST_SYNC_ERROR_TIME_KEY = '@NutritionTracker:lastSyncErrorTime';
 
-// Error cooldown period in milliseconds (5 minutes)
-const ERROR_COOLDOWN_PERIOD = 5 * 60 * 1000;
-
 // Sync provider component
 export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, token } = useAuth();
+  // Get auth context
+  const auth = useAuth();
+  const user = auth.user;
+  const token = auth.token;
+  const isAuthLoading = auth.loading;
+
+  // State
   const [isOnline, setIsOnline] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [pendingChanges, setPendingChanges] = useState(0);
   const [deviceId, setDeviceId] = useState<string | null>(null);
-  const [lastSyncErrorTime, setLastSyncErrorTime] = useState<number | null>(null);
+  const [isReady, setIsReady] = useState(false);
+
+  // Ref for tracking sync status
   const syncInProgressRef = useRef(false);
 
-  // Load device ID and last sync time from storage on app start
+  // Initialize
   useEffect(() => {
-    const loadStoredData = async () => {
+    // Skip if auth is still loading
+    if (isAuthLoading) return;
+
+    const initializeSync = async () => {
       try {
         // Load device ID
         let storedDeviceId = await AsyncStorage.getItem(DEVICE_ID_KEY);
 
         if (!storedDeviceId) {
-          // Generate a new device ID if not found
           storedDeviceId = uuid.v4() as string;
           await AsyncStorage.setItem(DEVICE_ID_KEY, storedDeviceId);
         }
@@ -72,41 +82,30 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setLastSyncTime(storedLastSyncTime);
         }
 
-        // Load last sync error time
-        const storedLastSyncErrorTime = await AsyncStorage.getItem(LAST_SYNC_ERROR_TIME_KEY);
-        if (storedLastSyncErrorTime) {
-          setLastSyncErrorTime(parseInt(storedLastSyncErrorTime, 10));
-        }
+        // Set up network monitoring
+        NetInfo.addEventListener(state => {
+          setIsOnline(state.isConnected ?? false);
+        });
+
+        // Mark as ready
+        setIsReady(true);
       } catch (error) {
-        console.error('Error loading sync data from storage:', error);
+        console.error('Error initializing sync:', error);
+        setIsReady(true); // Still mark as ready to avoid blocking the app
       }
     };
 
-    loadStoredData();
-  }, []);
+    initializeSync();
+  }, [isAuthLoading]);
 
-  // Monitor network connectivity
+  // Check for pending changes when user changes
   useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      setIsOnline(state.isConnected ?? false);
-    });
+    if (!isReady || !user) return;
 
-    return () => unsubscribe();
-  }, []);
-
-  // Monitor pending changes
-  useEffect(() => {
     const checkPendingChanges = async () => {
-      if (!user) return;
-
       try {
-        // Get pending food logs
         const pendingFoodLogs = await foodLogService.getPendingChanges();
-
-        // Get pending goals
         const pendingGoals = await goalService.getPendingChanges();
-
-        // Update pending changes count
         setPendingChanges(pendingFoodLogs.length + pendingGoals.length);
       } catch (error) {
         console.error('Error checking pending changes:', error);
@@ -115,50 +114,18 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     checkPendingChanges();
 
-    // Set up interval to check for pending changes
-    const interval = setInterval(checkPendingChanges, 60000); // Check every minute
-
+    const interval = setInterval(checkPendingChanges, 60000);
     return () => clearInterval(interval);
-  }, [user]);
-
-  // Auto-sync when online and there are pending changes
-  useEffect(() => {
-    // Check if we should sync
-    const shouldSync = () => {
-      // Don't sync if not online, no user, no pending changes, or already syncing
-      if (!isOnline || !user || pendingChanges === 0 || isSyncing || syncInProgressRef.current) {
-        return false;
-      }
-
-      // Don't sync if we had an error recently
-      if (lastSyncErrorTime) {
-        const now = Date.now();
-        const timeSinceLastError = now - lastSyncErrorTime;
-
-        if (timeSinceLastError < ERROR_COOLDOWN_PERIOD) {
-          console.log(`Skipping auto-sync due to recent error (${Math.round(timeSinceLastError / 1000)}s ago)`);
-          return false;
-        }
-      }
-
-      return true;
-    };
-
-    if (shouldSync()) {
-      syncNow();
-    }
-  }, [isOnline, pendingChanges, user, isSyncing, lastSyncErrorTime]);
+  }, [user, isReady]);
 
   // Get device ID function
   const getDeviceId = async (): Promise<string> => {
     if (deviceId) return deviceId;
 
     try {
-      // Try to load from storage
       let storedDeviceId = await AsyncStorage.getItem(DEVICE_ID_KEY);
 
       if (!storedDeviceId) {
-        // Generate a new device ID if not found
         storedDeviceId = uuid.v4() as string;
         await AsyncStorage.setItem(DEVICE_ID_KEY, storedDeviceId);
       }
@@ -167,31 +134,27 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return storedDeviceId;
     } catch (error) {
       console.error('Error getting device ID:', error);
-      // Fallback to a temporary device ID
       return uuid.v4() as string;
     }
   };
 
   // Sync now function
   const syncNow = async () => {
-    if (!user || !token || !deviceId || isSyncing || syncInProgressRef.current) return;
+    if (!user || !token || !deviceId || isSyncing || syncInProgressRef.current) {
+      return;
+    }
 
-    // Set sync in progress flag
     syncInProgressRef.current = true;
-
     try {
       setIsSyncing(true);
       setSyncError(null);
 
-      // Get pending food logs
+      // Get pending food logs and goals
       const pendingFoodLogs = await foodLogService.getPendingChanges();
-
-      // Get pending goals
       const pendingGoals = await goalService.getPendingChanges();
 
-      // If no pending changes, just update the last sync time
+      // If no pending changes, exit early
       if (pendingFoodLogs.length === 0 && pendingGoals.length === 0) {
-        console.log('No pending changes to sync');
         setIsSyncing(false);
         syncInProgressRef.current = false;
         return;
@@ -208,26 +171,22 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Process server changes
       if (result.server_changes) {
-        // Process food log changes
-        if (result.server_changes.food_logs && result.server_changes.food_logs.length > 0) {
+        if (result.server_changes.food_logs?.length > 0) {
           await foodLogService.processSyncedLogs(result.server_changes.food_logs);
         }
 
-        // Process goal changes
-        if (result.server_changes.goals && result.server_changes.goals.length > 0) {
+        if (result.server_changes.goals?.length > 0) {
           await goalService.processSyncedGoals(result.server_changes.goals);
         }
       }
 
       // Mark synced items as synced
       if (result.processed_changes) {
-        // Mark food logs as synced
         if (result.processed_changes.food_logs) {
           const { created, updated, deleted } = result.processed_changes.food_logs;
           await foodLogService.markAsSynced([...created, ...updated], deleted);
         }
 
-        // Mark goals as synced
         if (result.processed_changes.goals) {
           const { created, updated, deleted } = result.processed_changes.goals;
           await goalService.markAsSynced([...created, ...updated], deleted);
@@ -238,22 +197,15 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLastSyncTime(result.sync_timestamp);
       await AsyncStorage.setItem(LAST_SYNC_TIME_KEY, result.sync_timestamp);
 
-      // Clear last sync error time
-      setLastSyncErrorTime(null);
+      // Clear sync error state
+      setSyncError(null);
       await AsyncStorage.removeItem(LAST_SYNC_ERROR_TIME_KEY);
 
       // Update pending changes count
       setPendingChanges(0);
     } catch (error: any) {
       console.error('Sync error:', error);
-
-      // Set sync error
       setSyncError(error.message || 'Failed to synchronize data');
-
-      // Record the error time
-      const now = Date.now();
-      setLastSyncErrorTime(now);
-      await AsyncStorage.setItem(LAST_SYNC_ERROR_TIME_KEY, now.toString());
     } finally {
       setIsSyncing(false);
       syncInProgressRef.current = false;
@@ -263,23 +215,33 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Clear sync error function
   const clearSyncError = () => {
     setSyncError(null);
-    setLastSyncErrorTime(null);
     AsyncStorage.removeItem(LAST_SYNC_ERROR_TIME_KEY);
   };
 
+  // Create context value
+  const contextValue: SyncContextData = {
+    isOnline,
+    isSyncing,
+    lastSyncTime,
+    syncError,
+    pendingChanges,
+    syncNow,
+    clearSyncError,
+    getDeviceId,
+  };
+
+  // If auth is loading or this context isn't ready yet, render a placeholder
+  if (isAuthLoading || !isReady) {
+    return (
+      <SyncContext.Provider value={defaultSyncContext}>
+        {null}
+      </SyncContext.Provider>
+    );
+  }
+
+  // Render children when ready
   return (
-    <SyncContext.Provider
-      value={{
-        isOnline,
-        isSyncing,
-        lastSyncTime,
-        syncError,
-        pendingChanges,
-        syncNow,
-        clearSyncError,
-        getDeviceId,
-      }}
-    >
+    <SyncContext.Provider value={contextValue}>
       {children}
     </SyncContext.Provider>
   );

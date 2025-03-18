@@ -9,6 +9,9 @@
  * @returns Formatted string with specified decimal places
  */
 export const formatNumber = (value: number, decimals: number = 1): string => {
+  if (decimals === 0) {
+    return Math.round(value).toString();
+  }
   return value.toFixed(decimals);
 };
 
@@ -36,11 +39,10 @@ export const formatWithUnit = (value: number, unit: string, decimals: number = 1
 /**
  * Format a number as calories
  * @param value The number of calories
- * @param decimals Number of decimal places (default: 0)
  * @returns Formatted calorie string
  */
-export const formatCalories = (value: number, decimals: number = 0): string => {
-  return `${formatNumber(value, decimals)} cal`;
+export const formatCalories = (value: number): string => {
+  return `${formatNumber(value, 0)} cal`;
 };
 
 /**

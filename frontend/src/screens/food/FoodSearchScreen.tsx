@@ -618,8 +618,11 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
                   <View style={styles.nutritionRow}>
                     <Text style={styles.nutritionLabel}>Calories:</Text>
                     <RNTextInput
-                      value={selectedFood?.calories.toString()}
-                      onChangeText={(value) => setSelectedFood(prev => prev ? {...prev, calories: parseFloat(value) || 0} : null)}
+                      value={selectedFood ? Math.round(selectedFood.calories).toString() : '0'}
+                      onChangeText={(value) => {
+                        const numValue = parseFloat(value) || 0;
+                        setSelectedFood(prev => prev ? {...prev, calories: numValue} : null);
+                      }}
                       keyboardType="numeric"
                       style={styles.nutritionInput}
                       maxLength={6}

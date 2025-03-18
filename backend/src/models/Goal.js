@@ -25,9 +25,9 @@ class Goal {
 
       const result = await db.query(
         `INSERT INTO nutrition_goals
-         (user_id, daily_calorie_target, protein_target_grams, carbs_target_grams,
-          fat_target_grams, start_date, sync_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (user_id, calories, protein_grams, carbs_grams,
+          fat_grams, start_date)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
         [
           user_id,
@@ -36,7 +36,6 @@ class Goal {
           carbs_target_grams,
           fat_target_grams,
           start_date,
-          sync_id,
         ]
       );
 
@@ -44,12 +43,12 @@ class Goal {
       return {
         id: dbGoal.id,
         user_id: dbGoal.user_id,
-        daily_calorie_target: dbGoal.daily_calorie_target,
-        protein_target_grams: dbGoal.protein_target_grams,
-        carbs_target_grams: dbGoal.carbs_target_grams,
-        fat_target_grams: dbGoal.fat_target_grams,
+        daily_calorie_target: dbGoal.calories,
+        protein_target_grams: dbGoal.protein_grams,
+        carbs_target_grams: dbGoal.carbs_grams,
+        fat_target_grams: dbGoal.fat_grams,
         start_date: dbGoal.start_date,
-        sync_id: dbGoal.sync_id,
+        sync_id,
         is_deleted: dbGoal.is_deleted,
         created_at: dbGoal.created_at,
         updated_at: dbGoal.updated_at
@@ -79,12 +78,12 @@ class Goal {
       return {
         id: dbGoal.id,
         user_id: dbGoal.user_id,
-        daily_calorie_target: dbGoal.daily_calorie_target,
-        protein_target_grams: dbGoal.protein_target_grams,
-        carbs_target_grams: dbGoal.carbs_target_grams,
-        fat_target_grams: dbGoal.fat_target_grams,
+        daily_calorie_target: dbGoal.calories,
+        protein_target_grams: dbGoal.protein_grams,
+        carbs_target_grams: dbGoal.carbs_grams,
+        fat_target_grams: dbGoal.fat_grams,
         start_date: dbGoal.start_date,
-        sync_id: dbGoal.sync_id,
+        sync_id: uuidv4(),
         is_deleted: dbGoal.is_deleted,
         created_at: dbGoal.created_at,
         updated_at: dbGoal.updated_at
@@ -116,12 +115,12 @@ class Goal {
       return {
         id: dbGoal.id,
         user_id: dbGoal.user_id,
-        daily_calorie_target: dbGoal.daily_calorie_target,
-        protein_target_grams: dbGoal.protein_target_grams,
-        carbs_target_grams: dbGoal.carbs_target_grams,
-        fat_target_grams: dbGoal.fat_target_grams,
+        daily_calorie_target: dbGoal.calories,
+        protein_target_grams: dbGoal.protein_grams,
+        carbs_target_grams: dbGoal.carbs_grams,
+        fat_target_grams: dbGoal.fat_grams,
         start_date: dbGoal.start_date,
-        sync_id: dbGoal.sync_id,
+        sync_id: uuidv4(),
         is_deleted: dbGoal.is_deleted,
         created_at: dbGoal.created_at,
         updated_at: dbGoal.updated_at
@@ -155,12 +154,12 @@ class Goal {
       return {
         id: dbGoal.id,
         user_id: dbGoal.user_id,
-        daily_calorie_target: dbGoal.daily_calorie_target,
-        protein_target_grams: dbGoal.protein_target_grams,
-        carbs_target_grams: dbGoal.carbs_target_grams,
-        fat_target_grams: dbGoal.fat_target_grams,
+        daily_calorie_target: dbGoal.calories,
+        protein_target_grams: dbGoal.protein_grams,
+        carbs_target_grams: dbGoal.carbs_grams,
+        fat_target_grams: dbGoal.fat_grams,
         start_date: dbGoal.start_date,
-        sync_id: dbGoal.sync_id,
+        sync_id: uuidv4(),
         is_deleted: dbGoal.is_deleted,
         created_at: dbGoal.created_at,
         updated_at: dbGoal.updated_at
@@ -188,12 +187,12 @@ class Goal {
       return result.rows.map(dbGoal => ({
         id: dbGoal.id,
         user_id: dbGoal.user_id,
-        daily_calorie_target: dbGoal.daily_calorie_target,
-        protein_target_grams: dbGoal.protein_target_grams,
-        carbs_target_grams: dbGoal.carbs_target_grams,
-        fat_target_grams: dbGoal.fat_target_grams,
+        daily_calorie_target: dbGoal.calories,
+        protein_target_grams: dbGoal.protein_grams,
+        carbs_target_grams: dbGoal.carbs_grams,
+        fat_target_grams: dbGoal.fat_grams,
         start_date: dbGoal.start_date,
-        sync_id: dbGoal.sync_id,
+        sync_id: uuidv4(),
         is_deleted: dbGoal.is_deleted,
         created_at: dbGoal.created_at,
         updated_at: dbGoal.updated_at
@@ -219,14 +218,15 @@ class Goal {
         carbs_target_grams,
         fat_target_grams,
         start_date,
+        sync_id = uuidv4(),
       } = goalData;
 
       const result = await db.query(
         `UPDATE nutrition_goals
-         SET daily_calorie_target = $1,
-             protein_target_grams = $2,
-             carbs_target_grams = $3,
-             fat_target_grams = $4,
+         SET calories = $1,
+             protein_grams = $2,
+             carbs_grams = $3,
+             fat_grams = $4,
              start_date = $5,
              updated_at = NOW()
          WHERE id = $6 AND user_id = $7 AND is_deleted = false
@@ -248,12 +248,12 @@ class Goal {
       return {
         id: dbGoal.id,
         user_id: dbGoal.user_id,
-        daily_calorie_target: dbGoal.daily_calorie_target,
-        protein_target_grams: dbGoal.protein_target_grams,
-        carbs_target_grams: dbGoal.carbs_target_grams,
-        fat_target_grams: dbGoal.fat_target_grams,
+        daily_calorie_target: dbGoal.calories,
+        protein_target_grams: dbGoal.protein_grams,
+        carbs_target_grams: dbGoal.carbs_grams,
+        fat_target_grams: dbGoal.fat_grams,
         start_date: dbGoal.start_date,
-        sync_id: dbGoal.sync_id,
+        sync_id,
         is_deleted: dbGoal.is_deleted,
         created_at: dbGoal.created_at,
         updated_at: dbGoal.updated_at
@@ -305,12 +305,12 @@ class Goal {
       return result.rows.map(dbGoal => ({
         id: dbGoal.id,
         user_id: dbGoal.user_id,
-        daily_calorie_target: dbGoal.daily_calorie_target,
-        protein_target_grams: dbGoal.protein_target_grams,
-        carbs_target_grams: dbGoal.carbs_target_grams,
-        fat_target_grams: dbGoal.fat_target_grams,
+        daily_calorie_target: dbGoal.calories,
+        protein_target_grams: dbGoal.protein_grams,
+        carbs_target_grams: dbGoal.carbs_grams,
+        fat_target_grams: dbGoal.fat_grams,
         start_date: dbGoal.start_date,
-        sync_id: dbGoal.sync_id,
+        sync_id: uuidv4(),
         is_deleted: dbGoal.is_deleted,
         created_at: dbGoal.created_at,
         updated_at: dbGoal.updated_at
@@ -331,8 +331,8 @@ class Goal {
     try {
       const result = await db.query(
         `SELECT * FROM nutrition_goals
-         WHERE sync_id = $1 AND user_id = $2`,
-        [syncId, userId]
+         WHERE user_id = $1`,
+        [userId]
       );
 
       if (!result.rows[0]) return null;
@@ -341,12 +341,12 @@ class Goal {
       return {
         id: dbGoal.id,
         user_id: dbGoal.user_id,
-        daily_calorie_target: dbGoal.daily_calorie_target,
-        protein_target_grams: dbGoal.protein_target_grams,
-        carbs_target_grams: dbGoal.carbs_target_grams,
-        fat_target_grams: dbGoal.fat_target_grams,
+        daily_calorie_target: dbGoal.calories,
+        protein_target_grams: dbGoal.protein_grams,
+        carbs_target_grams: dbGoal.carbs_grams,
+        fat_target_grams: dbGoal.fat_grams,
         start_date: dbGoal.start_date,
-        sync_id: dbGoal.sync_id,
+        sync_id,
         is_deleted: dbGoal.is_deleted,
         created_at: dbGoal.created_at,
         updated_at: dbGoal.updated_at

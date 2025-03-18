@@ -87,7 +87,7 @@ class FoodApiService {
     return {
       name: apiData.name || apiData.product_name || apiData.food_name || '',
       barcode: apiData.barcode || apiData.code || apiData.upc || null,
-      calories: parseFloat(apiData.calories || apiData.energy_kcal || apiData.nutriments?.energy_kcal || 0),
+      calories: Math.round(parseFloat(apiData.calories || apiData.energy_kcal || apiData.nutriments?.energy_kcal || 0)),
       protein: parseFloat(apiData.protein || apiData.proteins || apiData.nutriments?.proteins_100g || 0),
       carbs: parseFloat(apiData.carbohydrates || apiData.nutriments?.carbohydrates_100g || 0),
       fat: parseFloat(apiData.fat || apiData.nutriments?.fat_100g || 0),

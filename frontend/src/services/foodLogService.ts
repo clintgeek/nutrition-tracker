@@ -89,7 +89,7 @@ export const foodLogService = {
 
       return logs.reduce(
         (summary, log) => {
-          const calories = (log.calories_per_serving || 0) * log.servings;
+          const calories = Math.round((log.calories_per_serving || 0) * log.servings);
           const protein = (log.protein_grams || 0) * log.servings;
           const carbs = (log.carbs_grams || 0) * log.servings;
           const fat = (log.fat_grams || 0) * log.servings;
