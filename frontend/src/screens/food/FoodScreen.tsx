@@ -15,7 +15,7 @@ import {
   Portal,
   Dialog,
 } from 'react-native-paper';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useRoute } from '@react-navigation/core';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -60,6 +60,7 @@ const FoodScreen: React.FC = () => {
   const theme = useTheme();
   const navigation = useNavigation();
   const route = useRoute();
+  const isFocused = useIsFocused();
   const { fromLog } = (route.params as RouteParams) || {};
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -76,26 +77,16 @@ const FoodScreen: React.FC = () => {
   // Fetch foods function
   const fetchFoods = useCallback(async (query: string = '', forceRefresh: boolean = false) => {
     try {
-      console.log('Fetching foods with query:', query, 'forceRefresh:', forceRefresh);
       setIsLoading(!forceRefresh);
       if (forceRefresh) setIsRefreshing(true);
 
       let results;
       if (query.trim()) {
-        // If there's a search query, use the search endpoint
-        console.log('Using search endpoint for query:', query);
         results = await foodService.searchFood(query);
       } else {
-        // If no search query, get custom foods
-        console.log('Fetching custom foods (no query)');
         const customFoods = await foodService.getCustomFoods();
-        console.log('Received custom foods:', customFoods);
         const sortedFoods = customFoods
-          .map(item => {
-            const mapped = mapFoodItemToFood(item);
-            console.log('Mapped food item:', { original: item, mapped });
-            return mapped;
-          })
+          .map(item => mapFoodItemToFood(item))
           .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 
         results = {
@@ -107,7 +98,6 @@ const FoodScreen: React.FC = () => {
       }
 
       const sortedResults = query.trim() ? results.foods : results.foods.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
-      console.log('Setting foods state with:', sortedResults);
       setFoods(sortedResults || []);
       setFilteredFoods(sortedResults || []);
     } catch (error) {
@@ -119,45 +109,16 @@ const FoodScreen: React.FC = () => {
     }
   }, []);
 
-  // Add mount logging
-  useEffect(() => {
-    console.log('\n========== FOOD SCREEN ==========');
-    console.log('MOUNT EVENT');
-    console.log('Initial route.params:', JSON.stringify(route.params, null, 2));
-    console.log('Initial navigation state:', JSON.stringify(navigation.getParent()?.getState(), null, 2));
-    console.log('================================\n');
-
-    // Cleanup logging
-    return () => {
-      console.log('\n🔴 FoodScreen Unmounting');
-      console.log('Final route.params:', JSON.stringify(route.params, null, 2));
-      console.log('Final navigation state:', JSON.stringify(navigation.getParent()?.getState(), null, 2));
-      console.log('================================\n');
-    };
-  }, []);
-
-  // Log navigation events
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('state', (e) => {
-      console.log('\n🔄 Food Screen Navigation State Change:', JSON.stringify(e.data, null, 2));
-    });
-
-    return unsubscribe;
-  }, [navigation]);
-
-  // Enhanced focus effect logging
+  // Handle scanned food and refresh params
   useEffect(() => {
     const params = route.params as { scannedFood?: Food; refresh?: boolean } | undefined;
-    console.log('Focus effect params:', params);
 
     if (params?.scannedFood) {
-      console.log('Showing scanned food:', params.scannedFood);
       setSelectedFood(params.scannedFood);
       setIsFoodDetailsVisible(true);
       navigation.setParams({ scannedFood: undefined });
     }
     if (params?.refresh) {
-      console.log('Refreshing food list due to route param');
       fetchFoods(searchQuery, true);
       navigation.setParams({ refresh: undefined });
     }
@@ -165,18 +126,15 @@ const FoodScreen: React.FC = () => {
 
   // Initial load
   useEffect(() => {
-    console.log('Initial food load');
     fetchFoods();
   }, [fetchFoods]);
 
-  // Add useFocusEffect to refresh the food list every time the screen comes into focus
+  // Refresh on focus
   useFocusEffect(
     useCallback(() => {
-      console.log('Food screen focused - refreshing food list');
       fetchFoods(searchQuery, true);
       return () => {
-        // Cleanup function when screen loses focus
-        console.log('Food screen lost focus');
+        setFabOpen(false);
       };
     }, [fetchFoods, searchQuery])
   );
@@ -184,7 +142,6 @@ const FoodScreen: React.FC = () => {
   // Create a memoized debounced search function
   const debouncedSearch = useMemo(
     () => debounce((query: string) => {
-      console.log('Debounced search triggered with query:', query);
       fetchFoods(query);
     }, 1000),
     [fetchFoods]
@@ -192,14 +149,12 @@ const FoodScreen: React.FC = () => {
 
   // Handle search query change
   const handleSearchQueryChange = (query: string) => {
-    console.log('Search query changed:', query);
     setSearchQuery(query);
     debouncedSearch(query);
   };
 
   // Handle refresh
   const handleRefresh = useCallback(() => {
-    console.log('Manual refresh triggered');
     fetchFoods(searchQuery, true);
   }, [fetchFoods, searchQuery]);
 
@@ -238,7 +193,6 @@ const FoodScreen: React.FC = () => {
 
       if (selectedFood.id && selectedFood.source === 'custom') {
         // Update existing custom food
-        console.log('Updating existing custom food:', selectedFood.id);
         const id = parseInt(selectedFood.id.toString());
         if (isNaN(id)) {
           throw new Error('Invalid food ID');
@@ -247,7 +201,6 @@ const FoodScreen: React.FC = () => {
         savedFoodId = id;
       } else {
         // Create new custom food
-        console.log('Creating new custom food');
         const result = await foodService.createCustomFood(foodData);
         if (!result || typeof result.id !== 'number') {
           throw new Error('Invalid response from createCustomFood');
@@ -530,33 +483,36 @@ const FoodScreen: React.FC = () => {
             </Button>
           </Dialog.Actions>
         </Dialog>
-      </Portal>
 
-      <FAB.Group
-        open={fabOpen}
-        visible={true}
-        icon={fabOpen ? 'close' : 'plus'}
-        actions={[
-          {
-            icon: 'food-apple',
-            label: 'Add Food',
-            onPress: () => {
-              setFabOpen(false);
-              navigation.navigate('AddFood');
-            },
-          },
-          {
-            icon: 'barcode',
-            label: 'Scan Barcode',
-            onPress: () => {
-              setFabOpen(false);
-              navigation.navigate('BarcodeScanner');
-            },
-          },
-        ]}
-        onStateChange={({ open }) => setFabOpen(open)}
-        style={styles.fab}
-      />
+        {/* Only render FAB.Group when screen is focused */}
+        {isFocused && (
+          <FAB.Group
+            open={fabOpen}
+            visible={true}
+            icon={fabOpen ? 'close' : 'plus'}
+            actions={[
+              {
+                icon: 'food-apple',
+                label: 'Add Food',
+                onPress: () => {
+                  setFabOpen(false);
+                  navigation.navigate('AddFood');
+                },
+              },
+              {
+                icon: 'barcode',
+                label: 'Scan Barcode',
+                onPress: () => {
+                  setFabOpen(false);
+                  navigation.navigate('BarcodeScanner');
+                },
+              },
+            ]}
+            onStateChange={({ open }) => setFabOpen(open)}
+            style={styles.fab}
+          />
+        )}
+      </Portal>
 
       {/* Add loading overlay for delete operation */}
       <LoadingOverlay visible={Object.values(isDeleting).some(Boolean)} message="Deleting food..." />

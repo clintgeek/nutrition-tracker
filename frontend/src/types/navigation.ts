@@ -53,8 +53,8 @@ export type GoalsStackParamList = {
 // Recipe Stack Types
 export type RecipeStackParamList = {
   Recipes: undefined;
-  RecipeDetail: { recipeId: number | 'new'; selectedIngredient?: Food };
-  SearchFoodForRecipe: { recipeId: number | 'new' };
+  RecipeDetail: { recipeId: string | number | 'new'; selectedIngredient?: Food };
+  SearchFoodForRecipe: { recipeId: string | number | 'new' };
 };
 
 // Combined Root Stack Type

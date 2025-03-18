@@ -40,8 +40,8 @@ export const weightService = {
   // Get weight goal
   async getWeightGoal(): Promise<WeightGoal | null> {
     try {
-      const response = await apiService.get<WeightGoal>('/weight/goal');
-      return response;
+      const response = await apiService.get<{ goal: WeightGoal }>('/weight/goal');
+      return response.goal;
     } catch (error) {
       return null;
     }
@@ -164,10 +164,10 @@ export const weightService = {
   addWeightLog: async (logData: Omit<WeightLog, 'id' | 'sync_id' | 'created_at' | 'updated_at'>): Promise<WeightLog> => {
     const syncId = uuid.v4() as string;
     try {
-      // Map the field names to what the backend expects
+      // Send data with the correct field names
       const response = await apiService.post<{ message: string; log: any }>('/weight/logs', {
-        weight: logData.weight_value,
-        date: logData.log_date,
+        weight_value: logData.weight_value,
+        log_date: logData.log_date,
         notes: logData.notes,
         sync_id: syncId,
       });
@@ -175,8 +175,8 @@ export const weightService = {
       // Transform the response back to our interface format
       const transformedLog: WeightLog = {
         id: response.log.id,
-        weight_value: parseFloat(response.log.weight || response.log.weight_value || 0),
-        log_date: response.log.date || response.log.log_date || '',
+        weight_value: parseFloat(response.log.weight_value || 0),
+        log_date: response.log.log_date || '',
         notes: response.log.notes,
         sync_id: response.log.sync_id || syncId,
         created_at: response.log.created_at,

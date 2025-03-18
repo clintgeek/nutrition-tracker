@@ -61,6 +61,12 @@ export const setAuthToken = (token: string | null): void => {
 // Request interceptor for adding auth token
 api.interceptors.request.use(
   (config: any): any => {
+    console.log('[ApiService] Making request:', {
+      method: config.method,
+      url: config.url,
+      headers: config.headers,
+      hasAuthToken: !!authToken
+    });
     if (authToken) {
       config.headers = {
         ...config.headers,
@@ -70,20 +76,34 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    console.error('[ApiService] Request error:', error);
     return Promise.reject(error);
   }
 );
 
 // Response interceptor for handling errors
 api.interceptors.response.use(
-  (response: AxiosResponse): AxiosResponse => response,
+  (response: AxiosResponse): AxiosResponse => {
+    console.log('[ApiService] Received response:', {
+      status: response.status,
+      url: response.config.url,
+      dataLength: Array.isArray(response.data) ? response.data.length : 'N/A',
+      data: response.data
+    });
+    return response;
+  },
   (error) => {
     // Log the error for debugging
-    console.error('API Error:', error);
+    console.error('[ApiService] Response error:', {
+      status: error.response?.status,
+      url: error.config?.url,
+      message: error.message,
+      response: error.response?.data
+    });
 
     // Handle network errors
     if (!error.response) {
-      console.error('Network error:', error.message);
+      console.error('[ApiService] Network error:', error.message);
       return Promise.reject(new Error('Network error. Please check your connection.'));
     }
 

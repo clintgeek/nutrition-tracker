@@ -62,46 +62,57 @@ const TodaySummary: React.FC = () => {
       }
 
       // First fetch goals to establish baseline
-      const currentGoal = await goalService.getCurrentGoal();
+      try {
+        const currentGoal = await goalService.getCurrentGoal();
 
-      // If no goal exists, that's a valid state, not an error
-      if (!currentGoal) {
-        setHasGoals(false);
-        setIsLoading(false);
-        return;
+        // If no goal exists, that's a valid state, not an error
+        if (!currentGoal) {
+          setHasGoals(false);
+          setIsLoading(false);
+          return;
+        }
+
+        const hasValidGoals = !!(currentGoal?.daily_calorie_target && currentGoal.daily_calorie_target > 0);
+        setHasGoals(hasValidGoals);
+
+        // Fetch today's summary
+        const today = new Date();
+        const todaySummary = await summaryService.getDailySummary(today);
+
+        // Update the summary state with the fetched data
+        setSummary({
+          calories: {
+            consumed: todaySummary.total_calories || 0,
+            goal: currentGoal.daily_calorie_target || 0,
+          },
+          macros: {
+            protein: {
+              consumed: todaySummary.total_protein || 0,
+              goal: currentGoal.protein_target_grams || 0,
+              isSet: !!(currentGoal.protein_target_grams && currentGoal.protein_target_grams > 0)
+            },
+            carbs: {
+              consumed: todaySummary.total_carbs || 0,
+              goal: currentGoal.carbs_target_grams || 0,
+              isSet: !!(currentGoal.carbs_target_grams && currentGoal.carbs_target_grams > 0)
+            },
+            fat: {
+              consumed: todaySummary.total_fat || 0,
+              goal: currentGoal.fat_target_grams || 0,
+              isSet: !!(currentGoal.fat_target_grams && currentGoal.fat_target_grams > 0)
+            },
+          },
+        });
+      } catch (error: any) {
+        // If the error is "No current goal found", that's a valid state
+        if (error.response?.data?.message === 'No current goal found') {
+          setHasGoals(false);
+          setIsLoading(false);
+          return;
+        }
+        // Otherwise, it's a real error
+        throw error;
       }
-
-      const hasValidGoals = !!(currentGoal?.daily_calorie_target && currentGoal.daily_calorie_target > 0);
-      setHasGoals(hasValidGoals);
-
-      // Fetch today's summary
-      const today = new Date();
-      const todaySummary = await summaryService.getDailySummary(today);
-
-      // Update the summary state with the fetched data
-      setSummary({
-        calories: {
-          consumed: todaySummary.total_calories || 0,
-          goal: currentGoal.daily_calorie_target || 0,
-        },
-        macros: {
-          protein: {
-            consumed: todaySummary.total_protein || 0,
-            goal: currentGoal.protein_target_grams || 0,
-            isSet: !!(currentGoal.protein_target_grams && currentGoal.protein_target_grams > 0)
-          },
-          carbs: {
-            consumed: todaySummary.total_carbs || 0,
-            goal: currentGoal.carbs_target_grams || 0,
-            isSet: !!(currentGoal.carbs_target_grams && currentGoal.carbs_target_grams > 0)
-          },
-          fat: {
-            consumed: todaySummary.total_fat || 0,
-            goal: currentGoal.fat_target_grams || 0,
-            isSet: !!(currentGoal.fat_target_grams && currentGoal.fat_target_grams > 0)
-          },
-        },
-      });
     } catch (error) {
       console.error('Error loading summary data:', error);
       setError('Failed to load summary data. Please try again.');

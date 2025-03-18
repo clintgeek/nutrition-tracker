@@ -32,16 +32,35 @@ const WebDatePicker = ({ value, onChange, minimumDate, maximumDate }: any) => {
   const handleChange = (e: any) => {
     if (e.target.value) {
       const newDate = new Date(e.target.value);
-      onChange({ type: 'set', nativeEvent: { timestamp: newDate.getTime() } }, newDate);
+      if (!isNaN(newDate.getTime())) {
+        onChange({ type: 'set', nativeEvent: { timestamp: newDate.getTime() } }, newDate);
+      }
     }
   };
 
-  // Format date for input value
-  const dateValue = value ? format(value, 'yyyy-MM-dd') : '';
+  // Format date for input value with validation
+  let dateValue = '';
+  try {
+    if (value && !isNaN(new Date(value).getTime())) {
+      dateValue = format(new Date(value), 'yyyy-MM-dd');
+    }
+  } catch (error) {
+    console.error('Error formatting date:', error);
+  }
 
   // Format min/max dates if provided
-  const minDate = minimumDate ? format(minimumDate, 'yyyy-MM-dd') : undefined;
-  const maxDate = maximumDate ? format(maximumDate, 'yyyy-MM-dd') : undefined;
+  let minDate = '';
+  let maxDate = '';
+  try {
+    if (minimumDate && !isNaN(new Date(minimumDate).getTime())) {
+      minDate = format(new Date(minimumDate), 'yyyy-MM-dd');
+    }
+    if (maximumDate && !isNaN(new Date(maximumDate).getTime())) {
+      maxDate = format(new Date(maximumDate), 'yyyy-MM-dd');
+    }
+  } catch (error) {
+    console.error('Error formatting min/max dates:', error);
+  }
 
   return (
     <input
@@ -121,16 +140,59 @@ const WeightGoalsScreen: React.FC = () => {
       const goal = await weightService.getWeightGoal();
       if (goal) {
         setWeightGoal(goal);
-        setTargetWeight(goal.target_weight?.toString() || '');
-        setStartWeight(goal.start_weight?.toString() || '');
-        setStartDate(new Date(goal.start_date));
-        if (goal.target_date) {
-          setTargetDate(new Date(goal.target_date));
+
+        // Validate and set target weight
+        const targetWeightValue = goal.target_weight?.toString() || '';
+        setTargetWeight(targetWeightValue);
+
+        // Validate and set start weight
+        const startWeightValue = goal.start_weight?.toString() || '';
+        setStartWeight(startWeightValue);
+
+        // Validate and set start date
+        try {
+          if (goal.start_date) {
+            const startDateObj = new Date(goal.start_date);
+            if (!isNaN(startDateObj.getTime())) {
+              setStartDate(startDateObj);
+            } else {
+              console.error('Invalid start date:', goal.start_date);
+              setStartDate(new Date());
+            }
+          } else {
+            setStartDate(new Date());
+          }
+        } catch (error) {
+          console.error('Error parsing start date:', error);
+          setStartDate(new Date());
         }
-        // Hide goal form when a goal exists
+
+        // Validate and set target date
+        try {
+          if (goal.target_date) {
+            const targetDateObj = new Date(goal.target_date);
+            if (!isNaN(targetDateObj.getTime())) {
+              setTargetDate(targetDateObj);
+            } else {
+              console.error('Invalid target date:', goal.target_date);
+              const threeMonthsFromNow = new Date();
+              threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
+              setTargetDate(threeMonthsFromNow);
+            }
+          } else {
+            const threeMonthsFromNow = new Date();
+            threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
+            setTargetDate(threeMonthsFromNow);
+          }
+        } catch (error) {
+          console.error('Error parsing target date:', error);
+          const threeMonthsFromNow = new Date();
+          threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
+          setTargetDate(threeMonthsFromNow);
+        }
+
         setShowGoalForm(false);
       } else {
-        // Show goal form when no goal exists
         setShowGoalForm(true);
       }
 
@@ -140,7 +202,7 @@ const WeightGoalsScreen: React.FC = () => {
 
       // Set current weight from most recent log if available
       if (logs.length > 0 && logs[0]?.weight_value) {
-        const latestLog = logs[0]; // Logs are sorted newest first
+        const latestLog = logs[0];
         setCurrentWeight(latestLog.weight_value.toString());
 
         // If no start weight is set yet, use the latest log weight
@@ -184,26 +246,46 @@ const WeightGoalsScreen: React.FC = () => {
     try {
       setSaving(true);
 
-      if (!targetWeight || parseFloat(targetWeight) <= 0) {
-        Alert.alert('Error', 'Please enter a valid target weight.');
+      // Validate target weight
+      const targetWeightNum = parseFloat(targetWeight);
+      if (isNaN(targetWeightNum) || targetWeightNum <= 0 || targetWeightNum > 1000) {
+        Alert.alert('Error', 'Please enter a valid target weight between 0 and 1000 lbs.');
         return;
       }
 
-      if (!startWeight || parseFloat(startWeight) <= 0) {
-        Alert.alert('Error', 'Please enter a valid starting weight.');
+      // Validate start weight
+      const startWeightNum = parseFloat(startWeight);
+      if (isNaN(startWeightNum) || startWeightNum <= 0 || startWeightNum > 1000) {
+        Alert.alert('Error', 'Please enter a valid starting weight between 0 and 1000 lbs.');
+        return;
+      }
+
+      // Validate dates
+      if (!startDate || isNaN(startDate.getTime())) {
+        Alert.alert('Error', 'Please select a valid start date.');
+        return;
+      }
+
+      if (!targetDate || isNaN(targetDate.getTime())) {
+        Alert.alert('Error', 'Please select a valid target date.');
+        return;
+      }
+
+      if (targetDate <= startDate) {
+        Alert.alert('Error', 'Target date must be after start date.');
         return;
       }
 
       const goalData: Omit<WeightGoal, 'id' | 'sync_id' | 'created_at' | 'updated_at'> = {
-        target_weight: parseFloat(targetWeight),
-        start_weight: parseFloat(startWeight),
+        target_weight: targetWeightNum,
+        start_weight: startWeightNum,
         start_date: format(startDate, 'yyyy-MM-dd'),
         target_date: format(targetDate, 'yyyy-MM-dd'),
       };
 
       const newGoal = await weightService.saveWeightGoal(goalData);
       setWeightGoal(newGoal);
-      setShowGoalForm(false); // Hide form after saving
+      setShowGoalForm(false);
 
       Alert.alert('Success', 'Weight goal saved successfully!');
     } catch (error) {
@@ -214,19 +296,112 @@ const WeightGoalsScreen: React.FC = () => {
     }
   };
 
+  // Render log weight form
+  const renderLogWeightForm = () => {
+    return (
+      <Card style={styles.logCard}>
+        <Card.Content>
+          <Title style={styles.sectionTitle}>Log Your Weight</Title>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Current Weight</Text>
+            <RNTextInput
+              style={styles.input}
+              value={currentWeight}
+              onChangeText={setCurrentWeight}
+              keyboardType="numeric"
+              placeholder="Enter your current weight"
+            />
+            <Text style={styles.inputUnit}>lbs</Text>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Date</Text>
+            {Platform.OS === 'web' ? (
+              <WebDatePicker
+                value={logDate}
+                onChange={(event, selectedDate) => {
+                  if (selectedDate) {
+                    setLogDate(selectedDate);
+                  }
+                }}
+                maximumDate={new Date()}
+              />
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={() => setShowLogDatePicker(true)}
+                >
+                  <Text>{format(logDate, 'MMM d, yyyy')}</Text>
+                </TouchableOpacity>
+                {showLogDatePicker && (
+                  <DateTimePicker
+                    value={logDate}
+                    mode="date"
+                    display="default"
+                    onChange={(event, selectedDate) => {
+                      setShowLogDatePicker(false);
+                      if (selectedDate) {
+                        setLogDate(selectedDate);
+                      }
+                    }}
+                    maximumDate={new Date()}
+                  />
+                )}
+              </>
+            )}
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Notes (Optional)</Text>
+            <RNTextInput
+              style={[styles.input, styles.notesInput]}
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="Add notes about this weight entry"
+              multiline
+            />
+          </View>
+
+          <Button
+            mode="contained"
+            onPress={addWeightLog}
+            style={styles.button}
+            disabled={addingLog || !currentWeight}
+            loading={addingLog}
+          >
+            Add Weight Log
+          </Button>
+        </Card.Content>
+      </Card>
+    );
+  };
+
   // Add weight log
   const addWeightLog = async () => {
     try {
       setAddingLog(true);
 
-      if (!currentWeight || parseFloat(currentWeight) <= 0) {
-        Alert.alert('Error', 'Please enter a valid weight.');
+      // Validate weight
+      const weightValue = parseFloat(currentWeight);
+      if (isNaN(weightValue) || weightValue <= 0 || weightValue > 1000) {
+        Alert.alert('Error', 'Please enter a valid weight between 0 and 1000 lbs.');
         return;
       }
 
+      // Validate date
+      if (!logDate || isNaN(logDate.getTime())) {
+        Alert.alert('Error', 'Please select a valid date.');
+        return;
+      }
+
+      // Format date as YYYY-MM-DD
+      const formattedDate = format(logDate, 'yyyy-MM-dd');
+
       const logData: Omit<WeightLog, 'id' | 'sync_id' | 'created_at' | 'updated_at'> = {
-        weight_value: parseFloat(currentWeight),
-        log_date: logDate.toISOString().split('T')[0],
+        weight_value: weightValue,
+        log_date: formattedDate,
         notes: notes.trim() || undefined,
       };
 
@@ -235,6 +410,7 @@ const WeightGoalsScreen: React.FC = () => {
       // Reset form
       setNotes('');
       setLogDate(new Date());
+      setCurrentWeight('');
 
       // Reload data
       await loadWeightData();
@@ -273,9 +449,9 @@ const WeightGoalsScreen: React.FC = () => {
     if (!weightGoal || !weightLogs.length || !weightLogs[0]?.weight_value) return 0;
     if (!weightGoal.start_weight || !weightGoal.target_weight) return 0;
 
-    const currentWeight = parseFloat(weightLogs[0].weight_value.toString());
-    const startWeight = parseFloat(weightGoal.start_weight.toString());
-    const targetWeight = parseFloat(weightGoal.target_weight.toString());
+    const currentWeight = parseFloat(weightLogs[0].weight_value?.toString() || '0');
+    const startWeight = parseFloat(weightGoal.start_weight?.toString() || '0');
+    const targetWeight = parseFloat(weightGoal.target_weight?.toString() || '0');
 
     // If target is to lose weight
     if (targetWeight < startWeight) {
@@ -605,11 +781,13 @@ const WeightGoalsScreen: React.FC = () => {
     const progressPercent = Math.round(progress * 100);
 
     // Get current weight from latest log
-    const currentWeight = weightLogs.length > 0 ? parseFloat(weightLogs[0].weight_value.toString()) : parseFloat(weightGoal.start_weight.toString());
+    const currentWeight = weightLogs.length > 0
+      ? parseFloat(weightLogs[0].weight_value?.toString() || '0')
+      : parseFloat(weightGoal?.start_weight?.toString() || '0');
 
     // Determine if goal is to lose or gain weight
-    const startWeightNum = parseFloat(weightGoal.start_weight.toString());
-    const targetWeightNum = parseFloat(weightGoal.target_weight.toString());
+    const startWeightNum = parseFloat(weightGoal?.start_weight?.toString() || '0');
+    const targetWeightNum = parseFloat(weightGoal?.target_weight?.toString() || '0');
     const isLoseWeight = targetWeightNum < startWeightNum;
     const goalType = isLoseWeight ? 'lose' : 'gain';
 
@@ -635,19 +813,19 @@ const WeightGoalsScreen: React.FC = () => {
           <View style={styles.weightValues}>
             <View style={styles.weightValue}>
               <Text style={styles.weightLabel}>Start</Text>
-              <Text style={styles.weightNumber}>{parseFloat(weightGoal.start_weight.toString()).toFixed(1)}</Text>
+              <Text style={styles.weightNumber}>{parseFloat(weightGoal?.start_weight?.toString() || '0').toFixed(1)}</Text>
               <Text style={styles.weightUnit}>lbs</Text>
             </View>
 
             <View style={styles.weightValue}>
               <Text style={styles.weightLabel}>Current</Text>
-              <Text style={styles.weightNumber}>{parseFloat(currentWeight.toString()).toFixed(1)}</Text>
+              <Text style={styles.weightNumber}>{parseFloat(currentWeight?.toString() || '0').toFixed(1)}</Text>
               <Text style={styles.weightUnit}>lbs</Text>
             </View>
 
             <View style={styles.weightValue}>
               <Text style={styles.weightLabel}>Target</Text>
-              <Text style={styles.weightNumber}>{parseFloat(weightGoal.target_weight.toString()).toFixed(1)}</Text>
+              <Text style={styles.weightNumber}>{parseFloat(weightGoal?.target_weight?.toString() || '0').toFixed(1)}</Text>
               <Text style={styles.weightUnit}>lbs</Text>
             </View>
           </View>
@@ -674,73 +852,6 @@ const WeightGoalsScreen: React.FC = () => {
               {currentChange.toFixed(1)} lbs {goalType === 'lose' ? 'lost' : 'gained'}, {remainingChange.toFixed(1)} lbs to go
             </Text>
           </View> */}
-        </Card.Content>
-      </Card>
-    );
-  };
-
-  // Render log weight form
-  const renderLogWeightForm = () => {
-    return (
-      <Card style={styles.logCard}>
-        <Card.Content>
-          <Title style={styles.sectionTitle}>Log Your Weight</Title>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Current Weight</Text>
-            <RNTextInput
-              style={styles.input}
-              value={currentWeight}
-              onChangeText={setCurrentWeight}
-              keyboardType="numeric"
-              placeholder="Enter your current weight"
-            />
-            <Text style={styles.inputUnit}>lbs</Text>
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Date</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowLogDatePicker(true)}
-            >
-              <Text>{format(logDate, 'MMM d, yyyy')}</Text>
-            </TouchableOpacity>
-            {showLogDatePicker && (
-              <DateTimePicker
-                value={logDate}
-                mode="date"
-                display="default"
-                onChange={(event, selectedDate) => {
-                  setShowLogDatePicker(false);
-                  if (selectedDate) {
-                    setLogDate(selectedDate);
-                  }
-                }}
-              />
-            )}
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Notes (Optional)</Text>
-            <RNTextInput
-              style={[styles.input, styles.notesInput]}
-              value={notes}
-              onChangeText={setNotes}
-              placeholder="Add notes about this weight entry"
-              multiline
-            />
-          </View>
-
-          <Button
-            mode="contained"
-            onPress={addWeightLog}
-            style={styles.button}
-            disabled={addingLog || !currentWeight}
-            loading={addingLog}
-          >
-            Add Weight Log
-          </Button>
         </Card.Content>
       </Card>
     );

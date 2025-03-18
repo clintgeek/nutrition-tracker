@@ -2,12 +2,12 @@ import React, { useEffect, useState, ReactNode } from 'react';
 import { View, Text, TextInput, ScrollView, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useRoute } from '@react-navigation/core';
-import type { ParamListBase, RouteProp } from '@react-navigation/core';
+import type { RouteProp } from '@react-navigation/core';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme, Portal, FAB } from 'react-native-paper';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { Recipe, RecipeIngredient, RecipeStep, CreateRecipeDTO, CreateRecipeStepDTO } from '../../types/Recipe';
-import { RecipeStackParamList, RootStackScreenProps } from '../../types/navigation';
+import { RecipeStackParamList } from '../../types/navigation';
 import { recipeService } from '../../services/recipeService';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { ErrorMessage } from '../../components/common/ErrorMessage';
@@ -17,9 +17,8 @@ import { IconButton } from '../../components/IconButton';
 import { formatNumber } from '../../utils/formatters';
 import { Icon } from '@rneui/themed';
 
-type Props = RootStackScreenProps<'RecipeStack'>;
-
 type RecipeDetailScreenRouteProp = RouteProp<RecipeStackParamList, 'RecipeDetail'>;
+type RecipeDetailScreenNavigationProp = NativeStackNavigationProp<RecipeStackParamList>;
 
 type Ingredient = CreateRecipeDTO['ingredients'][0];
 type Step = CreateRecipeDTO['steps'][0];
@@ -50,8 +49,8 @@ type DraggableIngredient = RecipeIngredient & { order_index: number };
 type DraggableStep = RecipeStep & { order: number };
 
 export function RecipeDetailScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<RecipeStackParamList>>();
-  const route = useRoute<RouteProp<RecipeStackParamList, 'RecipeDetail'>>();
+  const navigation = useNavigation<RecipeDetailScreenNavigationProp>();
+  const route = useRoute<RecipeDetailScreenRouteProp>();
   const theme = useTheme();
   const recipeId = route.params?.recipeId;
   const isNew = recipeId === 'new';

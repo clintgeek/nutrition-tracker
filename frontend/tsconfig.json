@@ -3,11 +3,16 @@
     "strict": false,
     "baseUrl": ".",
     "paths": {
-      "*": ["src/*"]
+      "*": [
+        "src/*"
+      ]
     },
     "allowSyntheticDefaultImports": true,
     "jsx": "react-native",
-    "lib": ["dom", "esnext"],
+    "lib": [
+      "dom",
+      "esnext"
+    ],
     "moduleResolution": "node",
     "noEmit": true,
     "skipLibCheck": true,
@@ -27,5 +32,6 @@
   ],
   "include": [
     "src/**/*"
-  ]
+  ],
+  "extends": "expo/tsconfig.base"
 }
