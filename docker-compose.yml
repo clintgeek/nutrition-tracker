@@ -10,11 +10,14 @@ services:
       - NODE_ENV=development
       - EXPO_NO_DOCTOR=1
       - EXPO_DEBUG=true
+      - REACT_APP_API_URL=http://backend:3000
     ports:
       - "${FRONTEND_PORT:-4080}:80"
     restart: always
     depends_on:
       - backend
+    networks:
+      - nutrition-network
 
   # Backend service
   backend:
@@ -31,14 +34,16 @@ services:
       - USDA_API_KEY=${USDA_API_KEY:-}
       - PORT=3000
       - TZ=America/Chicago
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - nutrition-network
 
   # Redis service
   redis:

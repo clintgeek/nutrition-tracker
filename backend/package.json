@@ -5,7 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
+    "dev": "NODE_ENV=development node -r dotenv/config src/server.js dotenv_config_path=.env.local",
     "test": "jest"
   },
   "dependencies": {

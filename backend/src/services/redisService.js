@@ -1,11 +1,10 @@
 const { createClient } = require('redis');
 const logger = require('../utils/logger');
 
-// Determine which Redis configuration to use based on environment
-const isProduction = process.env.NODE_ENV === 'production';
+// Redis configuration
 const redisConfig = {
-  url: `redis://${isProduction ? process.env.SERVER_REDIS_HOST : process.env.REDIS_HOST}:${isProduction ? process.env.SERVER_REDIS_PORT : process.env.REDIS_PORT}`,
-  password: isProduction ? process.env.SERVER_REDIS_PASSWORD : process.env.REDIS_PASSWORD,
+  url: `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`,
+  password: process.env.REDIS_PASSWORD,
 };
 
 const redisClient = createClient(redisConfig);
