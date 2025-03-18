@@ -20,6 +20,7 @@ export default function BarcodeScanner() {
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [camera, setCamera] = useState<Camera | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
   const navigation = useNavigation();
   const theme = useTheme();
   const isFocused = useIsFocused();
@@ -30,11 +31,18 @@ export default function BarcodeScanner() {
 
     const initializeCamera = async () => {
       try {
-        const { status } = await Camera.requestCameraPermissionsAsync();
+        // Request permissions for both camera and barcode scanner
+        const [cameraStatus, barcodeStatus] = await Promise.all([
+          Camera.requestCameraPermissionsAsync(),
+          ExpoBarCodeScanner.requestPermissionsAsync()
+        ]);
+
         if (mounted) {
-          setHasPermission(status === 'granted');
-          if (status !== 'granted') {
-            setError('Camera permission is required to scan barcodes');
+          const hasPermission = cameraStatus.status === 'granted' && barcodeStatus.status === 'granted';
+          setHasPermission(hasPermission);
+
+          if (!hasPermission) {
+            setError('Camera and barcode scanner permissions are required');
             setShowErrorDialog(true);
           }
         }
@@ -64,29 +72,46 @@ export default function BarcodeScanner() {
       try {
         // Start with camera paused
         await ref.pausePreview();
+        console.log('Camera preview paused');
 
         // Give the camera more time to initialize on Android
+        const delay = Platform.OS === 'android' ? 3000 : 500;
+        console.log(`Waiting ${delay}ms before resuming preview...`);
+
         setTimeout(async () => {
           try {
+            console.log('Attempting to resume preview...');
             await ref.resumePreview();
+            console.log('Preview resumed successfully');
             setIsInitialized(true);
           } catch (err) {
             console.error('Error resuming preview:', err);
             // Try one more time after a longer delay
+            console.log('Retrying preview resume after 5 seconds...');
             setTimeout(async () => {
               try {
                 await ref.resumePreview();
+                console.log('Preview resumed successfully after retry');
                 setIsInitialized(true);
               } catch (err) {
                 console.error('Error resuming preview after retry:', err);
+                setError('Failed to initialize camera. Please try again.');
+                setShowErrorDialog(true);
               }
-            }, 1000);
+            }, 5000);
           }
-        }, Platform.OS === 'android' ? 1000 : 500);
+        }, delay);
       } catch (err) {
         console.error('Error handling camera ref:', err);
+        setError('Failed to initialize camera. Please try again.');
+        setShowErrorDialog(true);
       }
     }
+  };
+
+  const handleCameraReady = () => {
+    console.log('Camera is ready');
+    setIsCameraReady(true);
   };
 
   const handleBarCodeScanned = async (event: BarCodeEvent) => {
@@ -159,6 +184,7 @@ export default function BarcodeScanner() {
           style={StyleSheet.absoluteFillObject}
           type={CameraType.back}
           onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+          onCameraReady={handleCameraReady}
           barCodeScannerSettings={{
             barCodeTypes: [
               ExpoBarCodeScanner.Constants.BarCodeType.ean13,
@@ -168,7 +194,7 @@ export default function BarcodeScanner() {
             ],
           }}
           autoFocus={AutoFocus.on}
-          useCamera2Api={false}
+          useCamera2Api={Platform.OS === 'android'}
           ratio="16:9"
         >
           <View style={styles.overlay}>
@@ -185,7 +211,7 @@ export default function BarcodeScanner() {
         </Camera>
       )}
 
-      {!isInitialized && (
+      {(!isInitialized || !isCameraReady) && (
         <View style={[styles.loadingOverlay, { backgroundColor: 'black' }]}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={styles.scannerText}>Initializing camera...</Text>
