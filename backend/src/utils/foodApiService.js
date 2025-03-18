@@ -88,9 +88,9 @@ class FoodApiService {
       name: apiData.name || apiData.product_name || apiData.food_name || '',
       barcode: apiData.barcode || apiData.code || apiData.upc || null,
       calories: Math.round(parseFloat(apiData.calories || apiData.energy_kcal || apiData.nutriments?.energy_kcal || 0)),
-      protein: parseFloat(apiData.protein || apiData.proteins || apiData.nutriments?.proteins_100g || 0),
-      carbs: parseFloat(apiData.carbohydrates || apiData.nutriments?.carbohydrates_100g || 0),
-      fat: parseFloat(apiData.fat || apiData.nutriments?.fat_100g || 0),
+      protein: Number((parseFloat(apiData.protein || apiData.proteins || apiData.nutriments?.proteins_100g || 0)).toFixed(1)),
+      carbs: Number((parseFloat(apiData.carbohydrates || apiData.nutriments?.carbohydrates_100g || 0)).toFixed(1)),
+      fat: Number((parseFloat(apiData.fat || apiData.nutriments?.fat_100g || 0)).toFixed(1)),
       serving_size: parseFloat(apiData.serving_size || apiData.portion_size || 100),
       serving_unit: (apiData.serving_unit || apiData.portion_unit || 'g').toLowerCase(),
       source: apiData.source || 'api',
@@ -578,10 +578,10 @@ class FoodApiService {
             return {
               name: food.description,
               brand: food.brandOwner || food.brandName || null,
-              calories: getNutrientValue(1008) || 0, // Energy (kcal)
-              protein: getNutrientValue(1003) || 0, // Protein
-              carbs: getNutrientValue(1005) || 0, // Carbohydrates
-              fat: getNutrientValue(1004) || 0, // Total lipid (fat)
+              calories: Math.round(getNutrientValue(1008) || 0), // Energy (kcal)
+              protein: Number((getNutrientValue(1003) || 0).toFixed(1)), // Protein
+              carbs: Number((getNutrientValue(1005) || 0).toFixed(1)), // Carbohydrates
+              fat: Number((getNutrientValue(1004) || 0).toFixed(1)), // Total lipid (fat)
               serving_size: food.servingSize || 100,
               serving_unit: food.servingSizeUnit?.toLowerCase() || 'g',
               source: 'usda',

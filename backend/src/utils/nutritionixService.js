@@ -91,7 +91,7 @@ class NutritionixService {
           food_name: food.food_name,
           serving_unit: food.serving_unit || 'g',
           serving_qty: food.serving_qty || 100,
-          nf_calories: food.full_nutrients?.find(n => n.attr_id === 208)?.value || 0,
+          nf_calories: Math.round(food.full_nutrients?.find(n => n.attr_id === 208)?.value || 0),
           nf_protein: food.full_nutrients?.find(n => n.attr_id === 203)?.value || 0,
           nf_total_carbohydrate: food.full_nutrients?.find(n => n.attr_id === 205)?.value || 0,
           nf_total_fat: food.full_nutrients?.find(n => n.attr_id === 204)?.value || 0
@@ -122,10 +122,10 @@ class NutritionixService {
     const transformed = {
       name: food.food_name,
       brand: food.brand_name || null,
-      calories: food.nf_calories || 0,
-      protein: food.nf_protein || 0,
-      carbs: food.nf_total_carbohydrate || 0,
-      fat: food.nf_total_fat || 0,
+      calories: Math.round(food.nf_calories || 0),
+      protein: Number((food.nf_protein || 0).toFixed(1)),
+      carbs: Number((food.nf_total_carbohydrate || 0).toFixed(1)),
+      fat: Number((food.nf_total_fat || 0).toFixed(1)),
       serving_size: food.serving_weight_grams || 100,
       serving_unit: 'g',
       source: 'nutritionix',
