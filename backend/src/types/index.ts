@@ -4,14 +4,16 @@ export interface Recipe {
   name: string;
   description: string | null;
   servings: number;
-  total_calories: number | null;
-  total_protein_grams: number | null;
-  total_carbs_grams: number | null;
-  total_fat_grams: number | null;
+  total_calories: number;
+  total_protein_grams: number;
+  total_carbs_grams: number;
+  total_fat_grams: number;
   created_at: string;
   updated_at: string;
   sync_id: string;
   is_deleted: boolean;
+  ingredients?: RecipeIngredient[];
+  steps?: RecipeStep[];
 }
 
 export interface RecipeIngredient {
@@ -19,7 +21,7 @@ export interface RecipeIngredient {
   recipe_id: number;
   food_item_id: number;
   amount: number;
-  unit: string | null;
+  unit: string;
   order_index: number;
   created_at: string;
   updated_at: string;
@@ -33,6 +35,17 @@ export interface RecipeIngredient {
   fat_grams?: number;
 }
 
+export interface RecipeStep {
+  id: number;
+  recipe_id: number;
+  description: string;
+  order_index: number;
+  created_at: string;
+  updated_at: string;
+  sync_id: string;
+  is_deleted: boolean;
+}
+
 export interface CreateRecipeDTO {
   name: string;
   description?: string;
@@ -40,6 +53,25 @@ export interface CreateRecipeDTO {
   ingredients: Array<{
     food_item_id: number;
     amount: number;
-    unit?: string;
+    unit: string;
   }>;
+  steps: Array<{
+    description: string;
+    order: number;
+  }>;
+}
+
+export interface CreateRecipeStepDTO {
+  description: string;
+  order: number;
+}
+
+export interface User {
+  id: number;
+  email: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  sync_id: string;
+  is_deleted: boolean;
 }

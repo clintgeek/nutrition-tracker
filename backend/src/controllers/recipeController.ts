@@ -18,9 +18,7 @@ export async function getRecipe(req: Request, res: Response) {
     if (!recipe) {
       return res.status(404).json({ error: 'Recipe not found' });
     }
-
-    const ingredients = await Recipe.getRecipeIngredients(recipe.id);
-    res.json({ ...recipe, ingredients });
+    res.json(recipe);
   } catch (error) {
     console.error('Error getting recipe:', error);
     res.status(500).json({ error: 'Failed to get recipe' });
@@ -31,8 +29,7 @@ export async function createRecipe(req: Request, res: Response) {
   try {
     const data: CreateRecipeDTO = req.body;
     const recipe = await Recipe.createRecipe(req.user!.id, data);
-    const ingredients = await Recipe.getRecipeIngredients(recipe.id);
-    res.status(201).json({ ...recipe, ingredients });
+    res.status(201).json(recipe);
   } catch (error) {
     console.error('Error creating recipe:', error);
     res.status(500).json({ error: 'Failed to create recipe' });
@@ -46,9 +43,7 @@ export async function updateRecipe(req: Request, res: Response) {
     if (!recipe) {
       return res.status(404).json({ error: 'Recipe not found' });
     }
-
-    const ingredients = await Recipe.getRecipeIngredients(recipe.id);
-    res.json({ ...recipe, ingredients });
+    res.json(recipe);
   } catch (error) {
     console.error('Error updating recipe:', error);
     res.status(500).json({ error: 'Failed to update recipe' });
@@ -65,19 +60,6 @@ export async function deleteRecipe(req: Request, res: Response) {
   } catch (error) {
     console.error('Error deleting recipe:', error);
     res.status(500).json({ error: 'Failed to delete recipe' });
-  }
-}
-
-export async function convertToFoodItem(req: Request, res: Response) {
-  try {
-    const foodItemId = await Recipe.convertToFoodItem(parseInt(req.params.id), req.user!.id);
-    if (!foodItemId) {
-      return res.status(404).json({ error: 'Recipe not found' });
-    }
-    res.json({ foodItemId });
-  } catch (error) {
-    console.error('Error converting recipe to food item:', error);
-    res.status(500).json({ error: 'Failed to convert recipe to food item' });
   }
 }
 
@@ -102,5 +84,18 @@ export async function updateIngredientOrder(req: Request, res: Response) {
   } catch (error) {
     console.error('Error updating ingredient order:', error);
     res.status(500).json({ error: 'Failed to update ingredient order' });
+  }
+}
+
+export async function convertToFoodItem(req: Request, res: Response) {
+  try {
+    const foodItemId = await Recipe.convertToFoodItem(parseInt(req.params.id), req.user!.id);
+    if (!foodItemId) {
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+    res.json({ foodItemId });
+  } catch (error) {
+    console.error('Error converting recipe to food item:', error);
+    res.status(500).json({ error: 'Failed to convert recipe to food item' });
   }
 }

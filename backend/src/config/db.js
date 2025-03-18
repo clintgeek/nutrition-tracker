@@ -3,6 +3,7 @@ const logger = require('./logger');
 
 // Create a new pool instance using environment variables
 const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || undefined,
   user: process.env.POSTGRES_USER,
   password: process.env.POSTGRES_PASSWORD,
   host: process.env.POSTGRES_HOST,
