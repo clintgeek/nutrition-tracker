@@ -60,14 +60,32 @@ export default function BarcodeScanner() {
   // Handle camera initialization
   const handleCameraRef = async (ref: Camera | null) => {
     setCamera(ref);
-    if (ref && Platform.OS === 'android') {
-      // Give the camera time to initialize
-      setTimeout(() => {
-        ref.resumePreview();
-        setIsInitialized(true);
-      }, 500);
-    } else {
-      setIsInitialized(true);
+    if (ref) {
+      try {
+        // Start with camera paused
+        await ref.pausePreview();
+
+        // Give the camera more time to initialize on Android
+        setTimeout(async () => {
+          try {
+            await ref.resumePreview();
+            setIsInitialized(true);
+          } catch (err) {
+            console.error('Error resuming preview:', err);
+            // Try one more time after a longer delay
+            setTimeout(async () => {
+              try {
+                await ref.resumePreview();
+                setIsInitialized(true);
+              } catch (err) {
+                console.error('Error resuming preview after retry:', err);
+              }
+            }, 1000);
+          }
+        }, Platform.OS === 'android' ? 1000 : 500);
+      } catch (err) {
+        console.error('Error handling camera ref:', err);
+      }
     }
   };
 
@@ -150,8 +168,8 @@ export default function BarcodeScanner() {
             ],
           }}
           autoFocus={AutoFocus.on}
-          useCamera2Api={Platform.OS === 'android'}
-          ratio="4:3"
+          useCamera2Api={false}
+          ratio="16:9"
         >
           <View style={styles.overlay}>
             <View style={styles.scanArea}>

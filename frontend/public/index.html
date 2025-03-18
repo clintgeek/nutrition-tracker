@@ -16,6 +16,19 @@
         baseURL: window.location.protocol + '//' + window.location.hostname + ':4081/api'
       };
       console.log('API Config:', window.API_CONFIG);
+
+      // Register service worker
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then(registration => {
+              console.log('ServiceWorker registration successful');
+            })
+            .catch(err => {
+              console.log('ServiceWorker registration failed: ', err);
+            });
+        });
+      }
     </script>
   </head>
   <body>
