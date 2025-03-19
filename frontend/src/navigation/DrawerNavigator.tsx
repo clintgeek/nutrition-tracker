@@ -77,6 +77,15 @@ const DrawerContent = (props: any) => {
         activeTintColor={theme.colors.primary}
       />
 
+      <DrawerItem
+        label="Meal Planner"
+        icon={({ color, size }) => (
+          <MaterialCommunityIcons name="calendar" color={color} size={size} />
+        )}
+        onPress={() => navigateToTab('MealPlanner')}
+        activeTintColor={theme.colors.primary}
+      />
+
       {/* Nutrition and Weight Goals from the original DrawerItemList */}
       <DrawerItem
         label="Nutrition Goals"

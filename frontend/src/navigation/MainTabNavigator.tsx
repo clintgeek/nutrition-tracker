@@ -12,6 +12,7 @@ import FoodStackNavigator from './FoodStackNavigator';
 import LogStackNavigator from './LogStackNavigator';
 import RecipeStackNavigator from './RecipeStackNavigator';
 import CustomHeader from '../components/CustomHeader';
+import { MealPlannerStackNavigator } from './MealPlannerStackNavigator';
 
 // Define navigation types
 type DrawerParamList = {
@@ -28,6 +29,7 @@ export type MainTabParamList = {
   Log: undefined;
   Food: undefined;
   Recipe: undefined;
+  MealPlanner: undefined;
 };
 
 // Create the tab navigator
@@ -117,6 +119,16 @@ const MainTabNavigator: React.FC = () => {
           tabBarLabel: 'Recipes',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="book-open" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="MealPlanner"
+        component={MealPlannerStackNavigator}
+        options={{
+          tabBarLabel: 'Planner',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="calendar" color={color} size={size} />
           ),
         }}
       />
