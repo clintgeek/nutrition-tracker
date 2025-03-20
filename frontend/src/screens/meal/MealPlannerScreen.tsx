@@ -1,12 +1,13 @@
-import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, TouchableOpacity, TextInput as RNTextInput, Dimensions, ScrollView } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, StyleSheet, TouchableOpacity, TextInput as RNTextInput, Dimensions, ScrollView, Platform } from 'react-native';
 import { Calendar } from 'react-native-calendars';
-import { Portal, Dialog, Button, Text, useTheme } from 'react-native-paper';
+import { Portal, Dialog, Button, Text, useTheme, FAB } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_URL } from '../../config';
 import * as Clipboard from 'expo-clipboard';
+import { DatePickerModal } from 'react-native-paper-dates';
 
 interface Meal {
   id: string;
@@ -27,6 +28,31 @@ export const MealPlannerScreen: React.FC = () => {
   const [isAddMealVisible, setIsAddMealVisible] = useState(false);
   const [newMealName, setNewMealName] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().split('T')[0]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
+
+  // Add function to sort and group meals by date
+  const sortedMealDates = useMemo(() => {
+    return Object.keys(meals)
+      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+  }, [meals]);
+
+  // Add function to get day name
+  const getDayName = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { weekday: 'long' });
+  };
+
+  // Add function to format date
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  const formatDateLong = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
+  };
 
   const saveMeals = async (updatedMeals: DayMeals) => {
     await AsyncStorage.setItem('meals', JSON.stringify(updatedMeals));
@@ -50,25 +76,25 @@ export const MealPlannerScreen: React.FC = () => {
     };
 
     return (
-      <View style={styles.headerContainer}>
-        <View style={styles.headerRow}>
-          <View style={styles.monthSection}>
-            <TouchableOpacity onPress={() => subtractMonth?.()} style={styles.iconButton}>
+      <View style={styles(theme).headerContainer}>
+        <View style={styles(theme).headerRow}>
+          <View style={styles(theme).monthSection}>
+            <TouchableOpacity onPress={() => subtractMonth?.()} style={styles(theme).iconButton}>
               <MaterialCommunityIcons name="chevron-left" size={24} color={theme.colors.primary} />
             </TouchableOpacity>
-            <Text style={styles.monthText}>
+            <Text style={styles(theme).monthText}>
               {`${currentDate.toLocaleString('default', { month: 'long' })}`}
             </Text>
-            <TouchableOpacity onPress={() => addMonth?.()} style={styles.iconButton}>
+            <TouchableOpacity onPress={() => addMonth?.()} style={styles(theme).iconButton}>
               <MaterialCommunityIcons name="chevron-right" size={24} color={theme.colors.primary} />
             </TouchableOpacity>
           </View>
-          <View style={styles.yearSection}>
-            <TouchableOpacity onPress={subtractYear} style={styles.iconButton}>
+          <View style={styles(theme).yearSection}>
+            <TouchableOpacity onPress={subtractYear} style={styles(theme).iconButton}>
               <MaterialCommunityIcons name="chevron-left" size={24} color={theme.colors.primary} />
             </TouchableOpacity>
-            <Text style={styles.yearText}>{`${currentDate.getFullYear()}`}</Text>
-            <TouchableOpacity onPress={addYear} style={styles.iconButton}>
+            <Text style={styles(theme).yearText}>{`${currentDate.getFullYear()}`}</Text>
+            <TouchableOpacity onPress={addYear} style={styles(theme).iconButton}>
               <MaterialCommunityIcons name="chevron-right" size={24} color={theme.colors.primary} />
             </TouchableOpacity>
           </View>
@@ -97,33 +123,34 @@ export const MealPlannerScreen: React.FC = () => {
           setIsAddMealVisible(true);
         }}
         style={[
-          styles.dayContainer,
-          state === 'disabled' ? styles.disabledDay : null,
-          isSelected ? { backgroundColor: theme.colors.primaryContainer } : null,
+          styles(theme).dayContainer,
+          state === 'disabled' ? styles(theme).disabledDay : null,
+          isSelected ? { backgroundColor: `${theme.colors.primary}20` } : null,
         ]}
       >
         <Text style={[
-          styles.dayText,
-          state === 'disabled' ? styles.disabledText : null,
+          styles(theme).dayText,
+          state === 'disabled' ? styles(theme).disabledText : null,
           date.day === new Date().getDate() &&
           date.month === new Date().getMonth() + 1 &&
-          date.year === new Date().getFullYear() ? styles.todayText : null
+          date.year === new Date().getFullYear() ? styles(theme).todayText : null,
+          isSelected ? { color: theme.colors.primary } : null
         ]}>
           {date.day}
         </Text>
-        <ScrollView style={styles.mealsContainer}>
+        <ScrollView style={styles(theme).mealsContainer}>
           {dayMeals.map((meal) => (
-            <View key={meal.id} style={styles.mealContainer}>
+            <View key={meal.id} style={styles(theme).mealContainer}>
               <View style={[
-                styles.mealPill,
+                styles(theme).mealPill,
                 { backgroundColor: getMealTypeColor(meal.type, theme) }
               ]}>
-                <Text numberOfLines={1} style={styles.mealText}>
+                <Text numberOfLines={1} style={styles(theme).mealText}>
                   {meal.name}
                 </Text>
               </View>
               <TouchableOpacity
-                style={styles.deleteButton}
+                style={styles(theme).deleteButton}
                 onPress={() => handleDeleteMeal(meal)}
               >
                 <MaterialCommunityIcons name="close-circle" size={16} color={theme.colors.error} />
@@ -138,15 +165,15 @@ export const MealPlannerScreen: React.FC = () => {
   const getMealTypeColor = (type: string, theme: any) => {
     switch (type) {
       case 'breakfast':
-        return theme.colors.tertiaryContainer;
+        return `${theme.colors.primary}15`;
       case 'lunch':
-        return theme.colors.secondaryContainer;
+        return `${theme.colors.primary}20`;
       case 'dinner':
-        return theme.colors.primaryContainer;
+        return `${theme.colors.primary}25`;
       case 'snack':
-        return theme.colors.surfaceVariant;
+        return `${theme.colors.primary}10`;
       default:
-        return theme.colors.surface;
+        return theme.colors.surfaceVariant;
     }
   };
 
@@ -191,6 +218,20 @@ export const MealPlannerScreen: React.FC = () => {
     );
   };
 
+  // Update handleDateChange to use the DatePickerModal
+  const handleDateChange = useCallback(({ date }: { date: Date }) => {
+    setDatePickerVisible(false);
+    if (date) {
+      setSelectedDate(date.toISOString().split('T')[0]);
+    }
+  }, []);
+
+  // Add function to open add meal dialog
+  const handleAddMealPress = () => {
+    setSelectedDate(new Date().toISOString().split('T')[0]);
+    setIsAddMealVisible(true);
+  };
+
   React.useEffect(() => {
     const loadMeals = async () => {
       const storedMeals = await AsyncStorage.getItem('meals');
@@ -201,58 +242,451 @@ export const MealPlannerScreen: React.FC = () => {
     loadMeals();
   }, []);
 
+  const styles = (theme: any) => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#fff',
+    },
+    calendar: {
+      height: CALENDAR_HEIGHT,
+      marginTop: 0,
+    },
+    headerContainer: {
+      height: HEADER_HEIGHT,
+      justifyContent: 'center',
+      paddingHorizontal: 10,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    monthSection: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      justifyContent: 'flex-start',
+    },
+    yearSection: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    yearText: {
+      fontSize: 16,
+      fontWeight: '600',
+      marginHorizontal: 8,
+    },
+    monthText: {
+      fontSize: 18,
+      fontWeight: '600',
+      marginHorizontal: 8,
+    },
+    dayContainer: {
+      width: DAY_WIDTH,
+      height: DAY_HEIGHT,
+      padding: 4,
+      borderWidth: 0.5,
+      borderColor: '#e0e0e0',
+      backgroundColor: '#fff',
+    },
+    dayText: {
+      textAlign: 'right',
+      marginBottom: 4,
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    todayText: {
+      color: '#1a73e8',
+      fontWeight: '700',
+    },
+    disabledDay: {
+      backgroundColor: '#f5f5f5',
+    },
+    disabledText: {
+      color: '#bdbdbd',
+    },
+    mealsContainer: {
+      flex: 1,
+    },
+    mealContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    mealPill: {
+      flex: 1,
+      borderRadius: 4,
+      padding: 4,
+    },
+    mealText: {
+      fontSize: 12,
+      textAlign: 'left',
+      paddingHorizontal: 4,
+    },
+    input: {
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: '#e0e0e0',
+      borderRadius: 4,
+      padding: 8,
+    },
+    mealTypeButton: {
+      marginTop: 8,
+    },
+    iconButton: {
+      padding: 4,
+    },
+    radioButtonRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      marginVertical: 8,
+    },
+    radioButtonContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: 8,
+    },
+    radioCircle: {
+      height: 20,
+      width: 20,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: '#000',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 8,
+    },
+    selectedRadioCircle: {
+      backgroundColor: '#000',
+    },
+    radioLabel: {
+      fontSize: 14,
+    },
+    header: {
+      padding: 8,
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      marginBottom: 0,
+    },
+    calendarButton: {
+      marginBottom: 0,
+    },
+    deleteButton: {
+      padding: 2,
+      marginLeft: 4,
+    },
+    mealListContainer: {
+      padding: 16,
+      backgroundColor: '#fff',
+    },
+    mealListTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      marginBottom: 16,
+      color: '#000',
+    },
+    dateSection: {
+      marginBottom: 16,
+    },
+    dateTitleContainer: {
+      marginBottom: 8,
+    },
+    dateTitle: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: '#666',
+    },
+    mealListItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#fff',
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 8,
+      elevation: 1,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+    },
+    mealTypeIndicator: {
+      width: 4,
+      height: 24,
+      borderRadius: 2,
+      marginRight: 12,
+    },
+    mealListName: {
+      flex: 1,
+      fontSize: 16,
+      color: '#000',
+    },
+    mealListDeleteButton: {
+      padding: 8,
+    },
+    emptyState: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 32,
+    },
+    emptyStateText: {
+      marginTop: 8,
+      fontSize: 16,
+      color: '#666',
+    },
+    fab: {
+      position: 'absolute',
+      margin: 16,
+      right: 0,
+      bottom: 0,
+      backgroundColor: theme.colors.primary,
+    },
+    datePickerButton: {
+      marginBottom: 16,
+    },
+    inputWrapper: {
+      marginBottom: 16,
+    },
+    inputLabel: {
+      fontSize: 12,
+      color: theme.colors.onSurfaceVariant,
+      marginBottom: 4,
+      marginLeft: 4,
+    },
+    inputContainer: {
+      backgroundColor: theme.colors.background,
+      borderRadius: 4,
+      padding: 16,
+      height: 52,
+      justifyContent: 'center',
+    },
+    inputText: {
+      fontSize: 16,
+      color: theme.colors.onBackground,
+    },
+    inputGroup: {
+      marginBottom: 16,
+    },
+    dateInput: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: 16,
+      backgroundColor: theme.colors.surfaceVariant,
+      borderRadius: 4,
+      minHeight: 56,
+    },
+    textInput: {
+      padding: 16,
+      backgroundColor: theme.colors.surfaceVariant,
+      borderRadius: 4,
+      minHeight: 56,
+      fontSize: 16,
+    },
+  });
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Button
-          mode="contained"
-          onPress={handleGetCalendarURL}
-          style={styles.calendarButton}
-        >
-          Get Calendar Subscription URL
-        </Button>
-      </View>
-      <Calendar
-        current={currentMonth}
-        onDayPress={(day) => {
-          setSelectedDate(day.dateString);
-          setIsAddMealVisible(true);
-        }}
-        dayComponent={DayComponent}
-        customHeader={CustomHeader}
-        hideExtraDays={false}
-        theme={{
-          backgroundColor: theme.colors.background,
-          calendarBackground: theme.colors.background,
-          textSectionTitleColor: theme.colors.onBackground,
-          selectedDayBackgroundColor: theme.colors.primary,
-          selectedDayTextColor: theme.colors.onPrimary,
-          todayTextColor: theme.colors.primary,
-          arrowColor: theme.colors.primary,
-          textDayHeaderFontSize: 14,
-          textDayHeaderFontWeight: '600',
-        }}
-        style={styles.calendar}
+    <View style={styles(theme).container}>
+      <ScrollView>
+        <View style={styles(theme).header}>
+          <Button
+            mode="contained"
+            onPress={handleGetCalendarURL}
+            style={styles(theme).calendarButton}
+          >
+            Get Calendar Subscription URL
+          </Button>
+        </View>
+        <Calendar
+          current={currentMonth}
+          onDayPress={(day) => {
+            setSelectedDate(day.dateString);
+            setIsAddMealVisible(true);
+          }}
+          dayComponent={DayComponent}
+          customHeader={CustomHeader}
+          hideExtraDays={false}
+          theme={{
+            backgroundColor: theme.colors.background,
+            calendarBackground: theme.colors.background,
+            textSectionTitleColor: theme.colors.onBackground,
+            selectedDayBackgroundColor: theme.colors.primaryContainer,
+            selectedDayTextColor: theme.colors.onPrimaryContainer,
+            todayTextColor: theme.colors.primary,
+            arrowColor: theme.colors.primary,
+            textDayHeaderFontSize: 14,
+            textDayHeaderFontWeight: '600',
+          }}
+          style={styles(theme).calendar}
+        />
+
+        {/* Meal List Section */}
+        <View style={styles(theme).mealListContainer}>
+          <Text style={styles(theme).mealListTitle}>Upcoming Meals</Text>
+          {sortedMealDates.map((date) => (
+            <View key={date} style={styles(theme).dateSection}>
+              <View style={styles(theme).dateTitleContainer}>
+                <Text style={styles(theme).dateTitle}>
+                  {formatDate(date)} • {getDayName(date)}
+                </Text>
+              </View>
+              {meals[date].map((meal) => (
+                <View key={meal.id} style={styles(theme).mealListItem}>
+                  <View style={[
+                    styles(theme).mealTypeIndicator,
+                    { backgroundColor: getMealTypeColor(meal.type, theme) }
+                  ]} />
+                  <Text style={styles(theme).mealListName}>{meal.name}</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      const updatedMeals = { ...meals };
+                      updatedMeals[date] = meals[date].filter(m => m.id !== meal.id);
+                      if (updatedMeals[date].length === 0) {
+                        delete updatedMeals[date];
+                      }
+                      setMeals(updatedMeals);
+                      saveMeals(updatedMeals);
+                    }}
+                    style={styles(theme).mealListDeleteButton}
+                  >
+                    <MaterialCommunityIcons
+                      name="delete-outline"
+                      size={20}
+                      color={theme.colors.error}
+                    />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          ))}
+          {sortedMealDates.length === 0 && (
+            <View style={styles(theme).emptyState}>
+              <MaterialCommunityIcons
+                name="food-outline"
+                size={48}
+                color={theme.colors.onSurfaceVariant}
+              />
+              <Text style={styles(theme).emptyStateText}>No meals planned yet</Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Add FAB */}
+      <FAB
+        icon="plus"
+        style={styles(theme).fab}
+        onPress={handleAddMealPress}
+        label="Add Meal"
+        labelTextColor="white"
+        theme={{ colors: { onSecondaryContainer: 'white' }}}
       />
 
       <Portal>
-        <Dialog visible={isAddMealVisible} onDismiss={() => setIsAddMealVisible(false)}>
-          <Dialog.Title>Add Meal for {selectedDate}</Dialog.Title>
-          <Dialog.Content>
-            <RNTextInput
-              placeholder="Meal Name"
-              value={newMealName}
-              onChangeText={setNewMealName}
-              style={styles.input}
+        <Dialog
+          visible={isAddMealVisible}
+          onDismiss={() => setIsAddMealVisible(false)}
+          style={{ backgroundColor: theme.colors.surface, borderRadius: 28, overflow: 'hidden' }}
+        >
+          <Dialog.Title>Add Meal</Dialog.Title>
+          <Dialog.Content style={{ backgroundColor: theme.colors.surface }}>
+            <View style={[styles(theme).inputGroup, { backgroundColor: theme.colors.surface }]}>
+              <Text style={styles(theme).inputLabel}>Date</Text>
+              {Platform.OS === 'web' ? (
+                <View style={{
+                  backgroundColor: theme.colors.background,
+                  borderRadius: 4,
+                  height: 48,
+                  overflow: 'hidden',
+                  borderWidth: 1,
+                  borderColor: theme.colors.outline
+                }}>
+                  <TouchableOpacity
+                    onPress={() => setDatePickerVisible(true)}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      padding: 12,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: theme.colors.background,
+                    }}
+                  >
+                    <Text>{selectedDate}</Text>
+                    <MaterialCommunityIcons
+                      name="calendar"
+                      size={20}
+                      color={theme.colors.primary}
+                    />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => setDatePickerVisible(true)}
+                  style={{
+                    backgroundColor: theme.colors.background,
+                    borderRadius: 4,
+                    height: 48,
+                    paddingHorizontal: 12,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    borderWidth: 1,
+                    borderColor: theme.colors.outline
+                  }}
+                >
+                  <Text>{selectedDate}</Text>
+                  <MaterialCommunityIcons
+                    name="calendar"
+                    size={20}
+                    color={theme.colors.primary}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={[styles(theme).inputGroup, { backgroundColor: theme.colors.surface }]}>
+              <Text style={styles(theme).inputLabel}>Meal Name</Text>
+              <RNTextInput
+                placeholder="Enter meal name"
+                value={newMealName}
+                onChangeText={setNewMealName}
+                style={{
+                  backgroundColor: theme.colors.background,
+                  borderRadius: 4,
+                  height: 48,
+                  paddingHorizontal: 12,
+                  fontSize: 16,
+                  borderWidth: 1,
+                  borderColor: theme.colors.outline
+                }}
+              />
+            </View>
+
+            <DatePickerModal
+              locale="en"
+              mode="single"
+              visible={datePickerVisible}
+              onDismiss={() => setDatePickerVisible(false)}
+              date={new Date(selectedDate)}
+              onConfirm={handleDateChange}
+              presentationStyle="pageSheet"
+              startYear={new Date().getFullYear() - 5}
+              endYear={new Date().getFullYear()}
+              saveLabel="Save"
+              animationType="slide"
+              closeIcon="close"
             />
           </Dialog.Content>
-          <Dialog.Actions>
+          <Dialog.Actions style={{ backgroundColor: theme.colors.surface }}>
             <Button onPress={() => setIsAddMealVisible(false)}>Cancel</Button>
-            <Button onPress={handleAddMeal}>Add</Button>
+            <Button mode="contained" onPress={handleAddMeal}>Add</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
-    </ScrollView>
+    </View>
   );
 };
 
@@ -263,142 +697,5 @@ const windowWidth = Dimensions.get('window').width;
 const CALENDAR_HEIGHT = windowHeight - HEADER_HEIGHT - DAY_HEADER_HEIGHT - 40;
 const DAY_HEIGHT = Math.floor((CALENDAR_HEIGHT / 6) * 0.75);
 const DAY_WIDTH = Math.floor(windowWidth / 7);
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  calendar: {
-    height: CALENDAR_HEIGHT,
-    marginTop: 0,
-  },
-  headerContainer: {
-    height: HEADER_HEIGHT,
-    justifyContent: 'center',
-    paddingHorizontal: 10,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  monthSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'flex-start',
-  },
-  yearSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  yearText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginHorizontal: 8,
-  },
-  monthText: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginHorizontal: 8,
-  },
-  dayContainer: {
-    width: DAY_WIDTH,
-    height: DAY_HEIGHT,
-    padding: 4,
-    borderWidth: 0.5,
-    borderColor: '#e0e0e0',
-    backgroundColor: '#fff',
-  },
-  dayText: {
-    textAlign: 'right',
-    marginBottom: 4,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  todayText: {
-    color: '#1a73e8',
-    fontWeight: '700',
-  },
-  disabledDay: {
-    backgroundColor: '#f5f5f5',
-  },
-  disabledText: {
-    color: '#bdbdbd',
-  },
-  mealsContainer: {
-    flex: 1,
-  },
-  mealContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  mealPill: {
-    flex: 1,
-    borderRadius: 4,
-    padding: 4,
-  },
-  mealText: {
-    fontSize: 12,
-    textAlign: 'left',
-    paddingHorizontal: 4,
-  },
-  input: {
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 4,
-    padding: 8,
-  },
-  mealTypeButton: {
-    marginTop: 8,
-  },
-  iconButton: {
-    padding: 4,
-  },
-  radioButtonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginVertical: 8,
-  },
-  radioButtonContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 8,
-  },
-  radioCircle: {
-    height: 20,
-    width: 20,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#000',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  selectedRadioCircle: {
-    backgroundColor: '#000',
-  },
-  radioLabel: {
-    fontSize: 14,
-  },
-  header: {
-    padding: 8,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginBottom: 0,
-  },
-  calendarButton: {
-    marginBottom: 0,
-  },
-  deleteButton: {
-    padding: 2,
-    marginLeft: 4,
-  },
-});
 
 export default MealPlannerScreen;

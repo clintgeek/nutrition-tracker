@@ -34,7 +34,7 @@ const NutritionSummaryCard: React.FC<NutritionSummaryProps> = ({ nutritionSummar
             <ProgressBar
               progress={caloriePercentage}
               color={theme.colors.primary}
-              style={styles.progressBar}
+              style={[styles.progressBar, { backgroundColor: '#f5f5f5' }]}
             />
             <View style={styles.valueContainer}>
               <Text style={styles.value}>
@@ -53,7 +53,7 @@ const NutritionSummaryCard: React.FC<NutritionSummaryProps> = ({ nutritionSummar
             <ProgressBar
               progress={proteinPercentage}
               color="#4CAF50"
-              style={styles.progressBar}
+              style={[styles.progressBar, { backgroundColor: '#f5f5f5' }]}
             />
             <View style={styles.valueContainer}>
               <Text style={styles.value}>
@@ -72,7 +72,7 @@ const NutritionSummaryCard: React.FC<NutritionSummaryProps> = ({ nutritionSummar
             <ProgressBar
               progress={carbsPercentage}
               color="#2196F3"
-              style={styles.progressBar}
+              style={[styles.progressBar, { backgroundColor: '#f5f5f5' }]}
             />
             <View style={styles.valueContainer}>
               <Text style={styles.value}>
@@ -91,7 +91,7 @@ const NutritionSummaryCard: React.FC<NutritionSummaryProps> = ({ nutritionSummar
             <ProgressBar
               progress={fatPercentage}
               color="#FF9800"
-              style={styles.progressBar}
+              style={[styles.progressBar, { backgroundColor: '#f5f5f5' }]}
             />
             <View style={styles.valueContainer}>
               <Text style={styles.value}>

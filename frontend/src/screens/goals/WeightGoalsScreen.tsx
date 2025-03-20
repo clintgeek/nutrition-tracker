@@ -11,7 +11,8 @@ import {
   Dialog,
   Portal,
   ProgressBar,
-  Paragraph
+  Paragraph,
+  IconButton
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useIsFocused, useFocusEffect } from '@react-navigation/native';
@@ -19,6 +20,7 @@ import { format } from 'date-fns';
 import { LoadingSpinner, SkeletonLoader, SkeletonCard, LoadingOverlay } from '../../components/common';
 import { weightService, WeightLog, WeightGoal } from '../../services/weightService';
 import { WeightTrendGraph, WeightMetricsCard } from '../../components/dashboard';
+import { IconButton as CustomIconButton } from '../../components/IconButton';
 
 // Conditionally import DateTimePicker based on platform
 let DateTimePicker: any = () => null;
@@ -88,8 +90,361 @@ interface Tab {
   icon: string;
 }
 
+const createStyles = (theme: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  tabContent: {
+    padding: 16,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    paddingTop: 12,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    marginBottom: 0,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTab: {
+    borderBottomColor: '#2196F3',
+  },
+  tabText: {
+    marginTop: 4,
+    fontSize: 14,
+    color: '#666',
+  },
+  activeTabText: {
+    color: '#2196F3',
+    fontWeight: 'bold',
+  },
+  goalCard: {
+    marginVertical: 0,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    elevation: 0,
+    shadowColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    marginBottom: 16,
+  },
+  logCard: {
+    marginBottom: 16,
+    elevation: 2,
+    backgroundColor: '#fff',
+  },
+  historyCard: {
+    marginBottom: 16,
+    elevation: 2,
+    backgroundColor: '#fff',
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 24,
+    color: '#333',
+  },
+  inputContainer: {
+    marginBottom: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inputLabel: {
+    width: 120,
+    fontSize: 16,
+    color: '#666',
+  },
+  input: {
+    flex: 1,
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+    fontSize: 16,
+  },
+  notesInput: {
+    height: 80,
+    textAlignVertical: 'top',
+    paddingTop: 12,
+    backgroundColor: '#fff',
+  },
+  inputUnit: {
+    marginLeft: 12,
+    width: 30,
+    fontSize: 16,
+    color: '#666',
+  },
+  dateButton: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 4,
+    padding: 12,
+    marginBottom: 8,
+  },
+  button: {
+    marginTop: 16,
+    height: 56,
+    justifyContent: 'center',
+  },
+  buttonLabel: {
+    fontSize: 16,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  cancelButton: {
+    marginLeft: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  progressContainer: {
+    marginVertical: 12,
+    position: 'relative',
+    zIndex: 1,
+  },
+  progressBar: {
+    height: 8,
+    borderRadius: 4,
+    position: 'relative',
+    zIndex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  deleteButton: {
+    margin: 0,
+  },
+  loadingText: {
+    marginTop: 16,
+  },
+  goalInfo: {
+    marginBottom: 16,
+  },
+  goalInfoText: {
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  progressText: {
+    marginTop: 4,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  progressPercentage: {
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  changeGoalContainer: {
+    width: '100%',
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  changeGoalButton: {
+    padding: 8,
+  },
+  changeGoalText: {
+    fontSize: 16,
+    color: '#2196F3',
+    textDecorationLine: 'underline',
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  emptyText: {
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginVertical: 16,
+    color: '#666',
+  },
+  divider: {
+    marginVertical: 8,
+  },
+  logItem: {
+    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  logItemMain: {
+    flex: 1,
+  },
+  logItemWeight: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  logItemDate: {
+    fontSize: 14,
+    opacity: 0.7,
+  },
+  logItemNotes: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    marginTop: 4,
+    flex: 2,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  goalInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  goalInfoItem: {
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  goalInfoLabel: {
+    fontSize: 14,
+    opacity: 0.7,
+  },
+  goalInfoValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  cardActions: {
+    justifyContent: 'center',
+    paddingTop: 0,
+    paddingBottom: 8,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  weightValues: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 8,
+  },
+  weightValue: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  weightLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  weightNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  weightUnit: {
+    color: '#666',
+  },
+  goalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  goalDetailsContainer: {
+    marginBottom: 16,
+    alignItems: 'flex-end',
+  },
+  goalText: {
+    fontSize: 14,
+    marginBottom: 4,
+    textAlign: 'right',
+  },
+  progressDetails: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'right',
+  },
+  logList: {
+    marginTop: 8,
+  },
+  cardStyle: {
+    marginBottom: 16,
+    elevation: 2,
+    backgroundColor: '#fff',
+  },
+  goalSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    position: 'relative',
+    zIndex: 2,
+  },
+  goalSummaryTextLeft: {
+    fontSize: 14,
+    flex: 1,
+    textAlign: 'left',
+  },
+  goalSummaryTextCenter: {
+    fontSize: 14,
+    flex: 1,
+    textAlign: 'center',
+  },
+  goalSummaryTextRight: {
+    fontSize: 14,
+    flex: 1,
+    textAlign: 'right',
+  },
+  weightInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 4,
+    paddingRight: 8,
+    backgroundColor: '#fff',
+  },
+  weightInput: {
+    flex: 1,
+    height: 40,
+    borderWidth: 0,
+    paddingHorizontal: 8,
+    backgroundColor: '#fff',
+  },
+  metricsContainer: {
+    marginTop: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+  },
+});
+
 const WeightGoalsScreen: React.FC = () => {
   const theme = useTheme();
+  const styles = createStyles(theme);
   const isFocused = useIsFocused();
 
   // Tab state
@@ -305,14 +660,16 @@ const WeightGoalsScreen: React.FC = () => {
 
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Current Weight</Text>
-            <RNTextInput
-              style={styles.input}
-              value={currentWeight}
-              onChangeText={setCurrentWeight}
-              keyboardType="numeric"
-              placeholder="Enter your current weight"
-            />
-            <Text style={styles.inputUnit}>lbs</Text>
+            <View style={styles.weightInputContainer}>
+              <RNTextInput
+                style={[styles.input, styles.weightInput]}
+                value={currentWeight}
+                onChangeText={setCurrentWeight}
+                keyboardType="numeric"
+                placeholder="Enter your current weight"
+              />
+              <Text style={styles.weightUnit}>lbs</Text>
+            </View>
           </View>
 
           <View style={styles.inputContainer}>
@@ -361,6 +718,7 @@ const WeightGoalsScreen: React.FC = () => {
               onChangeText={setNotes}
               placeholder="Add notes about this weight entry"
               multiline
+              numberOfLines={2}
             />
           </View>
 
@@ -368,6 +726,7 @@ const WeightGoalsScreen: React.FC = () => {
             mode="contained"
             onPress={addWeightLog}
             style={styles.button}
+            labelStyle={styles.buttonLabel}
             disabled={addingLog || !currentWeight}
             loading={addingLog}
           >
@@ -799,17 +1158,6 @@ const WeightGoalsScreen: React.FC = () => {
     return (
       <Card style={styles.goalCard}>
         <Card.Content>
-          <View style={styles.goalHeader}>
-            <View style={{flex: 1}}></View>
-            <Button
-              mode="text"
-              onPress={handleChangeGoal}
-              style={styles.changeGoalButton}
-            >
-              Change Goal
-            </Button>
-          </View>
-
           <View style={styles.weightValues}>
             <View style={styles.weightValue}>
               <Text style={styles.weightLabel}>Start</Text>
@@ -823,10 +1171,22 @@ const WeightGoalsScreen: React.FC = () => {
               <Text style={styles.weightUnit}>lbs</Text>
             </View>
 
-            <View style={styles.weightValue}>
-              <Text style={styles.weightLabel}>Target</Text>
-              <Text style={styles.weightNumber}>{parseFloat(weightGoal?.target_weight?.toString() || '0').toFixed(1)}</Text>
-              <Text style={styles.weightUnit}>lbs</Text>
+            <View style={[styles.weightValue, { flexDirection: 'row', alignItems: 'flex-start' }]}>
+              <View style={{ alignItems: 'center', flex: 1 }}>
+                <Text style={styles.weightLabel}>Target</Text>
+                <Text style={styles.weightNumber}>{parseFloat(weightGoal?.target_weight?.toString() || '0').toFixed(1)}</Text>
+                <Text style={styles.weightUnit}>lbs</Text>
+              </View>
+              <TouchableOpacity
+                onPress={handleChangeGoal}
+                style={[styles.changeGoalButton, { marginTop: 2 }]}
+              >
+                <MaterialCommunityIcons
+                  name="pencil"
+                  size={20}
+                  color={theme.colors.primary}
+                />
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -838,20 +1198,6 @@ const WeightGoalsScreen: React.FC = () => {
               testID="progress-bar"
             />
           </View>
-
-          {/* <View style={styles.goalSummaryRow}>
-            <Text style={styles.goalSummaryTextLeft}>
-              Goal: {goalType === 'lose' ? 'Lose' : 'Gain'} {totalChange.toFixed(1)} lbs
-            </Text>
-
-            <Text style={styles.goalSummaryTextCenter}>
-              {progressPercent}% Complete
-            </Text>
-
-            <Text style={styles.goalSummaryTextRight}>
-              {currentChange.toFixed(1)} lbs {goalType === 'lose' ? 'lost' : 'gained'}, {remainingChange.toFixed(1)} lbs to go
-            </Text>
-          </View> */}
         </Card.Content>
       </Card>
     );
@@ -972,306 +1318,5 @@ const WeightGoalsScreen: React.FC = () => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  tabContent: {
-    padding: 16,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  activeTab: {
-    borderBottomColor: '#2196F3',
-  },
-  tabText: {
-    marginTop: 4,
-    fontSize: 12,
-    color: '#666',
-  },
-  activeTabText: {
-    color: '#2196F3',
-    fontWeight: 'bold',
-  },
-  goalCard: {
-    marginVertical: 8,
-    elevation: 2,
-    position: 'relative',
-    zIndex: 1,
-    backgroundColor: '#fff',
-  },
-  logCard: {
-    marginBottom: 16,
-    elevation: 2,
-  },
-  historyCard: {
-    marginBottom: 16,
-    elevation: 2,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    marginBottom: 16,
-  },
-  inputContainer: {
-    marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  inputLabel: {
-    width: 120,
-    fontSize: 16,
-  },
-  input: {
-    flex: 1,
-    height: 40,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-  },
-  notesInput: {
-    height: 80,
-    textAlignVertical: 'top',
-    paddingTop: 8,
-  },
-  inputUnit: {
-    marginLeft: 8,
-    width: 30,
-  },
-  dateButton: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 4,
-    padding: 12,
-    marginBottom: 8,
-  },
-  button: {
-    marginTop: 8,
-  },
-  cancelButton: {
-    marginLeft: 8,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  progressContainer: {
-    marginVertical: 16,
-    position: 'relative',
-    zIndex: 1,
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-    position: 'relative',
-    zIndex: 1,
-  },
-  deleteButton: {
-    margin: 0,
-  },
-  loadingText: {
-    marginTop: 16,
-  },
-  goalInfo: {
-    marginBottom: 16,
-  },
-  goalInfoText: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  progressText: {
-    marginTop: 4,
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  progressPercentage: {
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  changeGoalContainer: {
-    width: '100%',
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  changeGoalButton: {
-    padding: 8,
-  },
-  changeGoalText: {
-    fontSize: 16,
-    color: '#2196F3',
-    textDecorationLine: 'underline',
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-  },
-  emptyText: {
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginVertical: 16,
-    color: '#666',
-  },
-  divider: {
-    marginVertical: 8,
-  },
-  logItem: {
-    padding: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  logItemMain: {
-    flex: 1,
-  },
-  logItemWeight: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  logItemDate: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  logItemNotes: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    marginTop: 4,
-    flex: 2,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  goalInfoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  goalInfoItem: {
-    flexDirection: 'column',
-    alignItems: 'center',
-  },
-  goalInfoLabel: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  goalInfoValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  cardActions: {
-    justifyContent: 'center',
-    paddingTop: 0,
-    paddingBottom: 8,
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 999,
-  },
-  weightValues: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  weightValue: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  weightLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  weightNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  weightUnit: {
-    fontSize: 12,
-    color: '#666',
-  },
-  goalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  goalDetailsContainer: {
-    marginBottom: 16,
-    alignItems: 'flex-end',
-  },
-  goalText: {
-    fontSize: 14,
-    marginBottom: 4,
-    textAlign: 'right',
-  },
-  progressDetails: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'right',
-  },
-  logList: {
-    marginTop: 8,
-  },
-  cardStyle: {
-    marginBottom: 16,
-    elevation: 2,
-  },
-  goalSummaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    position: 'relative',
-    zIndex: 2,
-  },
-  goalSummaryTextLeft: {
-    fontSize: 14,
-    flex: 1,
-    textAlign: 'left',
-  },
-  goalSummaryTextCenter: {
-    fontSize: 14,
-    flex: 1,
-    textAlign: 'center',
-  },
-  goalSummaryTextRight: {
-    fontSize: 14,
-    flex: 1,
-    textAlign: 'right',
-  },
-});
 
 export default WeightGoalsScreen;

@@ -4,8 +4,9 @@ import { DefaultTheme } from 'react-native-paper';
 const colors = {
   primary: '#6098cc',
   accent: '#2196F3',
-  background: '#FFFFFF',
+  background: '#f5f5f5',
   surface: '#FFFFFF',
+  surfaceVariant: '#FFFFFF',  // Back to white for card backgrounds
   text: '#212121',
   disabled: '#BDBDBD',
   placeholder: '#9E9E9E',

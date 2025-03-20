@@ -60,6 +60,9 @@ const MainDrawerNavigator = () => {
       drawerContent={(props) => <DrawerContent {...props} />}
       screenOptions={{
         headerShown: false,
+        drawerStyle: {
+          borderTopWidth: 0
+        }
       }}
     >
       <Drawer.Screen

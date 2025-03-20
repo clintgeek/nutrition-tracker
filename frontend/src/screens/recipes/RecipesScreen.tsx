@@ -40,6 +40,109 @@ export function RecipesScreen() {
   const [fabOpen, setFabOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    searchContainer: {
+      padding: 16,
+      backgroundColor: theme.colors.surface,
+      elevation: 4,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      zIndex: 1,
+    },
+    searchBar: {
+      elevation: 0,
+      backgroundColor: theme.colors.background,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollViewContent: {
+      paddingVertical: 8,
+      paddingBottom: 80, // Add padding for FAB
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    recipeCard: {
+      marginHorizontal: 16,
+      marginVertical: 4,
+      elevation: 1,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 8,
+    },
+    cardContent: {
+      padding: 16,
+    },
+    sourceIcon: {
+      position: 'absolute',
+      top: '50%',
+      left: 16,
+      transform: [{ translateY: -24 }], // Half the size to center it
+    },
+    recipeInfo: {
+      marginLeft: 72, // 48dp (icon size) + 16dp (margin) + 8dp (extra space)
+    },
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    recipeName: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: theme.colors.onSurface,
+      marginRight: 4,
+    },
+    servingInfo: {
+      fontSize: 14,
+      color: theme.colors.onSurfaceVariant,
+      flex: 1,
+    },
+    actionIcon: {
+      backgroundColor: 'transparent',
+    },
+    nutritionGrid: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 16,
+    },
+    nutritionItem: {
+      alignItems: 'center',
+    },
+    nutritionValue: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: theme.colors.onSurface,
+      textAlign: 'center',
+    },
+    nutritionLabel: {
+      fontSize: 12,
+      color: theme.colors.onSurfaceVariant,
+      textAlign: 'center',
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 16,
+      minHeight: 400,
+    },
+    fab: {
+      position: 'absolute',
+      margin: 16,
+      right: 0,
+      bottom: 64,
+    },
+  });
+
   // Load recipes on mount and when screen comes into focus
   useFocusEffect(
     useCallback(() => {
@@ -135,47 +238,49 @@ export function RecipesScreen() {
     return (
       <TouchableOpacity onPress={() => handleRecipePress(item)}>
         <Card style={styles.recipeCard}>
-          <Card.Content style={styles.recipeCardContent}>
+          <Card.Content style={styles.cardContent}>
             <Avatar.Icon
-              size={40}
+              size={48}
               icon="book-open"
-              style={{ backgroundColor: theme.colors.primary }}
-              color="#fff"
+              style={[styles.sourceIcon, { backgroundColor: `${theme.colors.primary}20` }]}
+              color={theme.colors.primary}
             />
-            <View style={styles.recipeInfo}>
-              <Title style={styles.recipeName}>{item.name}</Title>
-              {item.description && (
-                <Text style={styles.description} numberOfLines={1}>
-                  {item.description}
-                </Text>
-              )}
 
-              <View style={styles.macroContainer}>
-                <View style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{caloriesPerServing}</Text>
-                  <Text style={styles.macroLabel}>Calories</Text>
+            <View style={styles.recipeInfo}>
+              <View style={styles.nameRow}>
+                <Text style={styles.recipeName} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.servingInfo}>
+                  {item.servings} servings
+                </Text>
+                <TouchableOpacity onPress={() => handleDeleteRecipe(item)}>
+                  <Avatar.Icon
+                    size={24}
+                    icon="delete"
+                    color={theme.colors.error}
+                    style={styles.actionIcon}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.nutritionGrid}>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionValue}>{caloriesPerServing}</Text>
+                  <Text style={styles.nutritionLabel}>Calories</Text>
                 </View>
-                <View style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{proteinPerServing}g</Text>
-                  <Text style={styles.macroLabel}>Protein</Text>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionValue}>{proteinPerServing}g</Text>
+                  <Text style={styles.nutritionLabel}>Protein</Text>
                 </View>
-                <View style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{carbsPerServing}g</Text>
-                  <Text style={styles.macroLabel}>Carbs</Text>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionValue}>{carbsPerServing}g</Text>
+                  <Text style={styles.nutritionLabel}>Carbs</Text>
                 </View>
-                <View style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{fatPerServing}g</Text>
-                  <Text style={styles.macroLabel}>Fat</Text>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionValue}>{fatPerServing}g</Text>
+                  <Text style={styles.nutritionLabel}>Fat</Text>
                 </View>
               </View>
             </View>
-
-            <TouchableOpacity
-              onPress={() => handleDeleteRecipe(item)}
-              style={styles.actionButton}
-            >
-              <MaterialCommunityIcons name="delete" size={24} color={theme.colors.error} />
-            </TouchableOpacity>
           </Card.Content>
         </Card>
       </TouchableOpacity>
@@ -287,99 +392,3 @@ export function RecipesScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  searchContainer: {
-    padding: 16,
-    backgroundColor: '#fff',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    zIndex: 1,
-  },
-  searchBar: {
-    elevation: 0,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollViewContent: {
-    padding: 16,
-    paddingBottom: 80, // Add padding for FAB
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  recipeCard: {
-    marginBottom: 16,
-    elevation: 2,
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  recipeCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  },
-  recipeInfo: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  recipeName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    textTransform: 'capitalize',
-  },
-  description: {
-    fontSize: 14,
-    color: '#757575',
-    marginBottom: 4,
-  },
-  macroContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  macroItem: {
-    flexDirection: 'column',
-    alignItems: 'center',
-  },
-  macroValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  macroLabel: {
-    fontSize: 14,
-    color: '#757575',
-  },
-  actionButton: {
-    margin: 0,
-    padding: 0,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-    minHeight: 400,
-  },
-  fab: {
-    position: 'absolute',
-    margin: 16,
-    right: 0,
-    bottom: 64, // Increased to move above tab bar
-  },
-});

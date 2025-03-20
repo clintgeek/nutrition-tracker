@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Alert, ScrollView, RefreshControl } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Alert, ScrollView, RefreshControl, TextInput } from 'react-native';
 import {
   Searchbar,
   FAB,
@@ -40,7 +40,7 @@ type RouteParams = {
 };
 
 const mapFoodItemToFood = (item: FoodItem): Food => ({
-  id: item.id.toString(),
+  id: typeof item.id === 'string' ? parseInt(item.id) : (typeof item.id === 'number' ? item.id : Date.now()),
   name: item.name,
   barcode: item.barcode,
   brand: item.brand,
@@ -71,7 +71,6 @@ const FoodScreen: React.FC = () => {
   const [isFoodDetailsVisible, setIsFoodDetailsVisible] = useState(false);
   const [foodToDelete, setFoodToDelete] = useState<Food | null>(null);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
-  const [fabOpen, setFabOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState({});
 
   // Fetch foods function
@@ -133,9 +132,6 @@ const FoodScreen: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       fetchFoods(searchQuery, true);
-      return () => {
-        setFabOpen(false);
-      };
     }, [fetchFoods, searchQuery])
   );
 
@@ -251,131 +247,370 @@ const FoodScreen: React.FC = () => {
     }
   };
 
-  const renderNutritionInfo = (food: Food) => (
-    <View style={styles.nutritionInfo}>
-      <Text>Calories: {food.calories}</Text>
-      <Text>Protein: {food.protein}g</Text>
-      <Text>Carbs: {food.carbs}g</Text>
-      <Text>Fat: {food.fat}g</Text>
-      <Text>Serving: {food.serving_size} {food.serving_unit}</Text>
-    </View>
-  );
-
   const renderFoodDetails = () => {
     if (!selectedFood) return null;
 
     return (
       <View style={styles.detailsContainer}>
-        <EditableTextInput
-          label="Name"
-          value={selectedFood.name}
-          onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, name: text } : null)}
-          style={styles.input}
-        />
-        <EditableTextInput
-          label="Brand"
-          value={selectedFood.brand || ''}
-          onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, brand: text } : null)}
-          style={styles.input}
-        />
-        <View style={styles.servingContainer}>
-          <EditableTextInput
-            label="Serving Size"
-            value={selectedFood.serving_size?.toString() || '100'}
-            onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, serving_size: parseFloat(text) || 100 } : null)}
-            keyboardType="numeric"
-            style={[styles.input, styles.servingSizeInput]}
-          />
-          <EditableTextInput
-            label="Unit"
-            value={selectedFood.serving_unit || ''}
-            onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, serving_unit: text } : null)}
-            style={[styles.input, styles.servingUnitInput]}
+        {/* Food Details */}
+        <Text style={styles.sectionLabel}>Food Details</Text>
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Name</Text>
+          <TextInput
+            value={selectedFood.name}
+            onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, name: text } : null)}
+            style={styles.input}
           />
         </View>
-        <EditableTextInput
-          label="Calories (per serving)"
-          value={selectedFood.calories?.toString() || '0'}
-          onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, calories: parseFloat(text) || 0 } : null)}
-          keyboardType="numeric"
-          style={styles.input}
-        />
-        <EditableTextInput
-          label="Protein (g per serving)"
-          value={selectedFood.protein?.toString() || '0'}
-          onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, protein: parseFloat(text) || 0 } : null)}
-          keyboardType="numeric"
-          style={styles.input}
-        />
-        <EditableTextInput
-          label="Carbs (g per serving)"
-          value={selectedFood.carbs?.toString() || '0'}
-          onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, carbs: parseFloat(text) || 0 } : null)}
-          keyboardType="numeric"
-          style={styles.input}
-        />
-        <EditableTextInput
-          label="Fat (g per serving)"
-          value={selectedFood.fat?.toString() || '0'}
-          onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, fat: parseFloat(text) || 0 } : null)}
-          keyboardType="numeric"
-          style={styles.input}
-        />
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Brand</Text>
+          <TextInput
+            value={selectedFood.brand || ''}
+            onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, brand: text } : null)}
+            style={styles.input}
+          />
+        </View>
+
+        {/* Serving Information */}
+        <Text style={styles.sectionLabel}>Serving Information</Text>
+        <View style={styles.servingRow}>
+          <View style={styles.servingSizeContainer}>
+            <Text style={styles.inputLabel}>Serving Size</Text>
+            <TextInput
+              value={selectedFood.serving_size?.toString() || '100'}
+              onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, serving_size: parseFloat(text) || 100 } : null)}
+              keyboardType="numeric"
+              style={styles.input}
+            />
+          </View>
+          <View style={styles.servingUnitContainer}>
+            <Text style={styles.inputLabel}>Unit</Text>
+            <TextInput
+              value={selectedFood.serving_unit || ''}
+              onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, serving_unit: text } : null)}
+              style={styles.input}
+            />
+          </View>
+        </View>
+
+        {/* Nutrition Information */}
+        <Text style={styles.sectionLabel}>Nutrition Information</Text>
+        <View style={styles.nutritionGrid}>
+          <View style={styles.nutritionColumn}>
+            <Text style={styles.nutritionHeader}>Calories</Text>
+            <TextInput
+              value={selectedFood.calories?.toString() || '0'}
+              onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, calories: parseFloat(text) || 0 } : null)}
+              keyboardType="numeric"
+              style={styles.nutritionInput}
+            />
+          </View>
+          <View style={styles.nutritionColumn}>
+            <Text style={styles.nutritionHeader}>Protein (g)</Text>
+            <TextInput
+              value={selectedFood.protein?.toString() || '0'}
+              onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, protein: parseFloat(text) || 0 } : null)}
+              keyboardType="numeric"
+              style={styles.nutritionInput}
+            />
+          </View>
+          <View style={styles.nutritionColumn}>
+            <Text style={styles.nutritionHeader}>Carbs (g)</Text>
+            <TextInput
+              value={selectedFood.carbs?.toString() || '0'}
+              onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, carbs: parseFloat(text) || 0 } : null)}
+              keyboardType="numeric"
+              style={styles.nutritionInput}
+            />
+          </View>
+          <View style={styles.nutritionColumn}>
+            <Text style={styles.nutritionHeader}>Fat (g)</Text>
+            <TextInput
+              value={selectedFood.fat?.toString() || '0'}
+              onChangeText={(text) => setSelectedFood(prev => prev ? { ...prev, fat: parseFloat(text) || 0 } : null)}
+              keyboardType="numeric"
+              style={styles.nutritionInput}
+            />
+          </View>
+        </View>
       </View>
     );
   };
 
   const renderFoodItem = ({ item }: { item: Food }) => {
-    const sourceColor = getSourceColor(item.source || '', theme);
+    const sourceIcon = getSourceIcon(item.source);
+    const sourceColor = getSourceColor(item.source, theme);
+
+    const handleFoodPress = (food: Food) => {
+      setSelectedFood(food);
+      setIsFoodDetailsVisible(true);
+    };
 
     return (
-      <TouchableOpacity onPress={() => navigateToFoodDetails(item)}>
-        <Card style={styles.foodCard}>
-          <Card.Content style={styles.foodCardContent}>
-            <Avatar.Icon
-              size={40}
-              icon={getSourceIcon(item.source || '')}
-              style={{ backgroundColor: sourceColor }}
-              color="#fff"
-            />
-            <View style={styles.foodInfo}>
-              <Title style={[styles.foodName, { color: sourceColor }]}>{item.name}</Title>
-              {item.brand && <Text style={styles.brandText}>{item.brand}</Text>}
+      <Card
+        style={styles.foodCard}
+        onPress={() => handleFoodPress(item)}
+      >
+        <Card.Content style={styles.cardContent}>
+          <Avatar.Icon
+            size={48}
+            icon={sourceIcon}
+            color={sourceColor}
+            style={[styles.sourceIcon, { backgroundColor: `${sourceColor}20` }]}
+          />
 
-              <View style={styles.macroContainer}>
-                <View style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{item.calories}</Text>
-                  <Text style={styles.macroLabel}>Calories</Text>
-                </View>
-                <View style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{item.protein}g</Text>
-                  <Text style={styles.macroLabel}>Protein</Text>
-                </View>
-                <View style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{item.carbs}g</Text>
-                  <Text style={styles.macroLabel}>Carbs</Text>
-                </View>
-                <View style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{item.fat}g</Text>
-                  <Text style={styles.macroLabel}>Fat</Text>
-                </View>
-              </View>
+          <View style={styles.foodInfoContainer}>
+            <View style={styles.nameRow}>
+              <Text style={styles.foodName} numberOfLines={1}>
+                {item.name}
+              </Text>
+              <Text style={styles.servingInfo}>
+                {item.serving_size || 100}{item.serving_unit || 'g'}
+              </Text>
+              {fromLog ? (
+                <TouchableOpacity onPress={() => handleAddToLog(item)}>
+                  <Avatar.Icon
+                    size={24}
+                    icon="plus"
+                    color={theme.colors.primary}
+                    style={styles.actionIcon}
+                  />
+                </TouchableOpacity>
+              ) : (
+                <Avatar.Icon
+                  size={24}
+                  icon="chevron-right"
+                  color={theme.colors.onSurfaceVariant}
+                  style={styles.chevron}
+                />
+              )}
             </View>
 
-            {/* Only show add button when coming from log screen */}
-            {fromLog && (
-              <TouchableOpacity
-                onPress={() => handleAddToLog(item)}
-                style={styles.actionButton}
-              >
-                <MaterialCommunityIcons name="plus-circle" size={24} color={theme.colors.primary} />
-              </TouchableOpacity>
-            )}
-          </Card.Content>
-        </Card>
-      </TouchableOpacity>
+            <View style={styles.nutritionGrid}>
+              <View style={styles.nutritionItem}>
+                <Text style={styles.nutritionValue}>{Math.round(item.calories || 0)}</Text>
+                <Text style={styles.nutritionLabel}>Calories</Text>
+              </View>
+              <View style={styles.nutritionItem}>
+                <Text style={styles.nutritionValue}>{(Number(item.protein || 0)).toFixed(1)}g</Text>
+                <Text style={styles.nutritionLabel}>Protein</Text>
+              </View>
+              <View style={styles.nutritionItem}>
+                <Text style={styles.nutritionValue}>{(Number(item.carbs || 0)).toFixed(1)}g</Text>
+                <Text style={styles.nutritionLabel}>Carbs</Text>
+              </View>
+              <View style={styles.nutritionItem}>
+                <Text style={styles.nutritionValue}>{(Number(item.fat || 0)).toFixed(1)}g</Text>
+                <Text style={styles.nutritionLabel}>Fat</Text>
+              </View>
+            </View>
+          </View>
+        </Card.Content>
+      </Card>
     );
   };
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    searchContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      backgroundColor: theme.colors.surface,
+      elevation: 4,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      zIndex: 1,
+    },
+    searchBar: {
+      backgroundColor: theme.colors.background,
+      flex: 1,
+    },
+    scanButton: {
+      padding: 8,
+      borderRadius: 8,
+      backgroundColor: theme.colors.surfaceVariant,
+      elevation: 2,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollViewContent: {
+      padding: 16,
+      paddingBottom: 80, // Add padding for FAB
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 10,
+    },
+    foodCard: {
+      marginHorizontal: 16,
+      marginVertical: 4,
+      elevation: 1,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 8,
+    },
+    cardContent: {
+      padding: 16,
+    },
+    sourceIcon: {
+      position: 'absolute',
+      top: '50%',
+      left: 16,
+      transform: [{ translateY: -24 }], // Half the size to center it
+    },
+    foodInfoContainer: {
+      marginLeft: 72, // Increased to accommodate larger icon
+    },
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    foodName: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: theme.colors.onSurface,
+      marginRight: 4,
+    },
+    servingInfo: {
+      fontSize: 14,
+      color: theme.colors.onSurfaceVariant,
+      flex: 1,
+    },
+    actionIcon: {
+      backgroundColor: 'transparent',
+    },
+    chevron: {
+      backgroundColor: 'transparent',
+    },
+    nutritionGrid: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+      gap: 16,
+      flexWrap: 'wrap',
+    },
+    nutritionItem: {
+      alignItems: 'center',
+    },
+    nutritionValue: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: theme.colors.onSurface,
+      textAlign: 'center',
+    },
+    nutritionLabel: {
+      fontSize: 12,
+      color: theme.colors.onSurfaceVariant,
+      textAlign: 'center',
+    },
+    detailsDialog: {
+      maxHeight: '80%',
+      backgroundColor: theme.colors.surface,
+    },
+    dialogContent: {
+      padding: 16,
+    },
+    detailsContainer: {
+      padding: 16,
+    },
+    sectionLabel: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginBottom: 8,
+      color: theme.colors.onSurface,
+    },
+    inputGroup: {
+      marginBottom: 16,
+    },
+    inputLabel: {
+      fontSize: 12,
+      color: theme.colors.onSurfaceVariant,
+      marginBottom: 4,
+    },
+    input: {
+      height: 40,
+      borderWidth: 1,
+      borderColor: theme.colors.outline,
+      borderRadius: 4,
+      paddingHorizontal: 8,
+      backgroundColor: theme.colors.background,
+      color: theme.colors.onSurface,
+    },
+    servingRow: {
+      flexDirection: 'row',
+      gap: 16,
+      marginBottom: 16,
+    },
+    servingSizeContainer: {
+      flex: 2,
+    },
+    servingUnitContainer: {
+      flex: 1,
+    },
+    nutritionColumn: {
+      flex: 1,
+      minWidth: '45%',
+    },
+    nutritionHeader: {
+      fontSize: 12,
+      color: theme.colors.onSurfaceVariant,
+      marginBottom: 4,
+    },
+    nutritionInput: {
+      height: 40,
+      borderWidth: 1,
+      borderColor: theme.colors.outline,
+      borderRadius: 4,
+      paddingHorizontal: 8,
+      backgroundColor: theme.colors.background,
+      color: theme.colors.onSurface,
+      textAlign: 'center',
+    },
+    macroContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 4,
+    },
+    macroItem: {
+      flexDirection: 'column',
+      alignItems: 'center',
+    },
+    macroValue: {
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
+    macroLabel: {
+      fontSize: 14,
+      color: theme.colors.onSurfaceVariant,
+    },
+    actionButton: {
+      margin: 0,
+      padding: 0,
+    },
+    listContent: {
+      paddingVertical: 8,
+    },
+    addButton: {
+      position: 'absolute',
+      margin: 16,
+      right: 0,
+      bottom: 65,
+      zIndex: -1,
+    },
+  });
 
   return (
     <View style={styles.container}>
@@ -407,7 +642,10 @@ const FoodScreen: React.FC = () => {
       ) : (
         <FlatList
           data={filteredFoods}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item, index) => {
+            if (item?.id) return item.id.toString();
+            return `temp-${index}-${Date.now()}`;
+          }}
           renderItem={renderFoodItem}
           contentContainerStyle={styles.listContent}
           refreshControl={
@@ -484,32 +722,14 @@ const FoodScreen: React.FC = () => {
           </Dialog.Actions>
         </Dialog>
 
-        {/* Only render FAB.Group when screen is focused */}
+        {/* Single FAB for adding food */}
         {isFocused && (
-          <FAB.Group
-            open={fabOpen}
-            visible={true}
-            icon={fabOpen ? 'close' : 'plus'}
-            actions={[
-              {
-                icon: 'food-apple',
-                label: 'Add Food',
-                onPress: () => {
-                  setFabOpen(false);
-                  navigation.navigate('AddFood');
-                },
-              },
-              {
-                icon: 'barcode',
-                label: 'Scan Barcode',
-                onPress: () => {
-                  setFabOpen(false);
-                  navigation.navigate('BarcodeScanner');
-                },
-              },
-            ]}
-            onStateChange={({ open }) => setFabOpen(open)}
-            style={styles.fab}
+          <FAB
+            icon="plus"
+            label="Add Food"
+            onPress={() => navigation.navigate('AddFood')}
+            style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+            color={theme.colors.onPrimary}
           />
         )}
       </Portal>
@@ -519,155 +739,5 @@ const FoodScreen: React.FC = () => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    zIndex: 1,
-  },
-  searchBar: {
-    flex: 1,
-    marginRight: 8,
-    elevation: 0,
-  },
-  scanButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
-    elevation: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollViewContent: {
-    padding: 16,
-    paddingBottom: 80, // Add padding for FAB
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-  },
-  foodCard: {
-    marginBottom: 16,
-    elevation: 2,
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  foodCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  },
-  foodInfo: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  foodName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    textTransform: 'capitalize',
-  },
-  brandText: {
-    fontSize: 14,
-    color: '#757575',
-    marginBottom: 4,
-  },
-  nutritionInfo: {
-    marginTop: 4,
-  },
-  calories: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  macros: {
-    fontSize: 14,
-    color: '#757575',
-  },
-  rightActions: {
-    marginLeft: 16,
-  },
-  deleteButton: {
-    padding: 8,
-  },
-  fab: {
-    position: 'absolute',
-    margin: 16,
-    right: 0,
-    bottom: 0,
-  },
-  detailsDialog: {
-    maxWidth: 400,
-    width: '90%',
-    alignSelf: 'center',
-  },
-  dialogContent: {
-    marginBottom: 16,
-  },
-  detailsContainer: {
-    marginBottom: 16,
-  },
-  input: {
-    marginBottom: 12,
-  },
-  servingContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  servingSizeInput: {
-    flex: 2,
-    marginRight: 8,
-  },
-  servingUnitInput: {
-    flex: 1,
-  },
-  macroContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  macroItem: {
-    flexDirection: 'column',
-    alignItems: 'center',
-  },
-  macroValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  macroLabel: {
-    fontSize: 14,
-    color: '#757575',
-  },
-  actionButton: {
-    margin: 0,
-    padding: 0,
-  },
-  listContent: {
-    padding: 16,
-    paddingBottom: 80, // Add padding for FAB
-  },
-});
 
 export default FoodScreen;

@@ -8,6 +8,7 @@ import {
   useTheme,
   Divider,
 } from 'react-native-paper';
+import { DatePickerInput } from 'react-native-paper-dates';
 import { useNavigation } from '@react-navigation/native';
 import { useRoute } from '@react-navigation/core';
 import { Food } from '../../types/Food';
@@ -30,15 +31,127 @@ const AddFoodToLogModal: React.FC = () => {
   const route = useRoute();
   const { food: initialFood, mealType: initialMealType, date: initialDate } = (route.params as { food: Food; mealType?: string; date?: string }) || {};
 
+  const styles = StyleSheet.create({
+    dialog: {
+      maxHeight: '80%',
+      backgroundColor: theme.colors.surface,
+    },
+    content: {
+      padding: 16,
+    },
+    servingsGroup: {
+      marginBottom: 16,
+    },
+    servingDetailsGroup: {
+      marginBottom: 16,
+    },
+    mealDetailsGroup: {
+      marginBottom: 16,
+    },
+    mealTypeSection: {
+      marginBottom: 16,
+    },
+    dateSection: {
+      marginBottom: 16,
+    },
+    sectionLabel: {
+      fontSize: 16,
+      marginBottom: 8,
+      color: theme.colors.onSurface,
+      fontWeight: '500',
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: theme.colors.outline,
+      borderRadius: 4,
+      padding: 8,
+      backgroundColor: theme.colors.background,
+    },
+    mealTypeContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    mealTypeButton: {
+      flex: 1,
+      minWidth: '45%',
+    },
+    divider: {
+      marginVertical: 16,
+    },
+    nutritionTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      marginBottom: 16,
+      color: theme.colors.onSurface,
+    },
+    nutritionContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    nutritionItem: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    nutritionLabel: {
+      fontSize: 14,
+      color: theme.colors.onSurfaceVariant,
+      marginBottom: 4,
+    },
+    nutritionInput: {
+      borderWidth: 1,
+      borderColor: theme.colors.outline,
+      borderRadius: 4,
+      padding: 4,
+      textAlign: 'center',
+      width: '100%',
+      backgroundColor: theme.colors.background,
+    },
+    servingContainer: {
+      flexDirection: 'row',
+    },
+    servingSizeContainer: {
+      flex: 2,
+      marginRight: 8,
+    },
+    servingUnitContainer: {
+      flex: 1,
+    },
+    servingSizeInput: {
+      borderWidth: 1,
+      borderColor: theme.colors.outline,
+      borderRadius: 4,
+      padding: 8,
+      backgroundColor: theme.colors.background,
+    },
+    servingUnitInput: {
+      borderWidth: 1,
+      borderColor: theme.colors.outline,
+      borderRadius: 4,
+      padding: 8,
+      backgroundColor: theme.colors.background,
+    },
+    dateInput: {
+      backgroundColor: theme.colors.background,
+    },
+  });
+
   const [food, setFood] = useState<Food>({
     ...initialFood,
     name: capitalizeFoodName(initialFood.name)
   });
   const [servings, setServings] = useState('1');
   const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>(initialMealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' || 'snack');
+  const [selectedDate, setSelectedDate] = useState<Date>(initialDate ? new Date(initialDate) : new Date());
   const [date, setDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
   const [isLoading, setIsLoading] = useState(false);
   const [isCustom, setIsCustom] = useState(false);
+
+  // Update date state when selectedDate changes
+  useEffect(() => {
+    setDate(selectedDate.toISOString().split('T')[0]);
+  }, [selectedDate]);
 
   // Calculate nutrition values based on servings
   const calculateNutrition = (value: number, isCalories: boolean = false) => {
@@ -71,10 +184,9 @@ const AddFoodToLogModal: React.FC = () => {
         const customFood = {
           ...food,
           name: capitalizeFoodName(food.name),
-          source: 'custom',
+          source: 'custom' as const,
           serving_size: food.serving_size,
           serving_unit: food.serving_unit,
-          // Round all nutrition values to nearest 0.5
           calories: roundToNearestHalf(food.calories),
           protein: roundToNearestHalf(food.protein),
           carbs: roundToNearestHalf(food.carbs),
@@ -83,7 +195,7 @@ const AddFoodToLogModal: React.FC = () => {
 
         if (food.is_custom) {
           // Update existing custom food
-          await foodService.updateCustomFood(parseInt(food.id), customFood);
+          await foodService.updateCustomFood(Number(food.id), customFood);
           foodToLog = { ...foodToLog, name: capitalizeFoodName(food.name) };
         } else {
           // Create new custom food
@@ -93,7 +205,7 @@ const AddFoodToLogModal: React.FC = () => {
       }
 
       await foodLogService.createLog({
-        food_item_id: parseInt(foodToLog.id),
+        food_item_id: Number(foodToLog.id),
         servings: parseFloat(servings),
         meal_type: mealType,
         log_date: date,
@@ -117,34 +229,77 @@ const AddFoodToLogModal: React.FC = () => {
         <Dialog.Content>
           <ScrollView>
             <View style={styles.content}>
-              <Text style={styles.label}>Servings</Text>
-              <TextInput
-                value={servings}
-                onChangeText={setServings}
-                keyboardType="decimal-pad"
-                style={styles.input}
-              />
-
-              <Text style={styles.label}>Meal Type</Text>
-              <View style={styles.mealTypeContainer}>
-                {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((type) => (
-                  <Button
-                    key={type}
-                    mode={mealType === type ? 'contained' : 'outlined'}
-                    onPress={() => setMealType(type)}
-                    style={styles.mealTypeButton}
-                  >
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </Button>
-                ))}
+              <View style={styles.servingsGroup}>
+                <Text style={styles.sectionLabel}>Servings</Text>
+                <TextInput
+                  value={servings}
+                  onChangeText={setServings}
+                  keyboardType="decimal-pad"
+                  style={styles.input}
+                />
               </View>
 
-              <Text style={styles.label}>Date</Text>
-              <TextInput
-                value={date}
-                onChangeText={setDate}
-                style={styles.input}
-              />
+              <View style={styles.servingDetailsGroup}>
+                <Text style={styles.sectionLabel}>Serving Size</Text>
+                <View style={styles.servingContainer}>
+                  <View style={styles.servingSizeContainer}>
+                    <TextInput
+                      value={food.serving_size?.toString() || '100'}
+                      onChangeText={(value) => {
+                        setFood(prev => ({ ...prev, serving_size: parseFloat(value) || 100 }));
+                        setIsCustom(true);
+                      }}
+                      keyboardType="numeric"
+                      style={styles.servingSizeInput}
+                    />
+                  </View>
+                  <View style={styles.servingUnitContainer}>
+                    <TextInput
+                      value={food.serving_unit || ''}
+                      onChangeText={(value) => {
+                        setFood(prev => ({ ...prev, serving_unit: value }));
+                        setIsCustom(true);
+                      }}
+                      style={styles.servingUnitInput}
+                      placeholder="g"
+                    />
+                  </View>
+                </View>
+              </View>
+
+              <Divider style={styles.divider} />
+
+              <View style={styles.mealDetailsGroup}>
+                <View style={styles.mealTypeSection}>
+                  <Text style={styles.sectionLabel}>Meal Type</Text>
+                  <View style={styles.mealTypeContainer}>
+                    {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((type) => (
+                      <Button
+                        key={type}
+                        mode={mealType === type ? 'contained' : 'outlined'}
+                        onPress={() => setMealType(type)}
+                        style={styles.mealTypeButton}
+                      >
+                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                      </Button>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.dateSection}>
+                  <Text style={styles.sectionLabel}>Date</Text>
+                  <DatePickerInput
+                    locale="en-GB"
+                    label="Date"
+                    value={selectedDate}
+                    onChange={(d) => d && setSelectedDate(d)}
+                    inputMode="start"
+                    mode="flat"
+                    style={styles.dateInput}
+                    withDateFormatInLabel={false}
+                  />
+                </View>
+              </View>
 
               <Divider style={styles.divider} />
 
@@ -187,10 +342,6 @@ const AddFoodToLogModal: React.FC = () => {
                   />
                 </View>
               </View>
-
-              <Text style={styles.servingInfo}>
-                Serving size: {food.serving_size} {food.serving_unit}
-              </Text>
             </View>
           </ScrollView>
         </Dialog.Content>
@@ -209,68 +360,5 @@ const AddFoodToLogModal: React.FC = () => {
     </Portal>
   );
 };
-
-const styles = StyleSheet.create({
-  dialog: {
-    maxHeight: '80%',
-  },
-  content: {
-    padding: 16,
-  },
-  label: {
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  input: {
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 4,
-    padding: 8,
-  },
-  mealTypeContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 16,
-  },
-  mealTypeButton: {
-    margin: 4,
-  },
-  divider: {
-    marginVertical: 16,
-  },
-  nutritionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  nutritionContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  nutritionItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  nutritionLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  nutritionInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 4,
-    padding: 4,
-    textAlign: 'center',
-    width: '80%',
-  },
-  servingInfo: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-});
 
 export default AddFoodToLogModal;

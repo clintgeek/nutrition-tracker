@@ -29,7 +29,10 @@ const DrawerContent = (props: any) => {
   };
 
   return (
-    <DrawerContentScrollView {...props}>
+    <DrawerContentScrollView
+      {...props}
+      contentContainerStyle={{ paddingTop: 0 }}
+    >
       <View style={[styles.drawerHeader, { backgroundColor: theme.colors.primary }]}>
         <View style={styles.logoContainer}>
           <MaterialCommunityIcons name="weight-lifter" size={32} color="white" />
@@ -101,7 +104,7 @@ const DrawerContent = (props: any) => {
         icon={({ color, size }) => (
           <MaterialCommunityIcons name="scale-bathroom" color={color} size={size} />
         )}
-        onPress={() => navigation.navigate('WeightGoals')}
+        onPress={() => navigation.navigate('MainTabs', { screen: 'WeightGoals' })}
         activeTintColor={theme.colors.primary}
       />
 

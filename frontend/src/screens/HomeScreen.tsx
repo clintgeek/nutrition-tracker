@@ -129,11 +129,13 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const navigateToWeightGoals = () => {
-    navigation.navigate('WeightGoals');
+    navigation.navigate('MainTabs', {
+      screen: 'WeightGoals'
+    });
   };
 
   const navigateToFoodLog = () => {
-    navigation.navigate('LogStack');
+    navigation.navigate('Log');
   };
 
   // Format date for recent logs
@@ -160,73 +162,72 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     <ScrollView style={styles.container}>
       <View style={styles.content}>
         {/* Today's Summary */}
-        <TodaySummary />
+        <TouchableOpacity onPress={navigateToFoodLog} activeOpacity={0.7}>
+          <TodaySummary />
+        </TouchableOpacity>
 
         {/* Weight Progress Section with Context */}
-        <View style={styles.weightSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Weight Progress</Text>
-            <TouchableOpacity onPress={navigateToWeightGoals}>
-              <Text style={styles.seeAllLink}>View Details</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Weight Metrics Card */}
-          <WeightMetricsCard
-            weightGoal={!isLoading && weightStats.weightGoal ? weightStats.weightGoal : null}
-            weightLogs={!isLoading && weightStats.weightLogs ? weightStats.weightLogs : []}
-            isLoading={isLoading}
-          />
-
-          {/* Enhanced Weight Graph with Context */}
-          <Card style={styles.graphCard}>
+        <TouchableOpacity onPress={navigateToWeightGoals} activeOpacity={0.7}>
+          <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
             <Card.Content>
-              <Text style={styles.graphTitle}>Goal Weight Trend</Text>
-              {isLoading ? (
-                <SkeletonLoader width="100%" height={100} />
-              ) : weightStats.hasMultipleLogs ? (
-                <WeightMiniGraph />
-              ) : (
-                <View style={styles.noGraphContainer}>
-                  <MaterialCommunityIcons name="chart-line" size={40} color="#ccc" />
-                  <Text style={styles.noGraphText}>
-                    {weightStats.weightLogs.length === 1
-                      ? "Add one more weight log to see your trend graph"
-                      : "Add weight logs to see your progress over time"}
-                  </Text>
-                  <Button
-                    mode="contained"
-                    onPress={navigateToWeightGoals}
-                    style={styles.logButton}
-                  >
-                    Log Weight
-                  </Button>
-                </View>
-              )}
+              <Title style={styles.sectionTitle}>Weight Progress</Title>
+              <WeightMetricsCard
+                weightGoal={!isLoading && weightStats.weightGoal ? weightStats.weightGoal : null}
+                weightLogs={!isLoading && weightStats.weightLogs ? weightStats.weightLogs : []}
+                isLoading={isLoading}
+              />
             </Card.Content>
           </Card>
-        </View>
+        </TouchableOpacity>
+
+        {/* Enhanced Weight Graph with Context */}
+        <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+          <Card.Content>
+            <Title style={styles.sectionTitle}>Goal Weight Trend</Title>
+            {isLoading ? (
+              <SkeletonLoader width="100%" height={100} />
+            ) : weightStats.hasMultipleLogs ? (
+              <WeightMiniGraph />
+            ) : (
+              <View style={styles.noGraphContainer}>
+                <MaterialCommunityIcons name="chart-line" size={40} color="#ccc" />
+                <Text style={styles.noGraphText}>
+                  {weightStats.weightLogs.length === 1
+                    ? "Add one more weight log to see your trend graph"
+                    : "Add weight logs to see your progress over time"}
+                </Text>
+                <Button
+                  mode="contained"
+                  onPress={navigateToWeightGoals}
+                  style={styles.logButton}
+                >
+                  Log Weight
+                </Button>
+              </View>
+            )}
+          </Card.Content>
+        </Card>
 
         {/* Recent Activity Section */}
         <View style={styles.activitySection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
-            <TouchableOpacity onPress={navigateToFoodLog}>
-              <Text style={styles.seeAllLink}>See All</Text>
-            </TouchableOpacity>
-          </View>
-
           {isLoading ? (
-            <Card style={styles.activityCard}>
+            <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
               <Card.Content>
+                <Title style={styles.sectionTitle}>Recent Activity</Title>
                 <SkeletonLoader width="100%" height={24} style={styles.skeletonItem} />
                 <SkeletonLoader width="100%" height={24} style={styles.skeletonItem} />
                 <SkeletonLoader width="100%" height={24} style={styles.skeletonItem} />
               </Card.Content>
             </Card>
           ) : recentLogs.length > 0 ? (
-            <Card style={styles.activityCard}>
+            <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
               <Card.Content>
+                <View style={styles.sectionHeader}>
+                  <Title style={styles.sectionTitle}>Recent Activity</Title>
+                  <TouchableOpacity onPress={navigateToFoodLog}>
+                    <Text style={styles.seeAllLink}>See All</Text>
+                  </TouchableOpacity>
+                </View>
                 {recentLogs.map((log, index) => (
                   <React.Fragment key={log.id || index}>
                     <View style={styles.activityItem}>
@@ -241,9 +242,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                       </View>
                       <Text style={styles.activityCalories}>
                         {(() => {
-                          // Try different ways to calculate calories
                           let calories = 0;
-
                           if (log.calories_per_serving && log.servings) {
                             calories = log.calories_per_serving * log.servings;
                           } else if (log.calories) {
@@ -251,7 +250,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                           } else if (log.total_calories) {
                             calories = log.total_calories;
                           }
-
                           return Math.round(calories) || 0;
                         })()} cal
                       </Text>
@@ -262,17 +260,20 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               </Card.Content>
             </Card>
           ) : (
-            <Card style={styles.emptyCard}>
-              <Card.Content style={styles.emptyContent}>
-                <MaterialCommunityIcons name="food" size={40} color="#ccc" />
-                <Text style={styles.emptyText}>No recent food logs</Text>
-                <Button
-                  mode="contained"
-                  onPress={navigateToFoodLog}
-                  style={styles.logButton}
-                >
-                  Log Food
-                </Button>
+            <Card style={[styles.emptyCard, { backgroundColor: theme.colors.surface }]}>
+              <Card.Content>
+                <Title style={styles.sectionTitle}>Recent Activity</Title>
+                <View style={styles.emptyContent}>
+                  <MaterialCommunityIcons name="food" size={40} color="#ccc" />
+                  <Text style={styles.emptyText}>No recent food logs</Text>
+                  <Button
+                    mode="contained"
+                    onPress={navigateToFoodLog}
+                    style={styles.logButton}
+                  >
+                    Log Food
+                  </Button>
+                </View>
               </Card.Content>
             </Card>
           )}
@@ -302,9 +303,10 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 20,
   },
-  weightSection: {
-    marginBottom: 24,
-    zIndex: 10, // Ensure this section appears above other elements
+  card: {
+    marginBottom: 16,
+    elevation: 2,
+    borderRadius: 8,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -313,24 +315,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    marginBottom: 12,
   },
   seeAllLink: {
     color: '#2196F3',
     fontWeight: '500',
-  },
-  graphCard: {
-    marginVertical: 8,
-    elevation: 2,
-    borderRadius: 8,
-  },
-  graphTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 12,
-    color: '#333',
   },
   noGraphContainer: {
     height: 150,
@@ -347,12 +338,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   activitySection: {
-    marginBottom: 24,
-  },
-  activityCard: {
-    marginVertical: 8,
-    elevation: 2,
-    borderRadius: 8,
+    marginBottom: 8,
   },
   activityItem: {
     flexDirection: 'row',
@@ -385,35 +371,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   emptyContent: {
-    padding: 24,
     alignItems: 'center',
+    paddingVertical: 24,
   },
   emptyText: {
     marginTop: 8,
     color: '#666',
     textAlign: 'center',
-  },
-  tipsCard: {
-    marginBottom: 24,
-    elevation: 2,
-    borderRadius: 8,
-    backgroundColor: '#FFF9E6',
-  },
-  tipHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  tipTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-    color: '#333',
-  },
-  tipText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#333',
   },
   skeletonItem: {
     marginVertical: 8,

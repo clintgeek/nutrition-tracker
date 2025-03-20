@@ -301,7 +301,14 @@ const WeightProgressCard: React.FC<WeightProgressCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     marginVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#fff',
     elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    borderWidth: 0,
   },
   headerRow: {
     flexDirection: 'row',

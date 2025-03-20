@@ -13,6 +13,7 @@ import LogStackNavigator from './LogStackNavigator';
 import RecipeStackNavigator from './RecipeStackNavigator';
 import CustomHeader from '../components/CustomHeader';
 import { MealPlannerStackNavigator } from './MealPlannerStackNavigator';
+import WeightGoalsScreen from '../screens/goals/WeightGoalsScreen';
 
 // Define navigation types
 type DrawerParamList = {
@@ -30,6 +31,7 @@ export type MainTabParamList = {
   Food: undefined;
   Recipe: undefined;
   MealPlanner: undefined;
+  WeightGoals: undefined;
 };
 
 // Create the tab navigator
@@ -130,6 +132,15 @@ const MainTabNavigator: React.FC = () => {
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="calendar" color={color} size={size} />
           ),
+        }}
+      />
+      <Tab.Screen
+        name="WeightGoals"
+        component={WeightGoalsScreen}
+        options={{
+          tabBarButton: () => null,
+          headerShown: true,
+          header: () => renderHeader('Weight Goals'),
         }}
       />
     </Tab.Navigator>

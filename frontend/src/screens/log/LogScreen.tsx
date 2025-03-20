@@ -5,7 +5,6 @@ import {
   Card,
   Title,
   Divider,
-  FAB,
   Chip,
   Avatar,
   useTheme,
@@ -46,6 +45,145 @@ const LogScreen: React.FC = () => {
   const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
 
   const theme = useTheme();
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#f5f5f5',
+    },
+    dateSelector: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      backgroundColor: theme.colors.surface,
+    },
+    dateButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    dateText: {
+      fontSize: 18,
+      fontWeight: 'bold',
+    },
+    calendarIcon: {
+      marginLeft: 8,
+    },
+    summaryCard: {
+      margin: 16,
+      marginTop: 8,
+      marginBottom: 8,
+      backgroundColor: theme.colors.surface,
+    },
+    summaryContent: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    summaryItem: {
+      alignItems: 'center',
+    },
+    summaryLabel: {
+      fontSize: 12,
+      color: '#757575',
+    },
+    summaryValue: {
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 10,
+    },
+    mealList: {
+      paddingBottom: 16,
+    },
+    mealCard: {
+      margin: 16,
+      marginTop: 8,
+      marginBottom: 8,
+      backgroundColor: theme.colors.surface,
+    },
+    logItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f0f0f0',
+    },
+    foodInfo: {
+      flex: 1,
+    },
+    foodName: {
+      fontSize: 16,
+      marginBottom: 4,
+    },
+    servingInfo: {
+      fontSize: 12,
+      color: '#757575',
+    },
+    nutritionInfo: {
+      alignItems: 'flex-end',
+    },
+    calories: {
+      fontWeight: 'bold',
+    },
+    macros: {
+      fontSize: 12,
+      color: '#757575',
+    },
+    emptyMeal: {
+      alignItems: 'center',
+      paddingVertical: 16,
+    },
+    emptyMealText: {
+      color: '#757575',
+      marginBottom: 8,
+    },
+    addButton: {
+      marginTop: 8,
+    },
+    deleteButton: {
+      minWidth: 120,
+      marginLeft: 8,
+    },
+    deleteDialogTitle: {
+      textAlign: 'center',
+      fontSize: 20,
+      fontWeight: 'bold',
+    },
+    deleteDialogContent: {
+      alignItems: 'center',
+      paddingVertical: 16,
+    },
+    deleteIcon: {
+      marginBottom: 16,
+    },
+    deleteDialogText: {
+      fontSize: 16,
+      textAlign: 'center',
+      marginBottom: 8,
+    },
+    deleteDialogSubtext: {
+      fontSize: 14,
+      color: '#666',
+      textAlign: 'center',
+    },
+    deleteDialogActions: {
+      justifyContent: 'space-evenly',
+      paddingHorizontal: 16,
+      paddingBottom: 8,
+    },
+    cancelButton: {
+      minWidth: 120,
+    },
+    scrollView: {
+      flex: 1,
+    },
+  });
 
   // Load calorie goal
   useEffect(() => {
@@ -202,7 +340,7 @@ const LogScreen: React.FC = () => {
       <Card style={styles.mealCard}>
         <Card.Title
           title={mealTitles[mealType]}
-          subtitle={`${Math.round(mealCalories)} kcal`}
+          subtitle={`${Math.round(mealCalories)} cal`}
           left={(props) => (
             <Avatar.Icon
               {...props}
@@ -236,12 +374,12 @@ const LogScreen: React.FC = () => {
 
                 <View style={styles.nutritionInfo}>
                   <Text style={styles.calories}>
-                    {Math.round((log.calories_per_serving || 0) * (log.servings || 1))} kcal
+                    {Math.round((log.calories_per_serving || 0) * (log.servings || 1))} cal
                   </Text>
                   <Text style={styles.macros}>
-                    P: {Math.round((log.protein_grams || 0) * (log.servings || 1))}g •
-                    C: {Math.round((log.carbs_grams || 0) * (log.servings || 1))}g •
-                    F: {Math.round((log.fat_grams || 0) * (log.servings || 1))}g
+                    P: {((log.protein_grams || 0) * (log.servings || 1)).toFixed(1)}g •
+                    C: {((log.carbs_grams || 0) * (log.servings || 1)).toFixed(1)}g •
+                    F: {((log.fat_grams || 0) * (log.servings || 1)).toFixed(1)}g
                   </Text>
                   <Button
                     icon="delete"
@@ -348,12 +486,6 @@ const LogScreen: React.FC = () => {
         </ScrollView>
       )}
 
-      <FAB
-        style={styles.fab}
-        icon="plus"
-        onPress={() => navigateToAddLog('breakfast')}
-      />
-
       <Portal>
         <Dialog visible={showDeleteDialog} onDismiss={() => setShowDeleteDialog(false)}>
           <Dialog.Title style={styles.deleteDialogTitle}>Remove Food Log</Dialog.Title>
@@ -389,148 +521,5 @@ const LogScreen: React.FC = () => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  dateSelector: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: 'white',
-  },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  dateText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  calendarIcon: {
-    marginLeft: 8,
-  },
-  summaryCard: {
-    margin: 16,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  summaryContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  summaryItem: {
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    fontSize: 12,
-    color: '#757575',
-  },
-  summaryValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-  },
-  mealList: {
-    paddingBottom: 16,
-  },
-  mealCard: {
-    margin: 16,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  logItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  foodInfo: {
-    flex: 1,
-  },
-  foodName: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  servingInfo: {
-    fontSize: 12,
-    color: '#757575',
-  },
-  nutritionInfo: {
-    alignItems: 'flex-end',
-  },
-  calories: {
-    fontWeight: 'bold',
-  },
-  macros: {
-    fontSize: 12,
-    color: '#757575',
-  },
-  emptyMeal: {
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
-  emptyMealText: {
-    color: '#757575',
-    marginBottom: 8,
-  },
-  addButton: {
-    marginTop: 8,
-  },
-  deleteButton: {
-    minWidth: 120,
-    marginLeft: 8,
-  },
-  deleteDialogTitle: {
-    textAlign: 'center',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  deleteDialogContent: {
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
-  deleteIcon: {
-    marginBottom: 16,
-  },
-  deleteDialogText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  deleteDialogSubtext: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  deleteDialogActions: {
-    justifyContent: 'space-evenly',
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  cancelButton: {
-    minWidth: 120,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  fab: {
-    position: 'absolute',
-    margin: 16,
-    right: 0,
-    bottom: 0,
-  },
-});
 
 export default LogScreen;

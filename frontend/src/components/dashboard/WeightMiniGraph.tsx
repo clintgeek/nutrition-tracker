@@ -3,7 +3,7 @@ import { View, StyleSheet, Dimensions } from 'react-native';
 import { Card, Text, useTheme } from 'react-native-paper';
 import { weightService } from '../../services/weightService';
 import { SkeletonLoader } from '../common';
-import Svg, { Path, Circle, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Path, Circle, Line, Defs, LinearGradient, Stop, Text as SvgText, Rect } from 'react-native-svg';
 
 interface WeightMiniGraphProps {
   showActualWeight?: boolean;
@@ -15,6 +15,55 @@ const WeightMiniGraph: React.FC<WeightMiniGraphProps> = ({
   days = 90 // Default to 90 days as fallback
 }) => {
   const theme = useTheme();
+
+  const styles = StyleSheet.create({
+    card: {
+      marginVertical: -8,
+      elevation: 0,
+      borderWidth: 0,
+      shadowColor: 'transparent',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0,
+      shadowRadius: 0,
+      backgroundColor: 'transparent',
+    },
+    container: {
+      position: 'relative',
+      overflow: 'hidden',
+      backgroundColor: theme.colors.surface,
+    },
+    graphSvg: {
+      position: 'relative',
+    },
+    errorContainer: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: 100,
+    },
+    errorText: {
+      color: theme.colors.error,
+    },
+    noDataContainer: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: 100,
+    },
+    noDataText: {
+      color: '#666',
+    },
+    valuesContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 8,
+      position: 'relative',
+    },
+    valueText: {
+      fontSize: 14,
+      color: theme.colors.onSurfaceVariant,
+      fontWeight: '500',
+    },
+  });
+
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [weightLogs, setWeightLogs] = useState<any[]>([]);
@@ -267,6 +316,30 @@ const WeightMiniGraph: React.FC<WeightMiniGraphProps> = ({
             stroke="white"
             strokeWidth={2}
           />
+
+          {/* Goal line */}
+          {weightGoal && weightGoal.target_weight && (
+            <>
+              <Line
+                x1={paddingHorizontal}
+                y1={paddingVertical + graphHeight - ((weightGoal.target_weight - minMaxValues.min) / (minMaxValues.max - minMaxValues.min) * graphHeight)}
+                x2={paddingHorizontal + graphWidth}
+                y2={paddingVertical + graphHeight - ((weightGoal.target_weight - minMaxValues.min) / (minMaxValues.max - minMaxValues.min) * graphHeight)}
+                stroke="#ccc"
+                strokeWidth={1}
+                strokeDasharray="5,5"
+              />
+              {/* Goal text */}
+              <SvgText
+                x={paddingHorizontal + 20}
+                y={paddingVertical + graphHeight - ((weightGoal.target_weight - minMaxValues.min) / (minMaxValues.max - minMaxValues.min) * graphHeight) - 5}
+                fontSize="10"
+                fill="#999"
+              >
+                Goal
+              </SvgText>
+            </>
+          )}
         </Svg>
 
         {/* Show weight values if enabled */}
@@ -298,51 +371,5 @@ const WeightMiniGraph: React.FC<WeightMiniGraphProps> = ({
     </Card>
   );
 };
-
-const styles = StyleSheet.create({
-  card: {
-    marginVertical: 8,
-    elevation: 2,
-    position: 'relative',
-    zIndex: 1,
-    overflow: 'hidden', // Prevent content from overflowing
-  },
-  container: {
-    position: 'relative',
-    zIndex: 2,
-    overflow: 'hidden', // Prevent content from overflowing
-  },
-  graphSvg: {
-    position: 'relative',
-    zIndex: 3,
-  },
-  errorContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: 100,
-  },
-  errorText: {
-    color: 'red',
-  },
-  noDataContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: 100,
-  },
-  noDataText: {
-    color: '#666',
-  },
-  valuesContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    position: 'relative',
-    zIndex: 4,
-  },
-  valueText: {
-    fontSize: 12,
-    color: '#666',
-  },
-});
 
 export default WeightMiniGraph;

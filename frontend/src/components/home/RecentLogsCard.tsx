@@ -48,7 +48,7 @@ const RecentLogsCard: React.FC<RecentLogsCardProps> = ({ recentLogs }) => {
                 0
               )}
             </Text>
-            <Text style={styles.caloriesLabel}>kcal</Text>
+            <Text style={styles.caloriesLabel}>cal</Text>
           </View>
         </View>
         <Divider />

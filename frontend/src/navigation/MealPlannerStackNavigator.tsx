@@ -53,7 +53,7 @@ export const MealPlannerStackNavigator: React.FC = () => {
       }}
     >
       <Stack.Screen
-        name="MealPlanner"
+        name="MealPlannerHome"
         component={MealPlannerScreen}
         options={{
           title: 'Meal Planner',

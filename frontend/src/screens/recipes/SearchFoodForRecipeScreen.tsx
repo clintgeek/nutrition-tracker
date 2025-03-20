@@ -215,45 +215,148 @@ export function SearchFoodForRecipeScreen() {
     }
   };
 
-  const renderFoodItem = ({ item }: { item: Food }) => (
-    <TouchableOpacity onPress={() => handleSelectFood(item)}>
-      <Card style={styles.foodCard}>
-        <Card.Content style={styles.foodCardContent}>
-          <Avatar.Icon
-            size={40}
-            icon={getSourceIcon(item.source || '')}
-            style={{ backgroundColor: getSourceColor(item.source || '', theme) }}
-            color="#fff"
-          />
-          <View style={styles.foodInfo}>
-            <Title style={styles.foodName}>{item.name}</Title>
-            {item.brand && <Text style={styles.brandText}>{item.brand}</Text>}
-            <Text style={styles.servingText}>
-              Per {item.serving_size || 1} {item.serving_unit || 'serving'}
-            </Text>
-            <View style={styles.macroContainer}>
-              <View style={styles.macroItem}>
-                <Text style={styles.macroValue}>{item.calories}</Text>
-                <Text style={styles.macroLabel}>Calories</Text>
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    searchContainer: {
+      padding: 16,
+      backgroundColor: theme.colors.surface,
+      elevation: 4,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      zIndex: 1,
+    },
+    searchBar: {
+      elevation: 0,
+      backgroundColor: theme.colors.background,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollViewContent: {
+      paddingVertical: 8,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 16,
+      color: theme.colors.onSurfaceVariant,
+    },
+    foodCard: {
+      marginHorizontal: 16,
+      marginVertical: 4,
+      elevation: 1,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 8,
+    },
+    cardContent: {
+      padding: 16,
+    },
+    sourceIcon: {
+      position: 'absolute',
+      top: '50%',
+      left: 16,
+      transform: [{ translateY: -24 }], // Half the size to center it
+    },
+    foodInfo: {
+      marginLeft: 72, // 48dp (icon size) + 16dp (margin) + 8dp (extra space)
+    },
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    foodName: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: theme.colors.onSurface,
+      marginRight: 4,
+    },
+    servingInfo: {
+      fontSize: 14,
+      color: theme.colors.onSurfaceVariant,
+      flex: 1,
+    },
+    nutritionGrid: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 16,
+    },
+    nutritionItem: {
+      alignItems: 'center',
+    },
+    nutritionValue: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: theme.colors.onSurface,
+      textAlign: 'center',
+    },
+    nutritionLabel: {
+      fontSize: 12,
+      color: theme.colors.onSurfaceVariant,
+      textAlign: 'center',
+    },
+  });
+
+  const renderFoodItem = ({ item }: { item: Food }) => {
+    const sourceColor = getSourceColor(item.source || '', theme);
+
+    return (
+      <TouchableOpacity onPress={() => handleSelectFood(item)}>
+        <Card style={styles.foodCard}>
+          <Card.Content style={styles.cardContent}>
+            <Avatar.Icon
+              size={48}
+              icon={getSourceIcon(item.source || '')}
+              style={[styles.sourceIcon, { backgroundColor: `${sourceColor}20` }]}
+              color={sourceColor}
+            />
+
+            <View style={styles.foodInfo}>
+              <View style={styles.nameRow}>
+                <Text style={styles.foodName} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.servingInfo}>
+                  {item.serving_size}{item.serving_unit}
+                </Text>
+                <Avatar.Icon
+                  size={24}
+                  icon="plus"
+                  color={theme.colors.primary}
+                  style={{ backgroundColor: 'transparent' }}
+                />
               </View>
-              <View style={styles.macroItem}>
-                <Text style={styles.macroValue}>{item.protein}g</Text>
-                <Text style={styles.macroLabel}>Protein</Text>
-              </View>
-              <View style={styles.macroItem}>
-                <Text style={styles.macroValue}>{item.carbs}g</Text>
-                <Text style={styles.macroLabel}>Carbs</Text>
-              </View>
-              <View style={styles.macroItem}>
-                <Text style={styles.macroValue}>{item.fat}g</Text>
-                <Text style={styles.macroLabel}>Fat</Text>
+
+              <View style={styles.nutritionGrid}>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionValue}>{Math.round(item.calories)}</Text>
+                  <Text style={styles.nutritionLabel}>Calories</Text>
+                </View>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionValue}>{(Number(item.protein)).toFixed(1)}g</Text>
+                  <Text style={styles.nutritionLabel}>Protein</Text>
+                </View>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionValue}>{(Number(item.carbs)).toFixed(1)}g</Text>
+                  <Text style={styles.nutritionLabel}>Carbs</Text>
+                </View>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionValue}>{(Number(item.fat)).toFixed(1)}g</Text>
+                  <Text style={styles.nutritionLabel}>Fat</Text>
+                </View>
               </View>
             </View>
-          </View>
-        </Card.Content>
-      </Card>
-    </TouchableOpacity>
-  );
+          </Card.Content>
+        </Card>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -290,77 +393,3 @@ export function SearchFoodForRecipeScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  searchContainer: {
-    padding: 16,
-    backgroundColor: '#fff',
-    elevation: 2,
-  },
-  searchBar: {
-    elevation: 0,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollViewContent: {
-    padding: 16,
-  },
-  foodCard: {
-    marginBottom: 16,
-    elevation: 2,
-  },
-  foodCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  foodInfo: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  foodName: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  brandText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  servingText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  macroContainer: {
-    flexDirection: 'row',
-    marginTop: 8,
-  },
-  macroItem: {
-    marginRight: 16,
-  },
-  macroValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  macroLabel: {
-    fontSize: 12,
-    color: '#666',
-  },
-  actionButton: {
-    padding: 8,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    color: '#666',
-  },
-});

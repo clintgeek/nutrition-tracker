@@ -3,10 +3,14 @@ import { Platform, StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { NavigationContainer } from '@react-navigation/native';
+import { enGB, registerTranslation } from 'react-native-paper-dates';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { SyncProvider } from './src/contexts/SyncContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import theme from './src/utils/theme';
+
+// Register English locale for the date picker
+registerTranslation('en-GB', enGB);
 
 // Add web-specific meta tags for better mobile experience
 if (Platform.OS === 'web') {

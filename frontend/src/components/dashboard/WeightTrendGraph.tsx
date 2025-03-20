@@ -4,7 +4,7 @@ import { Card, Text, useTheme, Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { weightService } from '../../services/weightService';
 import { SkeletonLoader } from '../common';
-import Svg, { Path, Circle, Line, Defs, LinearGradient, Stop, Text as SvgText } from 'react-native-svg';
+import Svg, { Path, Circle, Line, Defs, LinearGradient, Stop, Text as SvgText, Rect } from 'react-native-svg';
 import { format, subDays, subMonths, differenceInDays } from 'date-fns';
 
 interface WeightTrendGraphProps {
@@ -226,7 +226,16 @@ const WeightTrendGraph: React.FC<WeightTrendGraphProps> = ({
 
   if (isLoading) {
     return (
-      <Card style={styles.card}>
+      <Card style={{
+        backgroundColor: '#fff',
+        marginBottom: 16,
+        elevation: 0,
+        borderWidth: 0,
+        shadowColor: 'transparent',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0,
+        shadowRadius: 0
+      }}>
         <Card.Content>
           <SkeletonLoader width="100%" height={250} />
           <View style={styles.timeRangeContainer}>
@@ -241,7 +250,16 @@ const WeightTrendGraph: React.FC<WeightTrendGraphProps> = ({
 
   if (error) {
     return (
-      <Card style={styles.card}>
+      <Card style={{
+        backgroundColor: '#fff',
+        marginBottom: 16,
+        elevation: 0,
+        borderWidth: 0,
+        shadowColor: 'transparent',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0,
+        shadowRadius: 0
+      }}>
         <Card.Content style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
         </Card.Content>
@@ -252,7 +270,16 @@ const WeightTrendGraph: React.FC<WeightTrendGraphProps> = ({
   // If no weight logs exist
   if (weightLogs.length === 0) {
     return (
-      <Card style={styles.card}>
+      <Card style={{
+        backgroundColor: '#fff',
+        marginBottom: 16,
+        elevation: 0,
+        borderWidth: 0,
+        shadowColor: 'transparent',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0,
+        shadowRadius: 0
+      }}>
         <Card.Content style={styles.noDataContainer}>
           <MaterialCommunityIcons
             name="scale-bathroom"
@@ -286,7 +313,16 @@ const WeightTrendGraph: React.FC<WeightTrendGraphProps> = ({
   const avgChangePerWeek = weeksElapsed > 0 ? weightTrend / weeksElapsed : 0;
 
   return (
-    <Card style={styles.card}>
+    <Card style={{
+      backgroundColor: '#fff',
+      marginBottom: 16,
+      elevation: 2,
+      borderRadius: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+    }}>
       <Card.Content style={styles.container}>
         <View style={styles.graphContainer}>
           <Svg width={width} height={height}>
@@ -328,8 +364,11 @@ const WeightTrendGraph: React.FC<WeightTrendGraphProps> = ({
                     x={point.x}
                     y={paddingVertical + graphHeight + 15}
                     fontSize="10"
-                    textAnchor="middle"
+                    textAnchor="end"
                     fill="#666"
+                    rotation={-45}
+                    originX={point.x}
+                    originY={paddingVertical + graphHeight + 15}
                   >
                     {format(point.date, 'MM/dd')}
                   </SvgText>
@@ -391,16 +430,36 @@ const WeightTrendGraph: React.FC<WeightTrendGraphProps> = ({
               />
             ))}
 
-            {/* Goal target point */}
+            {/* Goal line with label */}
             {weightGoal && weightGoal.target_weight && weightGoal.target_date && selectedTimeRange === 'goal' && (
-              <Circle
-                cx={paddingHorizontal + graphWidth}
-                cy={paddingVertical + graphHeight - ((weightGoal.target_weight - minMaxValues.min) / (minMaxValues.max - minMaxValues.min) * graphHeight)}
-                r={6}
-                fill={theme.colors.accent}
-                stroke="white"
-                strokeWidth={2}
-              />
+              <>
+                <Line
+                  x1={paddingHorizontal}
+                  y1={paddingVertical + graphHeight - ((weightGoal.target_weight - minMaxValues.min) / (minMaxValues.max - minMaxValues.min) * graphHeight)}
+                  x2={paddingHorizontal + graphWidth}
+                  y2={paddingVertical + graphHeight - ((weightGoal.target_weight - minMaxValues.min) / (minMaxValues.max - minMaxValues.min) * graphHeight)}
+                  stroke="#ccc"
+                  strokeWidth={1}
+                  strokeDasharray="5,5"
+                />
+                {/* White background rectangle for text */}
+                <Rect
+                  x={paddingHorizontal + (graphWidth * 0.05) - 10}
+                  y={paddingVertical + graphHeight - ((weightGoal.target_weight - minMaxValues.min) / (minMaxValues.max - minMaxValues.min) * graphHeight) - 8}
+                  width={40}
+                  height={16}
+                  fill="white"
+                />
+                {/* Goal text */}
+                <SvgText
+                  x={paddingHorizontal + (graphWidth * 0.05)}
+                  y={paddingVertical + graphHeight - ((weightGoal.target_weight - minMaxValues.min) / (minMaxValues.max - minMaxValues.min) * graphHeight) + 4}
+                  fontSize="10"
+                  fill="#999"
+                >
+                  Goal
+                </SvgText>
+              </>
             )}
           </Svg>
         </View>
@@ -438,12 +497,11 @@ const WeightTrendGraph: React.FC<WeightTrendGraphProps> = ({
 };
 
 const styles = StyleSheet.create({
-  card: {
-    marginVertical: 8,
-    elevation: 2,
-  },
   container: {
-    padding: 0,
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   graphContainer: {
     marginBottom: 16,

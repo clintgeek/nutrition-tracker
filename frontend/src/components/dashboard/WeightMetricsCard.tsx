@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Card, Text, useTheme } from 'react-native-paper';
+import { Text, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { differenceInDays, subDays } from 'date-fns';
 import { SkeletonLoader } from '../common';
@@ -20,32 +20,26 @@ const WeightMetricsCard: React.FC<WeightMetricsCardProps> = ({
 
   if (isLoading) {
     return (
-      <Card style={styles.card}>
-        <Card.Content>
-          <View style={styles.metricsContainer}>
-            {[1, 2, 3, 4].map(i => (
-              <View key={i} style={styles.metricItem}>
-                <SkeletonLoader width={40} height={40} style={styles.iconSkeleton} />
-                <SkeletonLoader width={80} height={20} style={styles.textSkeleton} />
-                <SkeletonLoader width={60} height={24} style={styles.valueSkeleton} />
-              </View>
-            ))}
+      <View style={styles.metricsContainer}>
+        {[1, 2, 3, 4].map(i => (
+          <View key={i} style={styles.metricItem}>
+            <SkeletonLoader width={40} height={40} style={styles.iconSkeleton} />
+            <SkeletonLoader width={80} height={20} style={styles.textSkeleton} />
+            <SkeletonLoader width={60} height={24} style={styles.valueSkeleton} />
           </View>
-        </Card.Content>
-      </Card>
+        ))}
+      </View>
     );
   }
 
   // If no goal or logs, show placeholder
   if (!weightGoal || weightLogs.length === 0) {
     return (
-      <Card style={styles.card}>
-        <Card.Content style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>
-            Set a weight goal and log your weight to see metrics
-          </Text>
-        </Card.Content>
-      </Card>
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>
+          Set a weight goal and log your weight to see metrics
+        </Text>
+      </View>
     );
   }
 
@@ -92,85 +86,78 @@ const WeightMetricsCard: React.FC<WeightMetricsCardProps> = ({
   }
 
   return (
-    <Card style={styles.card}>
-      <Card.Content>
-        <View style={styles.metricsContainer}>
-          {/* Progress Percentage */}
-          <View style={styles.metricItem}>
-            <View style={[styles.iconContainer, { backgroundColor: theme.colors.primary }]}>
-              <MaterialCommunityIcons name="percent" size={24} color="white" />
-            </View>
-            <Text style={styles.metricLabel}>Progress</Text>
-            <Text style={styles.metricValue}>{progressPercent.toFixed(0)}%</Text>
-          </View>
-
-          {/* Total Lost/Gained since goal start */}
-          <View style={styles.metricItem}>
-            <View style={[styles.iconContainer, {
-              backgroundColor: isPositiveProgress ? theme.colors.primary : theme.colors.error
-            }]}>
-              <MaterialCommunityIcons
-                name={isGain ? "scale-balance" : "weight"}
-                size={24}
-                color="white"
-              />
-            </View>
-            <Text style={styles.metricLabel}>Total</Text>
-            <Text style={styles.metricValue}>
-              {Math.abs(totalChange).toFixed(1)}
-            </Text>
-          </View>
-
-          {/* This Week's Change */}
-          <View style={styles.metricItem}>
-            <View style={[styles.iconContainer, {
-              backgroundColor: (isGain && thisWeekChange > 0) || (!isGain && thisWeekChange < 0)
-                ? theme.colors.primary
-                : theme.colors.error
-            }]}>
-              <MaterialCommunityIcons
-                name="calendar-week"
-                size={24}
-                color="white"
-              />
-            </View>
-            <Text style={styles.metricLabel}>This Week</Text>
-            <Text style={styles.metricValue}>
-              {Math.abs(thisWeekChange).toFixed(1)}
-            </Text>
-          </View>
-
-          {/* Weekly Average */}
-          <View style={styles.metricItem}>
-            <View style={[styles.iconContainer, {
-              backgroundColor: isPositiveProgress ? theme.colors.primary : theme.colors.error
-            }]}>
-              <MaterialCommunityIcons
-                name={isGain ? "trending-up" : "trending-down"}
-                size={24}
-                color="white"
-              />
-            </View>
-            <Text style={styles.metricLabel}>Average</Text>
-            <Text style={styles.metricValue}>
-              {Math.abs(parseFloat(weeklyAverage)).toFixed(1)}
-            </Text>
-          </View>
+    <View style={styles.metricsContainer}>
+      {/* Progress Percentage */}
+      <View style={styles.metricItem}>
+        <View style={[styles.iconContainer, { backgroundColor: theme.colors.primary }]}>
+          <MaterialCommunityIcons name="percent" size={24} color="white" />
         </View>
-      </Card.Content>
-    </Card>
+        <Text style={styles.metricLabel}>Progress</Text>
+        <Text style={styles.metricValue}>{progressPercent.toFixed(0)}%</Text>
+      </View>
+
+      {/* Total Lost/Gained since goal start */}
+      <View style={styles.metricItem}>
+        <View style={[styles.iconContainer, {
+          backgroundColor: isPositiveProgress ? theme.colors.primary : theme.colors.error
+        }]}>
+          <MaterialCommunityIcons
+            name={isGain ? "scale-balance" : "weight"}
+            size={24}
+            color="white"
+          />
+        </View>
+        <Text style={styles.metricLabel}>Total</Text>
+        <Text style={styles.metricValue}>
+          {Math.abs(totalChange).toFixed(1)}
+        </Text>
+      </View>
+
+      {/* This Week's Change */}
+      <View style={styles.metricItem}>
+        <View style={[styles.iconContainer, {
+          backgroundColor: (isGain && thisWeekChange > 0) || (!isGain && thisWeekChange < 0)
+            ? theme.colors.primary
+            : theme.colors.error
+        }]}>
+          <MaterialCommunityIcons
+            name="calendar-week"
+            size={24}
+            color="white"
+          />
+        </View>
+        <Text style={styles.metricLabel}>This Week</Text>
+        <Text style={styles.metricValue}>
+          {Math.abs(thisWeekChange).toFixed(1)}
+        </Text>
+      </View>
+
+      {/* Weekly Average */}
+      <View style={styles.metricItem}>
+        <View style={[styles.iconContainer, {
+          backgroundColor: isPositiveProgress ? theme.colors.primary : theme.colors.error
+        }]}>
+          <MaterialCommunityIcons
+            name={isGain ? "trending-up" : "trending-down"}
+            size={24}
+            color="white"
+          />
+        </View>
+        <Text style={styles.metricLabel}>Average</Text>
+        <Text style={styles.metricValue}>
+          {Math.abs(parseFloat(weeklyAverage)).toFixed(1)}
+        </Text>
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    marginVertical: 8,
-    elevation: 2,
-  },
   metricsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
+    marginTop: 8,
   },
   metricItem: {
     alignItems: 'center',

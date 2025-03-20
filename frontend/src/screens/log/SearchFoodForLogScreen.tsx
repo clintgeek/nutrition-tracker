@@ -14,28 +14,38 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LogStackParamList, RootStackScreenProps } from '../../types/navigation';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import debounce from 'lodash/debounce';
+import { MD3Theme } from 'react-native-paper/lib/typescript/types';
 
 import { foodService, FoodItem } from '../../services/foodService';
 import { Food } from '../../types/Food';
 import EmptyState from '../../components/common/EmptyState';
 import { foodLogService } from '../../services/foodLogService';
 
-const mapFoodItemToFood = (item: FoodItem): Food => ({
-  id: item.id.toString(),
-  name: item.name,
-  barcode: item.barcode,
-  brand: item.brand,
-  calories: item.calories,
-  protein: item.protein,
-  carbs: item.carbs,
-  fat: item.fat,
-  serving_size: item.serving_size,
-  serving_unit: item.serving_unit,
-  is_custom: item.source === 'custom',
-  source: item.source,
-  created_at: item.created_at || new Date().toISOString(),
-  updated_at: item.updated_at || new Date().toISOString()
-});
+const mapFoodItemToFood = (item: FoodItem): Food => {
+  // Ensure id is a number
+  const id = typeof item.id === 'string' ? parseInt(item.id, 10) : (item.id || 0);
+
+  // Ensure source is one of the valid types
+  const validSources = ['custom', 'usda', 'recipe'] as const;
+  const source = validSources.includes(item.source as any) ? item.source as 'custom' | 'usda' | 'recipe' : 'custom';
+
+  return {
+    id,
+    name: item.name,
+    barcode: item.barcode,
+    brand: item.brand,
+    calories: item.calories,
+    protein: item.protein,
+    carbs: item.carbs,
+    fat: item.fat,
+    serving_size: item.serving_size,
+    serving_unit: item.serving_unit,
+    is_custom: item.source === 'custom',
+    source,
+    created_at: item.created_at || new Date().toISOString(),
+    updated_at: item.updated_at || new Date().toISOString()
+  };
+};
 
 const getSourceIcon = (source: string) => {
   switch (source?.toLowerCase()) {
@@ -50,14 +60,14 @@ const getSourceIcon = (source: string) => {
   }
 };
 
-const getSourceColor = (source: string, theme: any) => {
+const getSourceColor = (source: string, theme: MD3Theme) => {
   switch (source?.toLowerCase()) {
     case 'usda':
-      return '#4CAF50';
+      return theme.colors.tertiary;
     case 'openfoodfacts':
-      return '#2196F3';
+      return theme.colors.secondary;
     case 'custom':
-      return '#FF9800';
+      return theme.colors.primary;
     default:
       return theme.colors.primary;
   }
@@ -184,48 +194,155 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
     return (
       <TouchableOpacity onPress={() => handleAddToLog(item)}>
         <Card style={styles.foodCard}>
-          <Card.Content style={styles.foodCardContent}>
+          <Card.Content style={styles.cardContent}>
             <Avatar.Icon
-              size={40}
+              size={48}
               icon={getSourceIcon(item.source || '')}
-              style={{ backgroundColor: sourceColor }}
-              color="#fff"
+              style={[styles.sourceIcon, { backgroundColor: `${sourceColor}20` }]}
+              color={sourceColor}
             />
-            <View style={styles.foodInfo}>
-              <Title style={[styles.foodName, { color: sourceColor }]}>{item.name}</Title>
-              {item.brand && <Text style={styles.brandText}>{item.brand}</Text>}
 
-              <View style={styles.macroContainer}>
-                <View style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{item.calories}</Text>
-                  <Text style={styles.macroLabel}>Calories</Text>
+            <View style={styles.foodInfoContainer}>
+              <View style={styles.nameRow}>
+                <Text style={styles.foodName} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text style={styles.servingInfo}>
+                  {item.serving_size || 100}{item.serving_unit || 'g'}
+                </Text>
+                <TouchableOpacity onPress={() => handleAddToLog(item)}>
+                  <Avatar.Icon
+                    size={24}
+                    icon="plus"
+                    color={theme.colors.primary}
+                    style={styles.actionIcon}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.nutritionGrid}>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionValue}>{Math.round(item.calories || 0)}</Text>
+                  <Text style={styles.nutritionLabel}>Calories</Text>
                 </View>
-                <View style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{item.protein}g</Text>
-                  <Text style={styles.macroLabel}>Protein</Text>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionValue}>{(Number(item.protein || 0)).toFixed(1)}g</Text>
+                  <Text style={styles.nutritionLabel}>Protein</Text>
                 </View>
-                <View style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{item.carbs}g</Text>
-                  <Text style={styles.macroLabel}>Carbs</Text>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionValue}>{(Number(item.carbs || 0)).toFixed(1)}g</Text>
+                  <Text style={styles.nutritionLabel}>Carbs</Text>
                 </View>
-                <View style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{item.fat}g</Text>
-                  <Text style={styles.macroLabel}>Fat</Text>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionValue}>{(Number(item.fat || 0)).toFixed(1)}g</Text>
+                  <Text style={styles.nutritionLabel}>Fat</Text>
                 </View>
               </View>
             </View>
-
-            <TouchableOpacity
-              onPress={() => handleAddToLog(item)}
-              style={styles.actionButton}
-            >
-              <MaterialCommunityIcons name="plus-circle" size={24} color={theme.colors.primary} />
-            </TouchableOpacity>
           </Card.Content>
         </Card>
       </TouchableOpacity>
     );
   };
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    searchContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      backgroundColor: theme.colors.surface,
+      elevation: 4,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      zIndex: 1,
+    },
+    searchBar: {
+      flex: 1,
+      marginRight: 8,
+      elevation: 0,
+      backgroundColor: theme.colors.background,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollViewContent: {
+      paddingVertical: 8,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 10,
+      color: theme.colors.onSurface,
+    },
+    foodCard: {
+      marginHorizontal: 16,
+      marginVertical: 4,
+      elevation: 1,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 8,
+    },
+    cardContent: {
+      padding: 16,
+    },
+    sourceIcon: {
+      position: 'absolute',
+      top: '50%',
+      left: 16,
+      transform: [{ translateY: -24 }], // Half the size to center it
+    },
+    foodInfoContainer: {
+      marginLeft: 72, // Increased to accommodate larger icon
+    },
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    foodName: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: theme.colors.onSurface,
+      marginRight: 4,
+    },
+    servingInfo: {
+      fontSize: 14,
+      color: theme.colors.onSurfaceVariant,
+      flex: 1,
+    },
+    actionIcon: {
+      backgroundColor: 'transparent',
+    },
+    nutritionGrid: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+      gap: 16,
+      flexWrap: 'wrap',
+    },
+    nutritionItem: {
+      alignItems: 'center',
+    },
+    nutritionValue: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: theme.colors.onSurface,
+      textAlign: 'center',
+    },
+    nutritionLabel: {
+      fontSize: 12,
+      color: theme.colors.onSurfaceVariant,
+      textAlign: 'center',
+    },
+  });
 
   return (
     <View style={styles.container}>
@@ -266,93 +383,5 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    zIndex: 1,
-  },
-  searchBar: {
-    flex: 1,
-    marginRight: 8,
-    elevation: 0,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollViewContent: {
-    padding: 16,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-  },
-  foodCard: {
-    marginBottom: 16,
-    elevation: 2,
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  foodCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  },
-  foodInfo: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  foodName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    textTransform: 'capitalize',
-  },
-  brandText: {
-    fontSize: 14,
-    color: '#757575',
-    marginBottom: 4,
-  },
-  macroContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  macroItem: {
-    flexDirection: 'column',
-    alignItems: 'center',
-  },
-  macroValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  macroLabel: {
-    fontSize: 14,
-    color: '#757575',
-  },
-  actionButton: {
-    margin: 0,
-    padding: 0,
-  },
-});
 
 export default SearchFoodForLogScreen;

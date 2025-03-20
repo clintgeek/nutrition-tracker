@@ -138,7 +138,7 @@ const TodaySummary: React.FC = () => {
   };
 
   return (
-    <Card style={styles.card}>
+    <Card style={[styles.card, { backgroundColor: '#fff' }]}>
       <Card.Content>
         {isLoading ? (
           <View style={styles.loadingContainer}>
@@ -177,13 +177,13 @@ const TodaySummary: React.FC = () => {
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Today's Calories</Text>
                 <Text style={styles.sectionValue}>
-                  {Math.round(summary.calories.consumed)} / {Math.round(summary.calories.goal)} kcal
+                  {Math.round(summary.calories.consumed)} / {Math.round(summary.calories.goal)} cal
                 </Text>
               </View>
               <ProgressBar
                 progress={calculatePercentage(summary.calories.consumed, summary.calories.goal)}
                 color={theme.colors.primary}
-                style={styles.progressBar}
+                style={[styles.progressBar, { backgroundColor: '#f5f5f5' }]}
               />
             </View>
 
@@ -198,13 +198,13 @@ const TodaySummary: React.FC = () => {
                       <View style={styles.macroHeader}>
                         <Text style={styles.macroLabel}>Protein</Text>
                         <Text style={styles.macroValue}>
-                          {Math.round(summary.macros.protein.consumed)}g / {Math.round(summary.macros.protein.goal)}g
+                          {(summary.macros.protein.consumed).toFixed(1)}g / {(summary.macros.protein.goal).toFixed(1)}g
                         </Text>
                       </View>
                       <ProgressBar
                         progress={calculatePercentage(summary.macros.protein.consumed, summary.macros.protein.goal)}
                         color="#4CAF50"
-                        style={styles.progressBar}
+                        style={[styles.progressBar, { backgroundColor: '#f5f5f5' }]}
                       />
                     </View>
                   )}
@@ -214,13 +214,13 @@ const TodaySummary: React.FC = () => {
                       <View style={styles.macroHeader}>
                         <Text style={styles.macroLabel}>Carbs</Text>
                         <Text style={styles.macroValue}>
-                          {Math.round(summary.macros.carbs.consumed)}g / {Math.round(summary.macros.carbs.goal)}g
+                          {(summary.macros.carbs.consumed).toFixed(1)}g / {(summary.macros.carbs.goal).toFixed(1)}g
                         </Text>
                       </View>
                       <ProgressBar
                         progress={calculatePercentage(summary.macros.carbs.consumed, summary.macros.carbs.goal)}
                         color="#FF9800"
-                        style={styles.progressBar}
+                        style={[styles.progressBar, { backgroundColor: '#f5f5f5' }]}
                       />
                     </View>
                   )}
@@ -230,13 +230,13 @@ const TodaySummary: React.FC = () => {
                       <View style={styles.macroHeader}>
                         <Text style={styles.macroLabel}>Fat</Text>
                         <Text style={styles.macroValue}>
-                          {Math.round(summary.macros.fat.consumed)}g / {Math.round(summary.macros.fat.goal)}g
+                          {(summary.macros.fat.consumed).toFixed(1)}g / {(summary.macros.fat.goal).toFixed(1)}g
                         </Text>
                       </View>
                       <ProgressBar
                         progress={calculatePercentage(summary.macros.fat.consumed, summary.macros.fat.goal)}
                         color="#E91E63"
-                        style={styles.progressBar}
+                        style={[styles.progressBar, { backgroundColor: '#f5f5f5' }]}
                       />
                     </View>
                   )}
