@@ -18,8 +18,8 @@ async function getRecipeById(recipeId, userId) {
 
 async function getRecipeIngredients(recipeId) {
   const result = await db.query(
-    `SELECT ri.*, f.name as food_name, f.calories_per_serving, f.protein_grams,
-            f.carbs_grams, f.fat_grams
+    `SELECT ri.*, f.name as food_name, f.calories as calories_per_serving, f.protein as protein_grams,
+            f.carbs as carbs_grams, f.fat as fat_grams
      FROM recipe_ingredients ri
      JOIN food_items f ON ri.food_item_id = f.id
      WHERE ri.recipe_id = $1 AND ri.is_deleted = false
@@ -52,23 +52,41 @@ async function createRecipe(userId, data) {
     // Add ingredients
     if (data.ingredients && data.ingredients.length > 0) {
       console.log('Adding ingredients:', data.ingredients);
-      const ingredientValues = data.ingredients.map((ing, index) =>
-        `($1, $${index * 3 + 2}, $${index * 3 + 3}, $${index * 3 + 4}, ${index})`
-      ).join(',');
 
-      const ingredientParams = data.ingredients.flatMap(ing =>
-        [recipe.id, ing.food_item_id, ing.amount, ing.unit || 'serving']
-      );
+      // Create parameterized values for each ingredient
+      const values = data.ingredients.map((ing, index) => {
+        const baseIndex = index * 4 + 1;
+        return `($${baseIndex}, $${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, ${index})`;
+      }).join(',');
 
-      console.log('Ingredient SQL:', `INSERT INTO recipe_ingredients (recipe_id, food_item_id, amount, unit, order_index) VALUES ${ingredientValues}`);
-      console.log('Ingredient params:', ingredientParams);
+      // Create flat array of parameters
+      const params = data.ingredients.flatMap(ing => [
+        recipe.id,
+        ing.food_item_id,
+        ing.amount,
+        ing.unit || 'serving'
+      ]);
 
-      await client.query(
-        `INSERT INTO recipe_ingredients (recipe_id, food_item_id, amount, unit, order_index)
-         VALUES ${ingredientValues}`,
-        ingredientParams
-      );
-      console.log('Ingredients added successfully');
+      console.log('Ingredient SQL:', `INSERT INTO recipe_ingredients (recipe_id, food_item_id, amount, unit, order_index) VALUES ${values}`);
+      console.log('Ingredient params:', params);
+
+      try {
+        await client.query(
+          `INSERT INTO recipe_ingredients (recipe_id, food_item_id, amount, unit, order_index)
+           VALUES ${values}`,
+          params
+        );
+        console.log('Ingredients added successfully');
+      } catch (error) {
+        console.error('Error adding ingredients:', error);
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          code: error.code,
+          detail: error.detail
+        });
+        throw error;
+      }
 
       // Calculate nutrition totals
       const ingredients = await getRecipeIngredients(recipe.id);
@@ -130,6 +148,12 @@ async function createRecipe(userId, data) {
     return recipe;
   } catch (error) {
     console.error('Error in createRecipe:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      detail: error.detail
+    });
     await client.query('ROLLBACK');
     throw error;
   } finally {
@@ -194,7 +218,7 @@ async function updateRecipe(recipeId, userId, data) {
       // Add new ingredients
       if (data.ingredients.length > 0) {
         const ingredientValues = data.ingredients.map((ing, index) =>
-          `($1, $${index * 3 + 2}, $${index * 3 + 3}, $${index * 3 + 4}, ${index})`
+          `($1, $${index * 4 + 2}, $${index * 4 + 3}, $${index * 4 + 4}, ${index})`
         ).join(',');
 
         const ingredientParams = data.ingredients.flatMap(ing =>

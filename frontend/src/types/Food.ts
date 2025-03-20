@@ -1,5 +1,29 @@
-export interface Food {
+// Base food interface for API responses
+export interface ApiFood {
   id: string | number;
+  name: string;
+  calories: number;
+  serving_size: number;
+  serving_unit: string;
+  protein: number;
+  carbs: number;
+  fat: number;
+  created_at?: string;
+  updated_at?: string;
+  is_custom?: boolean;
+  user_id?: string;
+  sync_status?: 'synced' | 'pending' | 'failed';
+  source: string;
+  barcode?: string;
+  brand?: string;
+  source_id?: string;
+  sync_id?: string;
+  is_deleted?: boolean;
+}
+
+// Food interface for internal use (after conversion)
+export interface Food {
+  id: number;
   name: string;
   calories: number;
   serving_size: number;
@@ -18,6 +42,12 @@ export interface Food {
   source_id?: string;
   sync_id?: string;
   is_deleted?: boolean;
+}
+
+// Interface for API responses
+export interface FoodApiResponse {
+  food: ApiFood;
+  message?: string;
 }
 
 // Interface for creating a new food item

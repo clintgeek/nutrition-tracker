@@ -51,16 +51,16 @@ const getSourceColor = (source: string, theme: any) => {
 };
 
 const mapFoodItemToFood = (item: FoodItem): Food => ({
-  id: item.id.toString(),
+  id: typeof item.id === 'string' ? parseInt(item.id, 10) : (item.id || Date.now()),
   name: item.name,
   barcode: item.barcode,
   brand: item.brand,
-  calories: item.calories,
-  protein: item.protein,
-  carbs: item.carbs,
-  fat: item.fat,
-  serving_size: item.serving_size,
-  serving_unit: item.serving_unit,
+  calories: item.calories || 0,
+  protein: item.protein || 0,
+  carbs: item.carbs || 0,
+  fat: item.fat || 0,
+  serving_size: item.serving_size || 100,
+  serving_unit: item.serving_unit || 'g',
   is_custom: item.source === 'custom',
   source: item.source === 'custom' ? 'custom' : 'usda',
   created_at: item.created_at || new Date().toISOString(),
@@ -186,7 +186,6 @@ export function SearchFoodForRecipeScreen() {
         // Ensure all fields are properly set
         food = {
           ...customFood,
-          id: customFood.id.toString(),
           name: capitalizeFoodName(customFood.name),
           calories: customFood.calories || food.calories || 0,
           protein: customFood.protein || food.protein || 0,
@@ -216,54 +215,45 @@ export function SearchFoodForRecipeScreen() {
     }
   };
 
-  const renderFoodItem = ({ item }: { item: Food }) => {
-    const sourceColor = getSourceColor(item.source || '', theme);
-
-    return (
-      <TouchableOpacity onPress={() => handleSelectFood(item)}>
-        <Card style={styles.foodCard}>
-          <Card.Content style={styles.foodCardContent}>
-            <Avatar.Icon
-              size={40}
-              icon={getSourceIcon(item.source || '')}
-              style={{ backgroundColor: sourceColor }}
-              color="#fff"
-            />
-            <View style={styles.foodInfo}>
-              <Title style={[styles.foodName, { color: sourceColor }]}>{item.name}</Title>
-              {item.brand && <Text style={styles.brandText}>{item.brand}</Text>}
-
-              <View style={styles.macroContainer}>
-                <View style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{item.calories}</Text>
-                  <Text style={styles.macroLabel}>Calories</Text>
-                </View>
-                <View style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{item.protein}g</Text>
-                  <Text style={styles.macroLabel}>Protein</Text>
-                </View>
-                <View style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{item.carbs}g</Text>
-                  <Text style={styles.macroLabel}>Carbs</Text>
-                </View>
-                <View style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{item.fat}g</Text>
-                  <Text style={styles.macroLabel}>Fat</Text>
-                </View>
+  const renderFoodItem = ({ item }: { item: Food }) => (
+    <TouchableOpacity onPress={() => handleSelectFood(item)}>
+      <Card style={styles.foodCard}>
+        <Card.Content style={styles.foodCardContent}>
+          <Avatar.Icon
+            size={40}
+            icon={getSourceIcon(item.source || '')}
+            style={{ backgroundColor: getSourceColor(item.source || '', theme) }}
+            color="#fff"
+          />
+          <View style={styles.foodInfo}>
+            <Title style={styles.foodName}>{item.name}</Title>
+            {item.brand && <Text style={styles.brandText}>{item.brand}</Text>}
+            <Text style={styles.servingText}>
+              Per {item.serving_size || 1} {item.serving_unit || 'serving'}
+            </Text>
+            <View style={styles.macroContainer}>
+              <View style={styles.macroItem}>
+                <Text style={styles.macroValue}>{item.calories}</Text>
+                <Text style={styles.macroLabel}>Calories</Text>
+              </View>
+              <View style={styles.macroItem}>
+                <Text style={styles.macroValue}>{item.protein}g</Text>
+                <Text style={styles.macroLabel}>Protein</Text>
+              </View>
+              <View style={styles.macroItem}>
+                <Text style={styles.macroValue}>{item.carbs}g</Text>
+                <Text style={styles.macroLabel}>Carbs</Text>
+              </View>
+              <View style={styles.macroItem}>
+                <Text style={styles.macroValue}>{item.fat}g</Text>
+                <Text style={styles.macroLabel}>Fat</Text>
               </View>
             </View>
-
-            <TouchableOpacity
-              onPress={() => handleSelectFood(item)}
-              style={styles.actionButton}
-            >
-              <MaterialCommunityIcons name="plus-circle" size={24} color={theme.colors.primary} />
-            </TouchableOpacity>
-          </Card.Content>
-        </Card>
-      </TouchableOpacity>
-    );
-  };
+          </View>
+        </Card.Content>
+      </Card>
+    </TouchableOpacity>
+  );
 
   return (
     <View style={styles.container}>
@@ -337,6 +327,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   brandText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  servingText: {
     fontSize: 14,
     color: '#666',
     marginBottom: 8,

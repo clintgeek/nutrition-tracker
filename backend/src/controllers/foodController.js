@@ -407,7 +407,7 @@ const getRecentFoods = asyncHandler(async (req, res) => {
     logger.info(`getRecentFoods called - User authenticated: ${!!req.user}, User ID: ${req.user?.id}`);
 
     if (req.user && req.user.id) {
-      // If authenticated, get user-specific foods
+      // If authenticated, get user-specific foods and all custom foods
       query = `
         WITH LastUsed AS (
           SELECT food_item_id,
@@ -420,19 +420,19 @@ const getRecentFoods = asyncHandler(async (req, res) => {
         FROM food_items f
         LEFT JOIN LastUsed lu ON f.id = lu.food_item_id
         WHERE f.is_deleted = FALSE
-          AND (f.user_id = $1 OR f.user_id IS NULL)
+          AND (f.user_id = $1 OR f.source = 'custom' OR f.source = 'recipe')
         ORDER BY lu.last_used DESC NULLS LAST, f.created_at DESC
         LIMIT $2
       `;
       params = [req.user.id, limit];
       logger.info('Using authenticated query with params:', params);
     } else {
-      // If not authenticated, get only public foods
+      // If not authenticated, get all custom foods and recipes
       query = `
         SELECT DISTINCT f.*
         FROM food_items f
         WHERE f.is_deleted = FALSE
-          AND f.user_id IS NULL
+          AND (f.source = 'custom' OR f.source = 'recipe')
         ORDER BY f.created_at DESC
         LIMIT $1
       `;

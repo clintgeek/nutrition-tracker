@@ -1,10 +1,6 @@
-import { Food, CreateFoodDTO } from '../types/Food';
+import { Food, ApiFood, CreateFoodDTO, FoodSearchResult, FoodSearchParams } from '../types/Food';
 import { apiService } from './apiService';
-
-interface FoodApiResponse {
-  message: string;
-  food: Food;
-}
+import { API_URL } from '../config';
 
 // Food item interface
 export interface FoodItem {
@@ -245,6 +241,48 @@ const capitalizeFoodName = (name: string): string => {
   return name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
 };
 
+// Helper function to convert ApiFood to Food
+function convertApiFood(apiFood: ApiFood): Food {
+  const id = typeof apiFood.id === 'string' ? parseInt(apiFood.id, 10) : apiFood.id;
+  if (isNaN(id)) {
+    throw new Error(`Invalid food ID: ${apiFood.id}`);
+  }
+
+  let source: 'custom' | 'usda' | 'recipe' = 'custom';
+  if (apiFood.source === 'usda' || apiFood.source === 'recipe') {
+    source = apiFood.source;
+  }
+
+  const convertedFood: Food = {
+    id,
+    name: apiFood.name,
+    calories: apiFood.calories,
+    serving_size: apiFood.serving_size,
+    serving_unit: apiFood.serving_unit,
+    protein: apiFood.protein,
+    carbs: apiFood.carbs,
+    fat: apiFood.fat,
+    created_at: apiFood.created_at,
+    updated_at: apiFood.updated_at,
+    is_custom: apiFood.is_custom,
+    user_id: apiFood.user_id,
+    sync_status: apiFood.sync_status,
+    source,
+    barcode: apiFood.barcode,
+    brand: apiFood.brand,
+    source_id: apiFood.source_id,
+    sync_id: apiFood.sync_id,
+    is_deleted: apiFood.is_deleted
+  };
+
+  return convertedFood;
+}
+
+// Helper function to convert array of ApiFood to Food
+function convertApiFoods(apiFoods: ApiFood[]): Food[] {
+  return apiFoods.map(convertApiFood);
+}
+
 // Food service
 export const foodService = {
   // Search for foods
@@ -265,7 +303,7 @@ export const foodService = {
         const brand = extractBrand(food);
 
         return {
-          id: food.id?.toString() || '',
+          id: typeof food.id === 'string' ? parseInt(food.id, 10) : food.id,
           name: food.name || food.product_name || food.food_name || '',
           barcode: food.barcode || food.code || food.upc || null,
           brand,
@@ -275,9 +313,9 @@ export const foodService = {
           fat: nutrition.fat,
           serving_size: nutrition.serving_size,
           serving_unit: nutrition.serving_unit,
-          source: food.source || 'api',
+          source: food.source === 'usda' || food.source === 'recipe' ? food.source : 'custom',
           source_id: food.sourceId || food.source_id || food.code || `api-${food.id}`,
-          is_custom: false,
+          is_custom: food.source !== 'usda' && food.source !== 'recipe',
         };
       });
 
@@ -294,11 +332,11 @@ export const foodService = {
   async combinedSearch(query: string, page = 1, limit = 20): Promise<Food[]> {
     try {
       const response = await apiService.get<SearchResponse>(`/api/foods/search?query=${encodeURIComponent(query)}`);
-      const mappedFoods = response.foods.map(food => ({
+      return response.foods.map(food => ({
         ...food,
-        id: food.id.toString(),
+        id: typeof food.id === 'string' ? parseInt(food.id, 10) : food.id,
+        source: food.source === 'usda' || food.source === 'recipe' ? food.source : 'custom'
       }));
-      return mappedFoods;
     } catch (error) {
       console.error('Error in combined search:', error);
       return [];
@@ -343,7 +381,7 @@ export const foodService = {
           const brand = extractBrand(data.product);
 
           return {
-            id: `off-${barcode}`,
+            id: Date.now(), // Generate a temporary numeric ID
             name: data.product.product_name || data.product.generic_name || 'Unknown Product',
             brand: brand,
             barcode: barcode,
@@ -353,10 +391,9 @@ export const foodService = {
             fat: nutrition.fat,
             serving_size: nutrition.serving_size,
             serving_unit: nutrition.serving_unit,
-            source: 'openfoodfacts',
+            source: 'custom', // OpenFoodFacts items are treated as custom foods
             source_id: barcode,
-            is_custom: false,
-            image_url: data.product.image_url,
+            is_custom: true
           };
         } catch (error) {
           if (attempt === retryCount) {
@@ -376,36 +413,24 @@ export const foodService = {
     }
   },
 
-  // Get custom foods
-  async getCustomFoods(page = 1, limit = 20): Promise<FoodItem[]> {
-    try {
-      const response = await apiService.get<CustomFoodsResponse>(`/foods/custom?page=${page}&limit=${limit}&include_deleted=false`);
-
-      if (response && response.foods && Array.isArray(response.foods)) {
-        return response.foods.map(food => ({
-          ...transformToFoodItem(food),
-          ...mapNutritionData(food)
-        }));
-      }
-
-      console.warn('Unexpected custom foods response format');
-      return [];
-    } catch (error) {
-      console.error('Error fetching custom foods:', error);
-      throw error;
+  // Helper function to ensure food has numeric ID
+  ensureNumericId(food: any): Food {
+    const numericId = Number(food.id);
+    if (isNaN(numericId)) {
+      throw new Error('Invalid food ID');
     }
+    return {
+      ...food,
+      id: numericId,
+      source: food.source === 'openfoodfacts' ? 'custom' : (food.source || 'custom')
+    } as Food;
   },
 
   // Create custom food
-  async createCustomFood(foodData: CreateFoodDTO): Promise<Food> {
+  async createCustomFood(food: CreateFoodDTO): Promise<Food> {
     try {
-      console.log('Creating custom food with data:', foodData);
-      const capitalizedFoodData = {
-        ...foodData,
-        name: capitalizeFoodName(foodData.name)
-      };
-      const response = await apiService.post<FoodApiResponse>('/foods/custom', capitalizedFoodData);
-      return response.food;
+      const response = await apiService.post<{ food: ApiFood }>('/foods/custom', food);
+      return convertApiFood(response.food);
     } catch (error) {
       console.error('Error creating custom food:', error);
       throw error;
@@ -413,36 +438,22 @@ export const foodService = {
   },
 
   // Update custom food
-  async updateCustomFood(id: number, foodData: Partial<Food>): Promise<Food> {
+  async updateCustomFood(id: number, food: Partial<CreateFoodDTO>): Promise<Food> {
     try {
-      console.log('Original food data:', foodData);
-
-      // Transform the data to match database column names
-      const transformedData = {
-        name: foodData.name ? capitalizeFoodName(foodData.name) : undefined,
-        calories_per_serving: foodData.calories,
-        protein_grams: foodData.protein,
-        carbs_grams: foodData.carbs,
-        fat_grams: foodData.fat,
-        serving_size: foodData.serving_size,
-        serving_unit: foodData.serving_unit,
-        source: foodData.source,
-        source_id: foodData.source_id,
-        brand: foodData.brand,
-        barcode: foodData.barcode
-      };
-
-      // Remove any undefined values
-      Object.keys(transformedData).forEach(key => {
-        if (transformedData[key] === undefined) {
-          delete transformedData[key];
-        }
+      const response = await fetch(`${API_URL}/foods/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(food),
       });
 
-      console.log('Transformed food data:', transformedData);
+      if (!response.ok) {
+        throw new Error('Failed to update custom food');
+      }
 
-      const response = await apiService.put<{ message: string; food: Food }>(`/foods/custom/${id}`, transformedData);
-      return response.food;
+      const data: { food: ApiFood } = await response.json();
+      return convertApiFood(data.food);
     } catch (error) {
       console.error('Error updating custom food:', error);
       throw error;
@@ -472,7 +483,7 @@ export const foodService = {
   // Map food item from database to frontend format
   mapFoodItemToFood(item: FoodItem): Food {
     return {
-      id: item.id.toString(),
+      id: typeof item.id === 'string' ? parseInt(item.id, 10) : item.id,
       name: item.name,
       brand: item.brand || undefined,
       barcode: item.barcode || undefined,
@@ -482,12 +493,66 @@ export const foodService = {
       fat: item.fat || item.fat_grams || 0,
       serving_size: item.serving_size || 100,
       serving_unit: item.serving_unit || '',
-      source: item.source,
+      source: item.source === 'usda' || item.source === 'recipe' ? item.source : 'custom',
       source_id: item.source_id,
-      is_custom: item.source === 'custom',
+      is_custom: item.source !== 'usda' && item.source !== 'recipe',
       is_deleted: item.is_deleted || false,
       created_at: item.created_at,
       updated_at: item.updated_at
     };
-  }
+  },
+
+  // Get food by ID
+  async getFood(id: number): Promise<Food> {
+    try {
+      const response = await fetch(`${API_URL}/foods/${id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch food');
+      }
+
+      const data: { food: ApiFood } = await response.json();
+      return convertApiFood(data.food);
+    } catch (error) {
+      console.error('Error fetching food:', error);
+      throw error;
+    }
+  },
+
+  // Search foods
+  async searchFoods(params: FoodSearchParams): Promise<FoodSearchResult> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params.query) queryParams.append('query', params.query);
+      if (params.page) queryParams.append('page', params.page.toString());
+      if (params.limit) queryParams.append('limit', params.limit.toString());
+      if (params.sort_by) queryParams.append('sort_by', params.sort_by);
+      if (params.sort_order) queryParams.append('sort_order', params.sort_order);
+      if (params.include_custom !== undefined) queryParams.append('include_custom', params.include_custom.toString());
+
+      const response = await fetch(`${API_URL}/foods/search?${queryParams.toString()}`);
+      if (!response.ok) {
+        throw new Error('Failed to search foods');
+      }
+
+      const data: { foods: ApiFood[]; total_count: number; page: number; total_pages: number } = await response.json();
+      return {
+        ...data,
+        foods: convertApiFoods(data.foods)
+      };
+    } catch (error) {
+      console.error('Error searching foods:', error);
+      throw error;
+    }
+  },
+
+  // Get custom foods
+  async getCustomFoods(): Promise<Food[]> {
+    try {
+      const response = await apiService.get<{ foods: ApiFood[] }>('/foods/custom');
+      return convertApiFoods(response.foods);
+    } catch (error) {
+      console.error('Error fetching custom foods:', error);
+      throw error;
+    }
+  },
 };

@@ -274,20 +274,13 @@ export function RecipesScreen() {
 
       {isFocused && (
         <Portal>
-          <FAB.Group
-            open={fabOpen}
+          <FAB
+            icon="plus"
+            label="New Recipe"
+            onPress={() => navigation.navigate('RecipeDetail', { recipeId: 'new' })}
             visible={true}
-            icon={fabOpen ? 'close' : 'plus'}
-            actions={[
-              {
-                icon: 'plus',
-                label: 'New Recipe',
-                onPress: () => navigation.navigate('RecipeDetail', { recipeId: 'new' })
-              }
-            ]}
-            onStateChange={({ open }) => setFabOpen(open)}
-            style={styles.fab}
-            fabStyle={{ backgroundColor: theme.colors.primary }}
+            style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+            color="white"
           />
         </Portal>
       )}
@@ -387,6 +380,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     margin: 16,
     right: 0,
-    bottom: 0,
+    bottom: 64, // Increased to move above tab bar
   },
 });

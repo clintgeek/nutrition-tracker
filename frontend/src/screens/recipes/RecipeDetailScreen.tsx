@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useRoute } from '@react-navigation/core';
 import type { RouteProp } from '@react-navigation/core';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useTheme, Portal, FAB } from 'react-native-paper';
+import { useTheme, Portal, FAB, Card, Title } from 'react-native-paper';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { Recipe, RecipeIngredient, RecipeStep, CreateRecipeDTO, CreateRecipeStepDTO } from '../../types/Recipe';
 import { RecipeStackParamList } from '../../types/navigation';
@@ -12,10 +12,12 @@ import { recipeService } from '../../services/recipeService';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { ErrorMessage } from '../../components/common/ErrorMessage';
 import { Button } from '../../components/Button';
-import { Card } from '../../components/Card';
 import { IconButton } from '../../components/IconButton';
 import { formatNumber } from '../../utils/formatters';
 import { Icon } from '@rneui/themed';
+import { EditIngredientModal } from '../../components/recipes/EditIngredientModal';
+import { Food } from '../../types/Food';
+import { v4 as uuidv4 } from 'uuid';
 
 type RecipeDetailScreenRouteProp = RouteProp<RecipeStackParamList, 'RecipeDetail'>;
 type RecipeDetailScreenNavigationProp = NativeStackNavigationProp<RecipeStackParamList>;
@@ -67,6 +69,8 @@ export function RecipeDetailScreen() {
     ingredients: [],
     steps: []
   });
+  const [selectedIngredient, setSelectedIngredient] = useState<Food | null>(null);
+  const [showEditIngredientModal, setShowEditIngredientModal] = useState(false);
 
   useEffect(() => {
     if (!isNew) {
@@ -191,108 +195,64 @@ export function RecipeDetailScreen() {
   };
 
   const handleAddIngredient = () => {
-    console.log('handleAddIngredient called - navigating to SearchFoodForRecipe');
-    console.log('Current recipeId:', recipeId);
-
-    // Try a different navigation approach
-    const params = {
-      recipeId: typeof recipeId === 'string' ? 'new' : Number(recipeId)
-    };
-    console.log('Navigation params:', params);
-
-    // Try using the push method instead of navigate
-    navigation.push('SearchFoodForRecipe', params);
-    console.log('Navigation push completed');
+    navigation.navigate('SearchFoodForRecipe', {
+      recipeId: route.params.recipeId
+    });
   };
 
-  // Handle selected ingredient from search
   useEffect(() => {
-    const selectedIngredient = route.params?.selectedIngredient;
-    console.log('Selected ingredient changed:', JSON.stringify(selectedIngredient, null, 2));
-    console.log('Current ingredients:', JSON.stringify(ingredients, null, 2));
-    console.log('Current form ingredients:', JSON.stringify(form.ingredients, null, 2));
-
-    if (selectedIngredient) {
-      const foodItemId = parseInt(selectedIngredient.id.toString());
-      console.log('Adding ingredient with ID:', foodItemId);
-
-      // Update form ingredients
-      setForm(prev => {
-        // Check if ingredient already exists
-        const exists = prev.ingredients.some(ing => ing.food_item_id === foodItemId);
-        if (exists) {
-          console.log('Ingredient already exists in form, not adding again');
-          return prev;
-        }
-
-        console.log('Previous form ingredients:', JSON.stringify(prev.ingredients, null, 2));
-
-        const newIngredient = {
-          food_item_id: foodItemId,
-          amount: 1,
-          unit: selectedIngredient.serving_unit || 'serving',
-          order_index: prev.ingredients.length
-        };
-
-        console.log('New ingredient to add:', JSON.stringify(newIngredient, null, 2));
-
-        const newIngredients = [...prev.ingredients, newIngredient];
-        console.log('Combined ingredients:', JSON.stringify(newIngredients, null, 2));
-
-        const newForm = {
-          ...prev,
-          ingredients: newIngredients
-        };
-
-        console.log('Updated form ingredients:', JSON.stringify(newForm.ingredients, null, 2));
-        return newForm;
-      });
-
-      // Also update ingredients state with food details
-      setIngredients(prev => {
-        // Check if ingredient already exists
-        const exists = prev.some(ing => ing.food_item_id === foodItemId);
-        if (exists) {
-          console.log('Ingredient already exists in ingredients, not adding again');
-          return prev;
-        }
-
-        console.log('Previous ingredients:', JSON.stringify(prev, null, 2));
-
-        const newIngredient = {
-          id: Date.now(), // Temporary ID for new ingredient
-          recipe_id: typeof recipeId === 'string' ? -1 : Number(recipeId),
-          food_item_id: foodItemId,
-          food_name: selectedIngredient.name,
-          calories_per_serving: selectedIngredient.calories,
-          protein_grams: selectedIngredient.protein,
-          carbs_grams: selectedIngredient.carbs,
-          fat_grams: selectedIngredient.fat,
-          amount: 1,
-          unit: selectedIngredient.serving_unit || 'serving',
-          order_index: prev.length,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          deleted_at: null,
-          sync_id: null,
-          is_deleted: false
-        };
-
-        console.log('New ingredient to add:', JSON.stringify(newIngredient, null, 2));
-
-        const newIngredients = [...prev, newIngredient];
-        console.log('Combined ingredients:', JSON.stringify(newIngredients, null, 2));
-
-        return newIngredients;
-      });
-
-      // Clear the selected ingredient from params
+    const selectedFood = route.params?.selectedIngredient;
+    if (selectedFood) {
+      setSelectedIngredient(selectedFood);
+      setShowEditIngredientModal(true);
       navigation.setParams({ selectedIngredient: undefined });
-      console.log('Cleared selected ingredient from params');
     }
-  }, [route.params?.selectedIngredient, recipeId]);
+  }, [route.params?.selectedIngredient]);
 
-  // Update the nutrition calculations to account for ingredient amounts
+  const handleSaveIngredient = (amount: number, savedFood: Food) => {
+    if (!selectedIngredient) return;
+
+    // Ensure we have a numeric ID
+    const foodItemId = Number(savedFood.id);
+    if (isNaN(foodItemId)) {
+      console.error('Invalid food ID:', savedFood.id);
+      return;
+    }
+
+    const newIngredient: DraggableIngredient = {
+      id: Date.now(), // Use timestamp as temporary ID
+      recipe_id: Number(recipeId),
+      food_item_id: foodItemId,
+      amount,
+      unit: savedFood.serving_unit,
+      order_index: ingredients.length,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      sync_id: '',
+      is_deleted: false,
+      // Joined fields
+      food_name: savedFood.name,
+      calories_per_serving: savedFood.calories,
+      protein_grams: savedFood.protein,
+      carbs_grams: savedFood.carbs,
+      fat_grams: savedFood.fat
+    };
+
+    setIngredients(prev => [...prev, newIngredient]);
+    setForm(prev => ({
+      ...prev,
+      ingredients: [...prev.ingredients, {
+        food_item_id: foodItemId,
+        amount: newIngredient.amount,
+        unit: newIngredient.unit,
+        order_index: newIngredient.order_index
+      }]
+    }));
+
+    setSelectedIngredient(null);
+    setShowEditIngredientModal(false);
+  };
+
   const calculateNutritionTotals = () => {
     return ingredients.reduce((totals, ing) => ({
       calories: totals.calories + (ing.calories_per_serving || 0) * (ing.amount || 1),
@@ -302,10 +262,8 @@ export function RecipeDetailScreen() {
     }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
   };
 
-  // Update the nutrition display section
   const nutritionTotals = calculateNutritionTotals();
 
-  // Also update handleRemoveIngredient to remove from both states
   const handleRemoveIngredient = (index: number) => {
     const ingredientToRemove = form.ingredients[index];
     setForm(prev => ({
@@ -317,7 +275,6 @@ export function RecipeDetailScreen() {
     );
   };
 
-  // Update handleUpdateIngredient to update both states
   const handleUpdateIngredient = (index: number, amount: number, unit: string) => {
     const ingredient = form.ingredients[index];
     setForm(prev => ({
@@ -364,39 +321,117 @@ export function RecipeDetailScreen() {
     }));
   };
 
-  const renderIngredient = ({ item, drag, isActive }: RenderItemParams<DraggableIngredient>) => (
-    <Card style={styles.draggableItem}>
-      <View style={[styles.ingredientRow, isActive && { backgroundColor: theme.colors.surfaceVariant }]}>
-        <IconButton
-          icon="drag"
-          size={20}
-          onPress={drag}
-        />
-        <View style={styles.ingredientContent}>
-          <Text style={[styles.ingredientName, { color: theme.colors.onSurface }]}>
-            {item.food_name}
-          </Text>
-          <Text style={[styles.ingredientAmount, { color: theme.colors.onSurfaceVariant }]}>
-            {item.amount} {item.unit}
-          </Text>
+  const renderNutritionSummary = () => {
+    const totals = ingredients.reduce((acc, ingredient) => ({
+      calories: acc.calories + (ingredient.calories_per_serving || 0) * (ingredient.amount || 1),
+      protein: acc.protein + (ingredient.protein_grams || 0) * (ingredient.amount || 1),
+      carbs: acc.carbs + (ingredient.carbs_grams || 0) * (ingredient.amount || 1),
+      fat: acc.fat + (ingredient.fat_grams || 0) * (ingredient.amount || 1)
+    }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+
+    const perServing = {
+      calories: Math.round(totals.calories / form.servings),
+      protein: Math.round(totals.protein * 10 / form.servings) / 10,
+      carbs: Math.round(totals.carbs * 10 / form.servings) / 10,
+      fat: Math.round(totals.fat * 10 / form.servings) / 10
+    };
+
+    return (
+      <Card style={styles.nutritionCard}>
+        <Card.Content>
+          <Title>Nutrition Summary</Title>
+          <View style={styles.nutritionRow}>
+            <View style={styles.nutritionColumn}>
+              <Title>Total Recipe</Title>
+              <View style={styles.macroRow}>
+                <View style={styles.macroItem}>
+                  <Text style={styles.macroValue}>{Math.round(totals.calories)}</Text>
+                  <Text style={styles.macroLabel}>Calories</Text>
+                </View>
+                <View style={styles.macroItem}>
+                  <Text style={styles.macroValue}>{Math.round(totals.protein)}g</Text>
+                  <Text style={styles.macroLabel}>Protein</Text>
+                </View>
+                <View style={styles.macroItem}>
+                  <Text style={styles.macroValue}>{Math.round(totals.carbs)}g</Text>
+                  <Text style={styles.macroLabel}>Carbs</Text>
+                </View>
+                <View style={styles.macroItem}>
+                  <Text style={styles.macroValue}>{Math.round(totals.fat)}g</Text>
+                  <Text style={styles.macroLabel}>Fat</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.nutritionColumn}>
+              <Title>Per Serving</Title>
+              <View style={styles.macroRow}>
+                <View style={styles.macroItem}>
+                  <Text style={styles.macroValue}>{perServing.calories}</Text>
+                  <Text style={styles.macroLabel}>Calories</Text>
+                </View>
+                <View style={styles.macroItem}>
+                  <Text style={styles.macroValue}>{perServing.protein}g</Text>
+                  <Text style={styles.macroLabel}>Protein</Text>
+                </View>
+                <View style={styles.macroItem}>
+                  <Text style={styles.macroValue}>{perServing.carbs}g</Text>
+                  <Text style={styles.macroLabel}>Carbs</Text>
+                </View>
+                <View style={styles.macroItem}>
+                  <Text style={styles.macroValue}>{perServing.fat}g</Text>
+                  <Text style={styles.macroLabel}>Fat</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </Card.Content>
+      </Card>
+    );
+  };
+
+  const renderIngredient = ({ item, drag, isActive }: RenderItemParams<DraggableIngredient>) => {
+    const nutrition = {
+      calories: Math.round((item.calories_per_serving || 0) * (item.amount || 1)),
+      protein: Math.round((item.protein_grams || 0) * (item.amount || 1) * 10) / 10,
+      carbs: Math.round((item.carbs_grams || 0) * (item.amount || 1) * 10) / 10,
+      fat: Math.round((item.fat_grams || 0) * (item.amount || 1) * 10) / 10
+    };
+
+    return (
+      <Card style={styles.draggableItem}>
+        <View style={[styles.ingredientRow, isActive && { backgroundColor: theme.colors.surfaceVariant }]}>
+          <IconButton
+            icon="drag"
+            size={20}
+            onPress={drag}
+          />
+          <View style={styles.ingredientContent}>
+            <Text style={[styles.ingredientName, { color: theme.colors.onSurface }]}>
+              {item.food_name}
+            </Text>
+            <Text style={[styles.ingredientAmount, { color: theme.colors.onSurfaceVariant }]}>
+              {item.amount} {item.unit}
+            </Text>
+            <View style={styles.macroRow}>
+              <Text style={styles.macroText}>{nutrition.calories} cal</Text>
+              <Text style={styles.macroText}>{nutrition.protein}g P</Text>
+              <Text style={styles.macroText}>{nutrition.carbs}g C</Text>
+              <Text style={styles.macroText}>{nutrition.fat}g F</Text>
+            </View>
+          </View>
+          <IconButton
+            icon="delete"
+            size={20}
+            onPress={() => handleRemoveIngredient(ingredients.findIndex(i => i.food_item_id === item.food_item_id))}
+            style={{
+              marginLeft: 4
+            }}
+            color={theme.colors.error}
+          />
         </View>
-        <IconButton
-          icon="delete"
-          size={20}
-          onPress={() => {
-            setForm(prev => ({
-              ...prev,
-              ingredients: prev.ingredients.filter(i => i.food_item_id !== item.food_item_id)
-            }));
-          }}
-          style={{
-            marginLeft: 4
-          }}
-          color={theme.colors.error}
-        />
-      </View>
-    </Card>
-  );
+      </Card>
+    );
+  };
 
   const renderStep = ({ item, drag, isActive }: RenderItemParams<DraggableStep>) => (
     <Card style={styles.draggableItem}>
@@ -531,6 +566,11 @@ export function RecipeDetailScreen() {
           />
 
           <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>
+            Nutrition
+          </Text>
+          {renderNutritionSummary()}
+
+          <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>
             Ingredients
           </Text>
           <DraggableFlatList
@@ -592,8 +632,19 @@ export function RecipeDetailScreen() {
           onPress={handleSave}
           loading={saving}
           disabled={saving}
+          color="white"
         />
       </Portal>
+
+      <EditIngredientModal
+        visible={showEditIngredientModal}
+        onDismiss={() => {
+          setShowEditIngredientModal(false);
+          setSelectedIngredient(null);
+        }}
+        onSave={handleSaveIngredient}
+        food={selectedIngredient as Food}
+      />
     </View>
   );
 }
@@ -665,5 +716,39 @@ const styles = StyleSheet.create({
     margin: 16,
     right: 0,
     bottom: 0,
+  },
+  nutritionCard: {
+    marginBottom: 16,
+  },
+  nutritionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  nutritionColumn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  macroRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: 8,
+  },
+  macroItem: {
+    alignItems: 'center',
+  },
+  macroValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  macroLabel: {
+    fontSize: 12,
+    opacity: 0.7,
+  },
+  macroText: {
+    fontSize: 12,
+    color: '#666',
+    marginRight: 8,
   },
 });

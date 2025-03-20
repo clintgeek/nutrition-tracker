@@ -180,6 +180,7 @@ class FoodItem {
          FROM food_items
          WHERE similarity(lower(name), lower($1)) > 0.1
          AND is_deleted = FALSE
+         AND (source = 'custom' OR source = 'recipe' OR source IS NULL)
          ORDER BY
            CASE WHEN source = 'recipe' THEN 0 ELSE 1 END,
            similarity(lower(name), lower($1)) DESC

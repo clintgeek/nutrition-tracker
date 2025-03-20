@@ -9,10 +9,9 @@ export async function getRecipes(userId: number): Promise<Recipe[]> {
     FROM recipes r
     LEFT JOIN recipe_ingredients ri ON r.id = ri.recipe_id AND NOT ri.is_deleted
     LEFT JOIN recipe_steps rs ON r.id = rs.recipe_id AND NOT rs.is_deleted
-    WHERE r.user_id = $1 AND NOT r.is_deleted
+    WHERE NOT r.is_deleted
     GROUP BY r.id
-    ORDER BY r.name`,
-    [userId]
+    ORDER BY r.name`
   );
   return rows;
 }
@@ -25,9 +24,9 @@ export async function getRecipeById(id: number, userId: number): Promise<Recipe 
     FROM recipes r
     LEFT JOIN recipe_ingredients ri ON r.id = ri.recipe_id AND NOT ri.is_deleted
     LEFT JOIN recipe_steps rs ON r.id = rs.recipe_id AND NOT rs.is_deleted
-    WHERE r.id = $1 AND r.user_id = $2 AND NOT r.is_deleted
+    WHERE r.id = $1 AND NOT r.is_deleted
     GROUP BY r.id`,
-    [id, userId]
+    [id]
   );
   return rows[0] || null;
 }
