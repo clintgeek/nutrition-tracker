@@ -146,6 +146,7 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   logCard: {
     marginBottom: 16,
+    marginTop: 24,
     elevation: 2,
     backgroundColor: '#fff',
   },

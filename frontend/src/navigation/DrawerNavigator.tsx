@@ -89,7 +89,7 @@ const DrawerContent = (props: any) => {
         activeTintColor={theme.colors.primary}
       />
 
-      {/* Nutrition and Weight Goals from the original DrawerItemList */}
+      {/* Goals */}
       <DrawerItem
         label="Nutrition Goals"
         icon={({ color, size }) => (

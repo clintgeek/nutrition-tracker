@@ -6,13 +6,15 @@ import {
   Title,
   Button,
   Divider,
-  Switch,
   useTheme,
   ActivityIndicator
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { goalService } from '../../services/goalService';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+
+const Tab = createBottomTabNavigator();
 
 // Goal types
 type GoalType = 'calories' | 'macros';
@@ -24,9 +26,10 @@ interface MacroGoals {
   fat: number;
 }
 
-const NutritionGoalsScreen: React.FC = () => {
+const NutritionGoalsContent: React.FC = () => {
   const theme = useTheme();
   const isFocused = useIsFocused();
+  const navigation = useNavigation();
 
   // State for goal type (calories or macros)
   const [goalType, setGoalType] = useState<GoalType>('calories');
@@ -183,25 +186,25 @@ const NutritionGoalsScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles(theme).loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={{ marginTop: 16 }}>Loading goals...</Text>
+        <Text style={{ marginTop: 16, color: theme.colors.onBackground }}>Loading goals...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        <Card style={styles.card}>
+    <ScrollView style={styles(theme).container}>
+      <View style={styles(theme).content}>
+        <Card style={styles(theme).card}>
           <Card.Content>
-            <Title style={{ marginBottom: 16 }}>Nutrition Goals</Title>
+            <Title style={{ marginBottom: 16, color: theme.colors.onSurface }}>Nutrition Goals</Title>
 
-            <Text style={styles.sectionTitle}>Goal Type</Text>
-            <View style={styles.goalTypeContainer}>
+            <Text style={styles(theme).sectionTitle}>Goal Type</Text>
+            <View style={styles(theme).goalTypeContainer}>
               <TouchableOpacity
                 style={[
-                  styles.goalTypeButton,
+                  styles(theme).goalTypeButton,
                   goalType === 'calories' && { backgroundColor: theme.colors.primary }
                 ]}
                 onPress={() => setGoalType('calories')}
@@ -212,7 +215,7 @@ const NutritionGoalsScreen: React.FC = () => {
                   color={goalType === 'calories' ? 'white' : theme.colors.primary}
                 />
                 <Text style={[
-                  styles.goalTypeText,
+                  styles(theme).goalTypeText,
                   goalType === 'calories' && { color: 'white' }
                 ]}>
                   Calories
@@ -220,7 +223,7 @@ const NutritionGoalsScreen: React.FC = () => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
-                  styles.goalTypeButton,
+                  styles(theme).goalTypeButton,
                   goalType === 'macros' && { backgroundColor: theme.colors.primary }
                 ]}
                 onPress={() => setGoalType('macros')}
@@ -231,7 +234,7 @@ const NutritionGoalsScreen: React.FC = () => {
                   color={goalType === 'macros' ? 'white' : theme.colors.primary}
                 />
                 <Text style={[
-                  styles.goalTypeText,
+                  styles(theme).goalTypeText,
                   goalType === 'macros' && { color: 'white' }
                 ]}>
                   Macros
@@ -241,79 +244,79 @@ const NutritionGoalsScreen: React.FC = () => {
 
             <Divider style={{ marginVertical: 16 }} />
 
-            <Text style={styles.sectionTitle}>Daily Calorie Target</Text>
-            <View style={styles.inputContainer}>
+            <Text style={styles(theme).sectionTitle}>Daily Calorie Target</Text>
+            <View style={styles(theme).inputContainer}>
               <RNTextInput
-                style={styles.input}
+                style={styles(theme).input}
                 value={calorieGoal}
                 onChangeText={setCalorieGoal}
                 keyboardType="numeric"
                 placeholder={goalType === 'macros' ? "Optional calorie target" : "Enter daily calorie target"}
               />
-              <Text style={styles.inputLabel}>calories</Text>
+              <Text style={styles(theme).inputLabel}>calories</Text>
             </View>
 
             {goalType === 'macros' && (
               <>
                 <Divider style={{ marginVertical: 16 }} />
 
-                <Text style={styles.sectionTitle}>Macro Nutrient Targets</Text>
-                <Text style={styles.description}>
+                <Text style={styles(theme).sectionTitle}>Macro Nutrient Targets</Text>
+                <Text style={styles(theme).description}>
                   Set your macronutrient targets as percentages of your daily calorie goal.
                 </Text>
 
-                <View style={styles.macroContainer}>
-                  <View style={styles.macroItem}>
-                    <Text style={styles.macroLabel}>Protein</Text>
-                    <View style={styles.macroInputContainer}>
+                <View style={styles(theme).macroContainer}>
+                  <View style={styles(theme).macroItem}>
+                    <Text style={styles(theme).macroLabel}>Protein</Text>
+                    <View style={styles(theme).macroInputContainer}>
                       <RNTextInput
-                        style={styles.macroInput}
+                        style={styles(theme).macroInput}
                         value={macroGoals.protein.toString()}
                         onChangeText={(value) => updateMacroGoal('protein', value)}
                         keyboardType="numeric"
                       />
-                      <Text style={styles.macroUnit}>%</Text>
+                      <Text style={styles(theme).macroUnit}>%</Text>
                     </View>
-                    <Text style={styles.macroGrams}>{macrosInGrams.protein}g</Text>
+                    <Text style={styles(theme).macroGrams}>{macrosInGrams.protein}g</Text>
                   </View>
 
-                  <View style={styles.macroItem}>
-                    <Text style={styles.macroLabel}>Carbs</Text>
-                    <View style={styles.macroInputContainer}>
+                  <View style={styles(theme).macroItem}>
+                    <Text style={styles(theme).macroLabel}>Carbs</Text>
+                    <View style={styles(theme).macroInputContainer}>
                       <RNTextInput
-                        style={styles.macroInput}
+                        style={styles(theme).macroInput}
                         value={macroGoals.carbs.toString()}
                         onChangeText={(value) => updateMacroGoal('carbs', value)}
                         keyboardType="numeric"
                       />
-                      <Text style={styles.macroUnit}>%</Text>
+                      <Text style={styles(theme).macroUnit}>%</Text>
                     </View>
-                    <Text style={styles.macroGrams}>{macrosInGrams.carbs}g</Text>
+                    <Text style={styles(theme).macroGrams}>{macrosInGrams.carbs}g</Text>
                   </View>
 
-                  <View style={styles.macroItem}>
-                    <Text style={styles.macroLabel}>Fat</Text>
-                    <View style={styles.macroInputContainer}>
+                  <View style={styles(theme).macroItem}>
+                    <Text style={styles(theme).macroLabel}>Fat</Text>
+                    <View style={styles(theme).macroInputContainer}>
                       <RNTextInput
-                        style={styles.macroInput}
+                        style={styles(theme).macroInput}
                         value={macroGoals.fat.toString()}
                         onChangeText={(value) => updateMacroGoal('fat', value)}
                         keyboardType="numeric"
                       />
-                      <Text style={styles.macroUnit}>%</Text>
+                      <Text style={styles(theme).macroUnit}>%</Text>
                     </View>
-                    <Text style={styles.macroGrams}>{macrosInGrams.fat}g</Text>
+                    <Text style={styles(theme).macroGrams}>{macrosInGrams.fat}g</Text>
                   </View>
                 </View>
 
                 {totalPercentage !== 100 && (
-                  <Text style={[styles.totalPercentage, { color: theme.colors.error }]}>
+                  <Text style={[styles(theme).totalPercentage, { color: theme.colors.error }]}>
                     Total: {totalPercentage}% (should be 100%)
                   </Text>
                 )}
 
                 {totalPercentage === 100 && (
-                  <Text style={styles.totalPercentage}>
+                  <Text style={styles(theme).totalPercentage}>
                     Total: {totalPercentage}%
                   </Text>
                 )}
@@ -323,7 +326,7 @@ const NutritionGoalsScreen: React.FC = () => {
             <Button
               mode="contained"
               onPress={saveGoals}
-              style={styles.saveButton}
+              style={styles(theme).saveButton}
               disabled={saving || (goalType === 'macros' && totalPercentage !== 100) || (goalType === 'calories' && !calorieGoal)}
               loading={saving}
             >
@@ -336,29 +339,145 @@ const NutritionGoalsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const NutritionGoalsScreen: React.FC = () => {
+  const theme = useTheme();
+  const navigation = useNavigation();
+
+  const handleTabPress = (screenName: string) => {
+    navigation.navigate('MainTabs', { screen: screenName });
+  };
+
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: '#757575',
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopWidth: 1,
+          borderTopColor: '#e0e0e0',
+          paddingTop: 5,
+          paddingBottom: 5,
+          height: 60,
+        },
+      }}
+    >
+      <Tab.Screen
+        name="Goals"
+        component={NutritionGoalsContent}
+        options={{
+          tabBarLabel: 'Goals',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="target" color={color} size={size} />
+          ),
+          headerShown: false,
+        }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+          },
+        }}
+      />
+      <Tab.Screen
+        name="Log"
+        component={NutritionGoalsContent}
+        options={{
+          tabBarLabel: 'Logs',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="food-apple" color={color} size={size} />
+          ),
+          headerShown: false,
+        }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            handleTabPress('Log');
+          },
+        }}
+      />
+      <Tab.Screen
+        name="Food"
+        component={NutritionGoalsContent}
+        options={{
+          tabBarLabel: 'Foods',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="food" color={color} size={size} />
+          ),
+          headerShown: false,
+        }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            handleTabPress('Food');
+          },
+        }}
+      />
+      <Tab.Screen
+        name="Recipe"
+        component={NutritionGoalsContent}
+        options={{
+          tabBarLabel: 'Recipes',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="book-open" color={color} size={size} />
+          ),
+          headerShown: false,
+        }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            handleTabPress('Recipe');
+          },
+        }}
+      />
+      <Tab.Screen
+        name="MealPlanner"
+        component={NutritionGoalsContent}
+        options={{
+          tabBarLabel: 'Planner',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="calendar" color={color} size={size} />
+          ),
+          headerShown: false,
+        }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            handleTabPress('MealPlanner');
+          },
+        }}
+      />
+    </Tab.Navigator>
+  );
+};
+
+const styles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.colors.background,
   },
   content: {
     padding: 16,
   },
   card: {
     marginBottom: 16,
+    backgroundColor: theme.colors.surface,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.colors.background,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 8,
+    color: theme.colors.onSurface,
   },
   description: {
     marginBottom: 16,
     opacity: 0.7,
+    color: theme.colors.onSurfaceVariant,
   },
   goalTypeContainer: {
     flexDirection: 'row',
@@ -372,11 +491,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: theme.colors.outline,
+    backgroundColor: theme.colors.surface,
   },
   goalTypeText: {
     marginLeft: 8,
     fontWeight: '500',
+    color: theme.colors.onSurface,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -386,14 +507,17 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: theme.colors.outline,
     borderRadius: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
     marginRight: 8,
+    backgroundColor: theme.colors.background,
+    color: theme.colors.onBackground,
   },
   inputLabel: {
     width: 80,
+    color: theme.colors.onSurfaceVariant,
   },
   macroContainer: {
     marginTop: 8,
@@ -405,6 +529,7 @@ const styles = StyleSheet.create({
   },
   macroLabel: {
     width: 80,
+    color: theme.colors.onSurface,
   },
   macroInputContainer: {
     flexDirection: 'row',
@@ -413,24 +538,29 @@ const styles = StyleSheet.create({
   },
   macroInput: {
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: theme.colors.outline,
     borderRadius: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
     width: 60,
+    backgroundColor: theme.colors.background,
+    color: theme.colors.onBackground,
   },
   macroUnit: {
     marginLeft: 4,
     width: 20,
+    color: theme.colors.onSurfaceVariant,
   },
   macroGrams: {
     width: 60,
     textAlign: 'right',
+    color: theme.colors.onSurfaceVariant,
   },
   totalPercentage: {
     marginTop: 8,
     fontWeight: 'bold',
     textAlign: 'right',
+    color: theme.colors.onSurface,
   },
   saveButton: {
     marginTop: 24,
