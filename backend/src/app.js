@@ -14,6 +14,7 @@ const syncRoutes = require('./routes/syncRoutes');
 const recipeRoutes = require('./routes/recipeRoutes');
 const weightRoutes = require('./routes/weightRoutes');
 const mealPlansRouter = require('./routes/mealPlans');
+const loggingRouter = require('./routes/logging');
 
 // Create Express app
 const app = express();
@@ -40,6 +41,7 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/recipes', recipeRoutes);
 app.use('/api/weight', weightRoutes);
 app.use('/api/meal-plans', mealPlansRouter);
+app.use('/api/logging', loggingRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

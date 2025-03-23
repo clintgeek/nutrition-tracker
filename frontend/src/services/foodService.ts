@@ -196,91 +196,29 @@ const calculateRelevanceScore = (food: Food, query: string): number => {
   return score;
 };
 
-// Transform backend response to frontend FoodItem format
-const transformToFoodItem = (data: any): FoodItem => ({
-  id: data.id?.toString() || '',
-  name: data.name,
-  barcode: data.barcode,
-  calories: data.calories || data.calories_per_serving,
-  protein: data.protein || data.protein_grams,
-  carbs: data.carbs || data.carbs_grams,
-  fat: data.fat || data.fat_grams,
-  servingSize: data.servingSize || data.serving_size,
-  servingUnit: data.servingUnit || data.serving_unit,
-  source: data.source,
-  sourceId: data.source_id,
-  source_id: data.source_id,
-  brand: data.brand,
-  created_at: data.created_at,
-  updated_at: data.updated_at,
-  is_deleted: data.is_deleted || false
-});
+// Single transformation function for all food data
+function transformFood(data: any): Food {
+  const nutrition = mapNutritionData(data);
+  const brand = extractBrand(data);
 
-// Transform backend response to frontend Food format
-const transformToFood = (data: any): Food => ({
-  id: data.id?.toString() || '',
-  name: data.name,
-  barcode: data.barcode,
-  brand: data.brand,
-  calories: data.calories || data.calories_per_serving,
-  protein: data.protein || data.protein_grams,
-  carbs: data.carbs || data.carbs_grams,
-  fat: data.fat || data.fat_grams,
-  serving_size: data.serving_size,
-  serving_unit: data.serving_unit,
-  is_custom: data.source === 'custom',
-  source: data.source,
-  source_id: data.source_id,
-  created_at: data.created_at,
-  updated_at: data.updated_at,
-  is_deleted: data.is_deleted || false
-});
-
-// Helper function to capitalize food name
-const capitalizeFoodName = (name: string): string => {
-  return name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
-};
-
-// Helper function to convert ApiFood to Food
-function convertApiFood(apiFood: ApiFood): Food {
-  const id = typeof apiFood.id === 'string' ? parseInt(apiFood.id, 10) : apiFood.id;
-  if (isNaN(id)) {
-    throw new Error(`Invalid food ID: ${apiFood.id}`);
-  }
-
-  let source: 'custom' | 'usda' | 'recipe' = 'custom';
-  if (apiFood.source === 'usda' || apiFood.source === 'recipe') {
-    source = apiFood.source;
-  }
-
-  const convertedFood: Food = {
-    id,
-    name: apiFood.name,
-    calories: apiFood.calories,
-    serving_size: apiFood.serving_size,
-    serving_unit: apiFood.serving_unit,
-    protein: apiFood.protein,
-    carbs: apiFood.carbs,
-    fat: apiFood.fat,
-    created_at: apiFood.created_at,
-    updated_at: apiFood.updated_at,
-    is_custom: apiFood.is_custom,
-    user_id: apiFood.user_id,
-    sync_status: apiFood.sync_status,
-    source,
-    barcode: apiFood.barcode,
-    brand: apiFood.brand,
-    source_id: apiFood.source_id,
-    sync_id: apiFood.sync_id,
-    is_deleted: apiFood.is_deleted
+  return {
+    id: typeof data.id === 'string' ? parseInt(data.id, 10) : data.id,
+    name: data.name || data.product_name || data.food_name || '',
+    barcode: data.barcode || data.code || data.upc || null,
+    brand,
+    calories: nutrition.calories,
+    protein: nutrition.protein,
+    carbs: nutrition.carbs,
+    fat: nutrition.fat,
+    serving_size: nutrition.serving_size,
+    serving_unit: nutrition.serving_unit,
+    source: data.source === 'usda' || data.source === 'recipe' ? data.source : 'custom',
+    source_id: data.sourceId || data.source_id || data.code || `api-${data.id}`,
+    is_custom: data.source !== 'usda' && data.source !== 'recipe',
+    created_at: data.created_at,
+    updated_at: data.updated_at,
+    is_deleted: data.is_deleted || false
   };
-
-  return convertedFood;
-}
-
-// Helper function to convert array of ApiFood to Food
-function convertApiFoods(apiFoods: ApiFood[]): Food[] {
-  return apiFoods.map(convertApiFood);
 }
 
 // Food service
@@ -344,29 +282,32 @@ export const foodService = {
     }
   },
 
-  // Get food by barcode
+  // Get food by barcode with improved error handling
   async getFoodByBarcode(barcode: string, retryCount = 2): Promise<Food> {
     try {
-      // First try our backend with caching disabled
+      // Try local database first
       try {
         const response = await apiService.get<{ food: Food }>(`/foods/barcode/${barcode}`, {
-          params: { cache: false } // Always get fresh data from our database
+          params: { cache: false }
         });
-        return response.food;
+        return transformFood(response.food);
       } catch (error) {
+        if (error.response?.status !== 404) {
+          throw error; // Only proceed to external API if it's a 404
+        }
         console.log('Food not found in local database, trying OpenFoodFacts...');
       }
 
-      // If not found, try OpenFoodFacts with caching
+      // Try external API with caching
       for (let attempt = 0; attempt <= retryCount; attempt++) {
         try {
           const response = await apiService.get<{ food: Food }>(`/foods/barcode/${barcode}/external`, {
             params: {
-              cache: true, // Cache external API results
-              cache_ttl: 86400 // Cache for 24 hours
+              cache: true,
+              cache_ttl: 86400 // 24 hours
             }
           });
-          return response.food;
+          return transformFood(response.food);
         } catch (error) {
           if (attempt === retryCount) {
             throw error;
@@ -398,11 +339,57 @@ export const foodService = {
     } as Food;
   },
 
+  // Search for foods (consolidated search method)
+  async searchFoods(params: FoodSearchParams): Promise<SearchResponse> {
+    try {
+      const response = await apiService.get<SearchResponse>('/foods/search', {
+        params: {
+          ...params,
+          cache: false // Always fresh for database searches
+        }
+      });
+
+      if (response.foods) {
+        return {
+          ...response,
+          foods: response.foods.map(transformFood)
+        };
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Error searching foods:', error);
+      throw error;
+    }
+  },
+
+  // Get custom foods
+  async getCustomFoods(): Promise<Food[]> {
+    try {
+      const response = await apiService.get<{ foods: ApiFood[] }>('/foods/custom');
+      return response.foods.map(transformFood);
+    } catch (error) {
+      console.error('Error fetching custom foods:', error);
+      throw error;
+    }
+  },
+
+  // Get food by ID
+  async getFood(id: number): Promise<Food> {
+    try {
+      const response = await apiService.get<{ food: ApiFood }>(`/foods/${id}`);
+      return transformFood(response.food);
+    } catch (error) {
+      console.error('Error fetching food:', error);
+      throw error;
+    }
+  },
+
   // Create custom food
   async createCustomFood(food: CreateFoodDTO): Promise<Food> {
     try {
       const response = await apiService.post<{ food: ApiFood }>('/foods/custom', food);
-      return convertApiFood(response.food);
+      return transformFood(response.food);
     } catch (error) {
       console.error('Error creating custom food:', error);
       throw error;
@@ -413,7 +400,7 @@ export const foodService = {
   async updateCustomFood(id: number, food: Partial<CreateFoodDTO>): Promise<Food> {
     try {
       const response = await apiService.put<{ food: ApiFood }>(`/foods/custom/${id}`, food);
-      return convertApiFood(response.food);
+      return transformFood(response.food);
     } catch (error) {
       console.error('Error updating custom food:', error);
       throw error;
@@ -428,12 +415,9 @@ export const foodService = {
   // Delete food (alias for deleteCustomFood for backward compatibility)
   async deleteFood(id: number): Promise<void> {
     try {
-      // Transform the data to match database column names
-      const transformedData = {
+      await apiService.put<{ message: string; food: Food }>(`/foods/custom/${id}`, {
         is_deleted: true
-      };
-
-      await apiService.put<{ message: string; food: Food }>(`/foods/custom/${id}`, transformedData);
+      });
     } catch (error) {
       console.error('Error soft deleting food:', error);
       throw error;
@@ -460,59 +444,5 @@ export const foodService = {
       created_at: item.created_at,
       updated_at: item.updated_at
     };
-  },
-
-  // Get food by ID
-  async getFood(id: number): Promise<Food> {
-    try {
-      const response = await fetch(`${API_URL}/foods/${id}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch food');
-      }
-
-      const data: { food: ApiFood } = await response.json();
-      return convertApiFood(data.food);
-    } catch (error) {
-      console.error('Error fetching food:', error);
-      throw error;
-    }
-  },
-
-  // Search foods
-  async searchFoods(params: FoodSearchParams): Promise<FoodSearchResult> {
-    try {
-      const queryParams = new URLSearchParams();
-      if (params.query) queryParams.append('query', params.query);
-      if (params.page) queryParams.append('page', params.page.toString());
-      if (params.limit) queryParams.append('limit', params.limit.toString());
-      if (params.sort_by) queryParams.append('sort_by', params.sort_by);
-      if (params.sort_order) queryParams.append('sort_order', params.sort_order);
-      if (params.include_custom !== undefined) queryParams.append('include_custom', params.include_custom.toString());
-
-      const response = await fetch(`${API_URL}/foods/search?${queryParams.toString()}`);
-      if (!response.ok) {
-        throw new Error('Failed to search foods');
-      }
-
-      const data: { foods: ApiFood[]; total_count: number; page: number; total_pages: number } = await response.json();
-      return {
-        ...data,
-        foods: convertApiFoods(data.foods)
-      };
-    } catch (error) {
-      console.error('Error searching foods:', error);
-      throw error;
-    }
-  },
-
-  // Get custom foods
-  async getCustomFoods(): Promise<Food[]> {
-    try {
-      const response = await apiService.get<{ foods: ApiFood[] }>('/foods/custom');
-      return convertApiFoods(response.foods);
-    } catch (error) {
-      console.error('Error fetching custom foods:', error);
-      throw error;
-    }
   },
 };
