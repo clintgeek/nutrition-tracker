@@ -46,7 +46,7 @@
 ## Roadmap
 
 ### High Priority
-- [ ] Round all calories to whole numbers (Low)
+- [x] Round all calories to whole numbers (Low)
 - [ ] Implement success notifications for actions (Low)
 - [ ] Add confirmation dialogs for destructive actions (Low)
 - [ ] Add form validation with helpful error messages (Medium)

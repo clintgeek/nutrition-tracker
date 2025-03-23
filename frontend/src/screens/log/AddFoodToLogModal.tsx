@@ -7,6 +7,7 @@ import {
   Text,
   useTheme,
   Divider,
+  Chip,
 } from 'react-native-paper';
 import { DatePickerInput } from 'react-native-paper-dates';
 import { useNavigation } from '@react-navigation/native';
@@ -36,23 +37,20 @@ const AddFoodToLogModal: React.FC = () => {
       maxHeight: '80%',
       backgroundColor: theme.colors.surface,
     },
+    scrollArea: {
+      paddingHorizontal: 0,
+    },
     content: {
       padding: 16,
     },
+    foodName: {
+      fontSize: 20,
+      fontWeight: '600',
+      marginBottom: 24,
+      textAlign: 'center',
+    },
     servingsGroup: {
-      marginBottom: 16,
-    },
-    servingDetailsGroup: {
-      marginBottom: 16,
-    },
-    mealDetailsGroup: {
-      marginBottom: 16,
-    },
-    mealTypeSection: {
-      marginBottom: 16,
-    },
-    dateSection: {
-      marginBottom: 16,
+      marginBottom: 24,
     },
     sectionLabel: {
       fontSize: 16,
@@ -60,80 +58,104 @@ const AddFoodToLogModal: React.FC = () => {
       color: theme.colors.onSurface,
       fontWeight: '500',
     },
-    input: {
+    servingsInput: {
+      height: 48,
       borderWidth: 1,
       borderColor: theme.colors.outline,
-      borderRadius: 4,
-      padding: 8,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      fontSize: 16,
       backgroundColor: theme.colors.background,
+    },
+    servingSizeContainer: {
+      flexDirection: 'row',
+      gap: 8,
+      marginBottom: 24,
+    },
+    servingSizeInput: {
+      flex: 2,
+      height: 48,
+      borderWidth: 1,
+      borderColor: theme.colors.outline,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      fontSize: 16,
+      backgroundColor: theme.colors.background,
+    },
+    servingUnitInput: {
+      flex: 1,
+      height: 48,
+      borderWidth: 1,
+      borderColor: theme.colors.outline,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      fontSize: 16,
+      backgroundColor: theme.colors.background,
+    },
+    mealTypeGroup: {
+      marginBottom: 24,
     },
     mealTypeContainer: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 8,
     },
-    mealTypeButton: {
-      flex: 1,
+    mealTypeChip: {
       minWidth: '45%',
+      marginBottom: 8,
+    },
+    mealTypeText: {
+      fontSize: 14,
+    },
+    dateGroup: {
+      marginBottom: 24,
+    },
+    dateInput: {
+      backgroundColor: theme.colors.background,
     },
     divider: {
       marginVertical: 16,
     },
+    nutritionGroup: {
+      marginTop: 8,
+    },
     nutritionTitle: {
       fontSize: 18,
-      fontWeight: 'bold',
+      fontWeight: '600',
       marginBottom: 16,
-      color: theme.colors.onSurface,
+      textAlign: 'center',
     },
-    nutritionContainer: {
+    nutritionGrid: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      gap: 12,
+      flexWrap: 'wrap',
     },
     nutritionItem: {
-      flex: 1,
       alignItems: 'center',
+      minWidth: '25%',
+    },
+    nutritionValue: {
+      fontSize: 24,
+      fontWeight: '600',
+      color: theme.colors.onSurface,
     },
     nutritionLabel: {
       fontSize: 14,
       color: theme.colors.onSurfaceVariant,
-      marginBottom: 4,
+      marginTop: 4,
     },
     nutritionInput: {
+      height: 48,
       borderWidth: 1,
       borderColor: theme.colors.outline,
-      borderRadius: 4,
-      padding: 4,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      fontSize: 20,
+      fontWeight: '600',
+      backgroundColor: theme.colors.background,
       textAlign: 'center',
-      width: '100%',
-      backgroundColor: theme.colors.background,
-    },
-    servingContainer: {
-      flexDirection: 'row',
-    },
-    servingSizeContainer: {
-      flex: 2,
-      marginRight: 8,
-    },
-    servingUnitContainer: {
-      flex: 1,
-    },
-    servingSizeInput: {
-      borderWidth: 1,
-      borderColor: theme.colors.outline,
-      borderRadius: 4,
-      padding: 8,
-      backgroundColor: theme.colors.background,
-    },
-    servingUnitInput: {
-      borderWidth: 1,
-      borderColor: theme.colors.outline,
-      borderRadius: 4,
-      padding: 8,
-      backgroundColor: theme.colors.background,
-    },
-    dateInput: {
-      backgroundColor: theme.colors.background,
+      color: theme.colors.onSurface,
+      marginBottom: 4,
     },
   });
 
@@ -156,16 +178,14 @@ const AddFoodToLogModal: React.FC = () => {
   // Calculate nutrition values based on servings
   const calculateNutrition = (value: number, isCalories: boolean = false) => {
     const servingsNum = parseFloat(servings) || 1;
-    // Use Math.round for calories, roundToNearestHalf for other nutrients
     return isCalories ?
       Math.round(value * servingsNum) :
       roundToNearestHalf(value * servingsNum);
   };
 
-  // Handle nutrition value changes
+  // Add back the nutrition change handler
   const handleNutritionChange = (field: keyof Food, value: string) => {
     const numValue = parseFloat(value) || 0;
-    // Use Math.round for calories, roundToNearestHalf for other nutrients
     const processedValue = field === 'calories' ?
       Math.round(numValue) :
       roundToNearestHalf(numValue);
@@ -173,7 +193,7 @@ const AddFoodToLogModal: React.FC = () => {
     setIsCustom(true);
   };
 
-  // Handle adding food to log
+  // Update the handleAddToLog function to not include serving size/unit in calculations
   const handleAddToLog = async () => {
     try {
       setIsLoading(true);
@@ -185,20 +205,19 @@ const AddFoodToLogModal: React.FC = () => {
           ...food,
           name: capitalizeFoodName(food.name),
           source: 'custom' as const,
-          serving_size: food.serving_size,
-          serving_unit: food.serving_unit,
           calories: roundToNearestHalf(food.calories),
           protein: roundToNearestHalf(food.protein),
           carbs: roundToNearestHalf(food.carbs),
           fat: roundToNearestHalf(food.fat),
+          // Keep serving size/unit as decorative metadata
+          serving_size: food.serving_size,
+          serving_unit: food.serving_unit,
         };
 
         if (food.is_custom) {
-          // Update existing custom food
           await foodService.updateCustomFood(Number(food.id), customFood);
           foodToLog = { ...foodToLog, name: capitalizeFoodName(food.name) };
         } else {
-          // Create new custom food
           const newFood = await foodService.createCustomFood(customFood);
           foodToLog = newFood;
         }
@@ -225,126 +244,113 @@ const AddFoodToLogModal: React.FC = () => {
   return (
     <Portal>
       <Dialog visible={true} onDismiss={() => navigation.goBack()} style={styles.dialog}>
-        <Dialog.Title>Add {capitalizeFoodName(food.name)} to Log</Dialog.Title>
-        <Dialog.Content>
+        <Dialog.Title>Add {capitalizeFoodName(food.name)}</Dialog.Title>
+        <Dialog.ScrollArea style={styles.scrollArea}>
           <ScrollView>
             <View style={styles.content}>
+              {/* Servings Input */}
               <View style={styles.servingsGroup}>
                 <Text style={styles.sectionLabel}>Servings</Text>
                 <TextInput
                   value={servings}
                   onChangeText={setServings}
                   keyboardType="decimal-pad"
-                  style={styles.input}
+                  style={styles.servingsInput}
+                  maxLength={4}
                 />
               </View>
 
-              <View style={styles.servingDetailsGroup}>
+              {/* Serving Size and Unit */}
+              <View style={styles.servingsGroup}>
                 <Text style={styles.sectionLabel}>Serving Size</Text>
-                <View style={styles.servingContainer}>
-                  <View style={styles.servingSizeContainer}>
-                    <TextInput
-                      value={food.serving_size?.toString() || '100'}
-                      onChangeText={(value) => {
-                        setFood(prev => ({ ...prev, serving_size: parseFloat(value) || 100 }));
-                        setIsCustom(true);
-                      }}
-                      keyboardType="numeric"
-                      style={styles.servingSizeInput}
-                    />
-                  </View>
-                  <View style={styles.servingUnitContainer}>
-                    <TextInput
-                      value={food.serving_unit || ''}
-                      onChangeText={(value) => {
-                        setFood(prev => ({ ...prev, serving_unit: value }));
-                        setIsCustom(true);
-                      }}
-                      style={styles.servingUnitInput}
-                      placeholder="g"
-                    />
-                  </View>
-                </View>
-              </View>
-
-              <Divider style={styles.divider} />
-
-              <View style={styles.mealDetailsGroup}>
-                <View style={styles.mealTypeSection}>
-                  <Text style={styles.sectionLabel}>Meal Type</Text>
-                  <View style={styles.mealTypeContainer}>
-                    {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((type) => (
-                      <Button
-                        key={type}
-                        mode={mealType === type ? 'contained' : 'outlined'}
-                        onPress={() => setMealType(type)}
-                        style={styles.mealTypeButton}
-                      >
-                        {type.charAt(0).toUpperCase() + type.slice(1)}
-                      </Button>
-                    ))}
-                  </View>
-                </View>
-
-                <View style={styles.dateSection}>
-                  <Text style={styles.sectionLabel}>Date</Text>
-                  <DatePickerInput
-                    locale="en-GB"
-                    label="Date"
-                    value={selectedDate}
-                    onChange={(d) => d && setSelectedDate(d)}
-                    inputMode="start"
-                    mode="flat"
-                    style={styles.dateInput}
-                    withDateFormatInLabel={false}
+                <View style={styles.servingSizeContainer}>
+                  <TextInput
+                    value={food.serving_size?.toString()}
+                    onChangeText={(value) => {
+                      setFood(prev => ({ ...prev, serving_size: parseFloat(value) || undefined }));
+                      setIsCustom(true);
+                    }}
+                    keyboardType="decimal-pad"
+                    style={styles.servingSizeInput}
+                    maxLength={4}
+                    placeholder="100"
+                  />
+                  <TextInput
+                    value={food.serving_unit}
+                    onChangeText={(value) => {
+                      setFood(prev => ({ ...prev, serving_unit: value || undefined }));
+                      setIsCustom(true);
+                    }}
+                    style={styles.servingUnitInput}
+                    maxLength={10}
+                    placeholder="g"
                   />
                 </View>
               </View>
 
-              <Divider style={styles.divider} />
+              {/* Date Selection */}
+              <View style={styles.dateGroup}>
+                <Text style={styles.sectionLabel}>Date</Text>
+                <DatePickerInput
+                  locale="en"
+                  value={selectedDate}
+                  onChange={(d) => d && setSelectedDate(d)}
+                  inputMode="start"
+                  style={styles.dateInput}
+                />
+              </View>
 
-              <Text style={styles.nutritionTitle}>Nutrition Information</Text>
-              <View style={styles.nutritionContainer}>
-                <View style={styles.nutritionItem}>
-                  <Text style={styles.nutritionLabel}>Calories</Text>
-                  <TextInput
-                    value={calculateNutrition(food.calories, true).toString()}
-                    onChangeText={(value) => handleNutritionChange('calories', value)}
-                    keyboardType="numeric"
-                    style={styles.nutritionInput}
-                  />
-                </View>
-                <View style={styles.nutritionItem}>
-                  <Text style={styles.nutritionLabel}>Protein</Text>
-                  <TextInput
-                    value={calculateNutrition(food.protein).toString()}
-                    onChangeText={(value) => handleNutritionChange('protein', value)}
-                    keyboardType="numeric"
-                    style={styles.nutritionInput}
-                  />
-                </View>
-                <View style={styles.nutritionItem}>
-                  <Text style={styles.nutritionLabel}>Carbs</Text>
-                  <TextInput
-                    value={calculateNutrition(food.carbs).toString()}
-                    onChangeText={(value) => handleNutritionChange('carbs', value)}
-                    keyboardType="numeric"
-                    style={styles.nutritionInput}
-                  />
-                </View>
-                <View style={styles.nutritionItem}>
-                  <Text style={styles.nutritionLabel}>Fat</Text>
-                  <TextInput
-                    value={calculateNutrition(food.fat).toString()}
-                    onChangeText={(value) => handleNutritionChange('fat', value)}
-                    keyboardType="numeric"
-                    style={styles.nutritionInput}
-                  />
+              {/* Nutrition Summary */}
+              <View style={styles.nutritionGroup}>
+                <Text style={styles.nutritionTitle}>Nutrition per serving</Text>
+                <View style={styles.nutritionGrid}>
+                  <View style={styles.nutritionItem}>
+                    <TextInput
+                      value={food.calories?.toString() || '0'}
+                      onChangeText={(value) => handleNutritionChange('calories', value)}
+                      keyboardType="decimal-pad"
+                      style={styles.nutritionInput}
+                      maxLength={4}
+                    />
+                    <Text style={styles.nutritionLabel}>Calories</Text>
+                  </View>
+                  <View style={styles.nutritionItem}>
+                    <TextInput
+                      value={food.protein?.toString() || '0'}
+                      onChangeText={(value) => handleNutritionChange('protein', value)}
+                      keyboardType="decimal-pad"
+                      style={styles.nutritionInput}
+                      maxLength={4}
+                    />
+                    <Text style={styles.nutritionLabel}>Protein (g)</Text>
+                  </View>
+                  <View style={styles.nutritionItem}>
+                    <TextInput
+                      value={food.carbs?.toString() || '0'}
+                      onChangeText={(value) => handleNutritionChange('carbs', value)}
+                      keyboardType="decimal-pad"
+                      style={styles.nutritionInput}
+                      maxLength={4}
+                    />
+                    <Text style={styles.nutritionLabel}>Carbs (g)</Text>
+                  </View>
+                  <View style={styles.nutritionItem}>
+                    <TextInput
+                      value={food.fat?.toString() || '0'}
+                      onChangeText={(value) => handleNutritionChange('fat', value)}
+                      keyboardType="decimal-pad"
+                      style={styles.nutritionInput}
+                      maxLength={4}
+                    />
+                    <Text style={styles.nutritionLabel}>Fat (g)</Text>
+                  </View>
                 </View>
               </View>
             </View>
           </ScrollView>
-        </Dialog.Content>
+        </Dialog.ScrollArea>
+
+        {/* Action Buttons */}
         <Dialog.Actions>
           <Button onPress={() => navigation.goBack()}>Cancel</Button>
           <Button

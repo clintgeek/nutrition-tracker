@@ -292,7 +292,8 @@ export const foodService = {
         query,
         page,
         limit,
-        include_deleted: false
+        include_deleted: false,
+        cache: false // Always fetch fresh results
       },
     });
 
@@ -346,55 +347,26 @@ export const foodService = {
   // Get food by barcode
   async getFoodByBarcode(barcode: string, retryCount = 2): Promise<Food> {
     try {
-      // First try our backend
+      // First try our backend with caching disabled
       try {
-        const response = await apiService.get<{ food: Food }>(`/foods/barcode/${barcode}`);
+        const response = await apiService.get<{ food: Food }>(`/foods/barcode/${barcode}`, {
+          params: { cache: false } // Always get fresh data from our database
+        });
         return response.food;
       } catch (error) {
         console.log('Food not found in local database, trying OpenFoodFacts...');
       }
 
-      // If not found, try OpenFoodFacts with retries
+      // If not found, try OpenFoodFacts with caching
       for (let attempt = 0; attempt <= retryCount; attempt++) {
         try {
-          const response = await fetch(`${OPENFOODFACTS_API_URL}/product/${barcode}.json`);
-
-          if (!response.ok) {
-            if (response.status === 429 && attempt < retryCount) {
-              await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
-              continue;
+          const response = await apiService.get<{ food: Food }>(`/foods/barcode/${barcode}/external`, {
+            params: {
+              cache: true, // Cache external API results
+              cache_ttl: 86400 // Cache for 24 hours
             }
-            throw new Error(`OpenFoodFacts API error: ${response.status}`);
-          }
-
-          const data = await response.json();
-
-          if (!data || !data.product) {
-            throw new Error('Product not found');
-          }
-
-          if (!data.product.product_name && !data.product.generic_name) {
-            throw new Error('Invalid product data: Missing product name');
-          }
-
-          const nutrition = mapNutritionData(data.product);
-          const brand = extractBrand(data.product);
-
-          return {
-            id: Date.now(), // Generate a temporary numeric ID
-            name: data.product.product_name || data.product.generic_name || 'Unknown Product',
-            brand: brand,
-            barcode: barcode,
-            calories: nutrition.calories,
-            protein: nutrition.protein,
-            carbs: nutrition.carbs,
-            fat: nutrition.fat,
-            serving_size: nutrition.serving_size,
-            serving_unit: nutrition.serving_unit,
-            source: 'custom', // OpenFoodFacts items are treated as custom foods
-            source_id: barcode,
-            is_custom: true
-          };
+          });
+          return response.food;
         } catch (error) {
           if (attempt === retryCount) {
             throw error;
@@ -440,20 +412,8 @@ export const foodService = {
   // Update custom food
   async updateCustomFood(id: number, food: Partial<CreateFoodDTO>): Promise<Food> {
     try {
-      const response = await fetch(`${API_URL}/foods/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(food),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update custom food');
-      }
-
-      const data: { food: ApiFood } = await response.json();
-      return convertApiFood(data.food);
+      const response = await apiService.put<{ food: ApiFood }>(`/foods/custom/${id}`, food);
+      return convertApiFood(response.food);
     } catch (error) {
       console.error('Error updating custom food:', error);
       throw error;

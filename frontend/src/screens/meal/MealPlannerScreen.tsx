@@ -1,13 +1,14 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, TextInput as RNTextInput, Dimensions, ScrollView, Platform } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { Portal, Dialog, Button, Text, useTheme, FAB } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_URL } from '../../config';
 import * as Clipboard from 'expo-clipboard';
 import { DatePickerModal } from 'react-native-paper-dates';
+import { mealPlanService, MealPlan } from '../../services/mealPlanService';
+import { format } from 'date-fns';
 
 interface Meal {
   id: string;
@@ -17,23 +18,25 @@ interface Meal {
 }
 
 interface DayMeals {
-  [date: string]: Meal[];
+  [date: string]: MealPlan[];
 }
 
 export const MealPlannerScreen: React.FC = () => {
   const theme = useTheme();
   const { user } = useAuth();
-  const [meals, setMeals] = useState<DayMeals>({});
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [isAddMealVisible, setIsAddMealVisible] = useState(false);
   const [newMealName, setNewMealName] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().split('T')[0]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [meals, setMeals] = useState<DayMeals>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   // Add function to sort and group meals by date
   const sortedMealDates = useMemo(() => {
     return Object.keys(meals)
+      .filter(date => meals[date].length > 0) // Only include dates that have meals
       .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
   }, [meals]);
 
@@ -52,10 +55,6 @@ export const MealPlannerScreen: React.FC = () => {
   const formatDateLong = (dateString: string) => {
     const date = new Date(dateString);
     return date.toISOString().split('T')[0];
-  };
-
-  const saveMeals = async (updatedMeals: DayMeals) => {
-    await AsyncStorage.setItem('meals', JSON.stringify(updatedMeals));
   };
 
   // Custom header for the calendar
@@ -108,12 +107,16 @@ export const MealPlannerScreen: React.FC = () => {
     const dayMeals = meals[date.dateString] || [];
     const isSelected = date.dateString === selectedDate;
 
-    const handleDeleteMeal = (meal: Meal) => {
-      const updatedMeals = { ...meals };
-      const dateMeals = [...(updatedMeals[date.dateString] || [])];
-      updatedMeals[date.dateString] = dateMeals.filter(m => m.id !== meal.id);
-      setMeals(updatedMeals);
-      saveMeals(updatedMeals);
+    const handleDeleteMeal = async (meal: MealPlan) => {
+      try {
+        await mealPlanService.deleteMealPlan(meal.id);
+        const updatedMeals = { ...meals };
+        const dateMeals = [...(updatedMeals[date.dateString] || [])];
+        updatedMeals[date.dateString] = dateMeals.filter(m => m.id !== meal.id);
+        setMeals(updatedMeals);
+      } catch (error) {
+        console.error('Error deleting meal:', error);
+      }
     };
 
     return (
@@ -143,7 +146,7 @@ export const MealPlannerScreen: React.FC = () => {
             <View key={meal.id} style={styles(theme).mealContainer}>
               <View style={[
                 styles(theme).mealPill,
-                { backgroundColor: getMealTypeColor(meal.type, theme) }
+                { backgroundColor: getMealTypeColor(meal.meal_type, theme) }
               ]}>
                 <Text numberOfLines={1} style={styles(theme).mealText}>
                   {meal.name}
@@ -162,8 +165,8 @@ export const MealPlannerScreen: React.FC = () => {
     );
   }, [meals, selectedDate, theme]);
 
-  const getMealTypeColor = (type: string, theme: any) => {
-    switch (type) {
+  const getMealTypeColor = (meal_type: string, theme: any) => {
+    switch (meal_type) {
       case 'breakfast':
         return `${theme.colors.primary}15`;
       case 'lunch':
@@ -177,29 +180,38 @@ export const MealPlannerScreen: React.FC = () => {
     }
   };
 
+  const addMealToDatabase = async (mealData: Omit<MealPlan, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'sync_id' | 'is_deleted'>) => {
+    try {
+      const newMeal = await mealPlanService.createMealPlan(mealData);
+      setMeals(prevMeals => ({
+        ...prevMeals,
+        [selectedDate]: [...(prevMeals[selectedDate] || []), newMeal]
+      }));
+      return newMeal;
+    } catch (error) {
+      console.error('Error adding meal:', error);
+      throw error;
+    }
+  };
+
   const handleAddMeal = async () => {
     if (!newMealName.trim()) return;
 
-    const newMeal: Meal = {
-      id: Date.now().toString(),
-      name: newMealName.trim(),
-      date: selectedDate,
-      type: 'dinner',
-    };
-
-    const updatedMeals = {
-      ...meals,
-      [selectedDate]: [...(meals[selectedDate] || []), newMeal],
-    };
-
-    setMeals(updatedMeals);
-    await AsyncStorage.setItem('meals', JSON.stringify(updatedMeals));
-    setNewMealName('');
-    setIsAddMealVisible(false);
+    try {
+      await addMealToDatabase({
+        name: newMealName.trim(),
+        date: selectedDate,
+        meal_type: 'dinner'
+      });
+      setNewMealName('');
+      setIsAddMealVisible(false);
+    } catch (error) {
+      console.error('Error adding meal:', error);
+    }
   };
 
   const handleGetCalendarURL = async () => {
-    const calendarUrl = `${API_URL}/meals/ical`;
+    const calendarUrl = `${API_URL}/meal-plans/ical`;
     await Clipboard.setStringAsync(calendarUrl);
 
     alert(
@@ -232,15 +244,83 @@ export const MealPlannerScreen: React.FC = () => {
     setIsAddMealVisible(true);
   };
 
-  React.useEffect(() => {
-    const loadMeals = async () => {
-      const storedMeals = await AsyncStorage.getItem('meals');
-      if (storedMeals) {
-        setMeals(JSON.parse(storedMeals));
-      }
-    };
+  useEffect(() => {
     loadMeals();
-  }, []);
+  }, [selectedDate, currentMonth]);
+
+  const loadMeals = async () => {
+    try {
+      setIsLoading(true);
+      // Get the first and last day of the current month
+      const currentDate = new Date(currentMonth);
+      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+
+      // Format dates for the API
+      const startDate = firstDayOfMonth.toISOString().split('T')[0];
+      const endDate = lastDayOfMonth.toISOString().split('T')[0];
+
+      // Load meals for the entire month
+      const mealPlans = await mealPlanService.getMealPlansByDateRange(startDate, endDate);
+
+      // Group meals by date and ensure dates are in YYYY-MM-DD format
+      const groupedMeals = mealPlans.reduce((acc, meal) => {
+        // Ensure the date is in YYYY-MM-DD format
+        const date = meal.date.split('T')[0];
+        if (!acc[date]) {
+          acc[date] = [];
+        }
+        acc[date].push(meal);
+        return acc;
+      }, {} as DayMeals);
+
+      // Initialize empty arrays for all days in the month
+      const allDaysInMonth: DayMeals = {};
+      let currentDay = new Date(firstDayOfMonth);
+      while (currentDay <= lastDayOfMonth) {
+        const dateString = currentDay.toISOString().split('T')[0];
+        allDaysInMonth[dateString] = groupedMeals[dateString] || [];
+        currentDay.setDate(currentDay.getDate() + 1);
+      }
+
+      setMeals(allDaysInMonth);
+    } catch (error) {
+      console.error('Error loading meals:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add function to handle calendar month change
+  const handleMonthChange = (month: { dateString: string }) => {
+    setCurrentMonth(month.dateString);
+  };
+
+  const handleUpdateMeal = async (id: number, mealData: Partial<MealPlan>) => {
+    try {
+      const updatedMeal = await mealPlanService.updateMealPlan(id, mealData);
+      setMeals(prevMeals => ({
+        ...prevMeals,
+        [selectedDate]: prevMeals[selectedDate].map(meal =>
+          meal.id === id ? updatedMeal : meal
+        )
+      }));
+    } catch (error) {
+      console.error('Error updating meal:', error);
+    }
+  };
+
+  const handleDeleteMeal = async (id: number) => {
+    try {
+      await mealPlanService.deleteMealPlan(id);
+      setMeals(prevMeals => ({
+        ...prevMeals,
+        [selectedDate]: prevMeals[selectedDate].filter(meal => meal.id !== id)
+      }));
+    } catch (error) {
+      console.error('Error deleting meal:', error);
+    }
+  };
 
   const styles = (theme: any) => StyleSheet.create({
     container: {
@@ -486,9 +566,43 @@ export const MealPlannerScreen: React.FC = () => {
     },
   });
 
+  const renderMealItem = (meal: MealPlan) => (
+    <TouchableOpacity
+      key={meal.id}
+      style={[
+        styles(theme).mealListItem,
+        { backgroundColor: theme.colors.surface }
+      ]}
+      onPress={() => handleUpdateMeal(meal.id, { name: newMealName })}
+    >
+      <View style={[
+        styles(theme).mealTypeIndicator,
+        { backgroundColor: getMealTypeColor(meal.meal_type, theme) }
+      ]} />
+      <Text style={styles(theme).mealListName}>{meal.name}</Text>
+      <TouchableOpacity
+        onPress={() => handleDeleteMeal(meal.id)}
+        style={styles(theme).mealListDeleteButton}
+      >
+        <MaterialCommunityIcons
+          name="delete-outline"
+          size={20}
+          color={theme.colors.error}
+        />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+
+  const windowHeight = Dimensions.get('window').height;
+  const windowWidth = Dimensions.get('window').width;
+  const CALENDAR_HEIGHT = windowHeight - HEADER_HEIGHT - DAY_HEADER_HEIGHT - 40;
+  const DAY_HEIGHT = Math.floor((CALENDAR_HEIGHT / 6) * 0.75);
+  const DAY_WIDTH = Math.floor(windowWidth / 7);
+  const isMobile = windowWidth < 768;
+
   return (
     <View style={styles(theme).container}>
-      <ScrollView>
+      <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
         <View style={styles(theme).header}>
           <Button
             mode="contained"
@@ -498,28 +612,31 @@ export const MealPlannerScreen: React.FC = () => {
             Get Calendar Subscription URL
           </Button>
         </View>
-        <Calendar
-          current={currentMonth}
-          onDayPress={(day) => {
-            setSelectedDate(day.dateString);
-            setIsAddMealVisible(true);
-          }}
-          dayComponent={DayComponent}
-          customHeader={CustomHeader}
-          hideExtraDays={false}
-          theme={{
-            backgroundColor: theme.colors.background,
-            calendarBackground: theme.colors.background,
-            textSectionTitleColor: theme.colors.onBackground,
-            selectedDayBackgroundColor: theme.colors.primaryContainer,
-            selectedDayTextColor: theme.colors.onPrimaryContainer,
-            todayTextColor: theme.colors.primary,
-            arrowColor: theme.colors.primary,
-            textDayHeaderFontSize: 14,
-            textDayHeaderFontWeight: '600',
-          }}
-          style={styles(theme).calendar}
-        />
+        {!isMobile && (
+          <Calendar
+            current={currentMonth}
+            onDayPress={(day) => {
+              setSelectedDate(day.dateString);
+              setIsAddMealVisible(true);
+            }}
+            onMonthChange={handleMonthChange}
+            dayComponent={DayComponent}
+            customHeader={CustomHeader}
+            hideExtraDays={false}
+            theme={{
+              backgroundColor: theme.colors.background,
+              calendarBackground: theme.colors.background,
+              textSectionTitleColor: theme.colors.onBackground,
+              selectedDayBackgroundColor: theme.colors.primaryContainer,
+              selectedDayTextColor: theme.colors.onPrimaryContainer,
+              todayTextColor: theme.colors.primary,
+              arrowColor: theme.colors.primary,
+              textDayHeaderFontSize: 14,
+              textDayHeaderFontWeight: '600',
+            }}
+            style={styles(theme).calendar}
+          />
+        )}
 
         {/* Meal List Section */}
         <View style={styles(theme).mealListContainer}>
@@ -531,33 +648,7 @@ export const MealPlannerScreen: React.FC = () => {
                   {formatDate(date)} • {getDayName(date)}
                 </Text>
               </View>
-              {meals[date].map((meal) => (
-                <View key={meal.id} style={styles(theme).mealListItem}>
-                  <View style={[
-                    styles(theme).mealTypeIndicator,
-                    { backgroundColor: getMealTypeColor(meal.type, theme) }
-                  ]} />
-                  <Text style={styles(theme).mealListName}>{meal.name}</Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      const updatedMeals = { ...meals };
-                      updatedMeals[date] = meals[date].filter(m => m.id !== meal.id);
-                      if (updatedMeals[date].length === 0) {
-                        delete updatedMeals[date];
-                      }
-                      setMeals(updatedMeals);
-                      saveMeals(updatedMeals);
-                    }}
-                    style={styles(theme).mealListDeleteButton}
-                  >
-                    <MaterialCommunityIcons
-                      name="delete-outline"
-                      size={20}
-                      color={theme.colors.error}
-                    />
-                  </TouchableOpacity>
-                </View>
-              ))}
+              {meals[date].map(renderMealItem)}
             </View>
           ))}
           {sortedMealDates.length === 0 && (
@@ -692,10 +783,5 @@ export const MealPlannerScreen: React.FC = () => {
 
 const HEADER_HEIGHT = 60;
 const DAY_HEADER_HEIGHT = 30;
-const windowHeight = Dimensions.get('window').height;
-const windowWidth = Dimensions.get('window').width;
-const CALENDAR_HEIGHT = windowHeight - HEADER_HEIGHT - DAY_HEADER_HEIGHT - 40;
-const DAY_HEIGHT = Math.floor((CALENDAR_HEIGHT / 6) * 0.75);
-const DAY_WIDTH = Math.floor(windowWidth / 7);
 
 export default MealPlannerScreen;

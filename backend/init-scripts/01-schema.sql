@@ -93,6 +93,19 @@ CREATE TABLE IF NOT EXISTS sync_metadata (
   UNIQUE(user_id, device_id)
 );
 
+-- Meal plans table
+CREATE TABLE IF NOT EXISTS meal_plans (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+  name VARCHAR(255) NOT NULL,
+  date DATE NOT NULL,
+  meal_type VARCHAR(50) NOT NULL, -- breakfast, lunch, dinner, snack
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  sync_id VARCHAR(36) NOT NULL DEFAULT gen_random_uuid(),
+  is_deleted BOOLEAN DEFAULT FALSE
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_food_logs_user_date ON food_logs(user_id, log_date);
 CREATE INDEX IF NOT EXISTS idx_food_items_barcode ON food_items(barcode);
@@ -106,3 +119,7 @@ CREATE INDEX IF NOT EXISTS idx_weight_logs_sync_id ON weight_logs(sync_id);
 CREATE INDEX IF NOT EXISTS idx_weight_goals_user ON weight_goals(user_id);
 CREATE INDEX IF NOT EXISTS idx_weight_goals_sync_id ON weight_goals(sync_id);
 CREATE INDEX IF NOT EXISTS idx_weight_goals_start_date ON weight_goals(start_date);
+CREATE INDEX IF NOT EXISTS idx_meal_plans_user_id ON meal_plans(user_id);
+CREATE INDEX IF NOT EXISTS idx_meal_plans_date ON meal_plans(date);
+CREATE INDEX IF NOT EXISTS idx_meal_plans_sync_id ON meal_plans(sync_id);
+CREATE INDEX IF NOT EXISTS idx_meal_plans_is_deleted ON meal_plans(is_deleted);

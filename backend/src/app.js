@@ -13,6 +13,7 @@ const goalRoutes = require('./routes/goalRoutes');
 const syncRoutes = require('./routes/syncRoutes');
 const recipeRoutes = require('./routes/recipeRoutes');
 const weightRoutes = require('./routes/weightRoutes');
+const mealPlansRouter = require('./routes/mealPlans');
 
 // Create Express app
 const app = express();
@@ -38,6 +39,7 @@ app.use('/api/goals', goalRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/recipes', recipeRoutes);
 app.use('/api/weight', weightRoutes);
+app.use('/api/meal-plans', mealPlansRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

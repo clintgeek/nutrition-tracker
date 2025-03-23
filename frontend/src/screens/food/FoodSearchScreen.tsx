@@ -620,7 +620,7 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
                     <RNTextInput
                       value={selectedFood ? Math.round(selectedFood.calories).toString() : '0'}
                       onChangeText={(value) => {
-                        const numValue = parseFloat(value) || 0;
+                        const numValue = Math.round(parseFloat(value) || 0);
                         setSelectedFood(prev => prev ? {...prev, calories: numValue} : null);
                       }}
                       keyboardType="numeric"
