@@ -85,7 +85,7 @@ export default function BarcodeScanner() {
 
   // Handle camera initialization
   const handleCameraRef = useCallback(async (ref: Camera | null) => {
-    loggingService.info('Camera ref received', { hasRef: !!ref });
+    loggingService.info('Camera ref received', { hasRef: !!ref, platform: Platform.OS });
 
     if (!ref) return;
 
@@ -95,14 +95,21 @@ export default function BarcodeScanner() {
 
       // Configure camera for optimal performance
       const camera = ref as any; // Type assertion for Camera methods
-      loggingService.info('Setting camera type');
-      await camera.setCameraTypeAsync(CameraType.back);
 
-      loggingService.info('Setting flash mode');
-      await camera.setFlashModeAsync(FlashMode.off);
-
-      loggingService.info('Setting auto focus');
-      await camera.setAutoFocusAsync(AutoFocus.on);
+      // Web-specific configuration
+      if (Platform.OS === 'web') {
+        loggingService.info('Applying web-specific camera configuration');
+        // Set a lower resolution for web
+        await camera.setCameraTypeAsync(CameraType.back);
+        await camera.setFlashModeAsync(FlashMode.off);
+        await camera.setAutoFocusAsync(AutoFocus.on);
+      } else {
+        // Native platform configuration
+        loggingService.info('Applying native camera configuration');
+        await camera.setCameraTypeAsync(CameraType.back);
+        await camera.setFlashModeAsync(FlashMode.off);
+        await camera.setAutoFocusAsync(AutoFocus.on);
+      }
 
       loggingService.info('Starting preview');
       await ref.resumePreview();
@@ -110,7 +117,7 @@ export default function BarcodeScanner() {
 
       setIsInitialized(true);
     } catch (err) {
-      loggingService.error('Error configuring camera', { error: err });
+      loggingService.error('Error configuring camera', { error: err, platform: Platform.OS });
       setError('Failed to configure camera. Please try again.');
       setShowErrorDialog(true);
     }
@@ -267,7 +274,11 @@ export default function BarcodeScanner() {
           useCamera2Api={Platform.OS === 'android'}
           ratio="16:9"
           onMountError={(error) => {
-            loggingService.error('Camera mount error', { error });
+            loggingService.error('Camera mount error', {
+              error,
+              platform: Platform.OS,
+              userAgent: navigator.userAgent
+            });
             setError('Failed to start camera. Please try again.');
             setShowErrorDialog(true);
           }}
