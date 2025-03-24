@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 
 // Import components
 import TodaySummary from '../components/home/TodaySummary';
+import MealPlanCard from '../components/home/MealPlanCard';
 import { WeightProgressCard, WeightMiniGraph, WeightMetricsCard } from '../components/dashboard';
 import { weightService } from '../services/weightService';
 import { logService } from '../services/logService';
@@ -207,6 +208,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             )}
           </Card.Content>
         </Card>
+
+        {/* Meal Plan Card */}
+        <MealPlanCard />
 
         {/* Recent Activity Section */}
         <View style={styles.activitySection}>
