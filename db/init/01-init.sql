@@ -23,6 +23,20 @@ CREATE TABLE users (
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_created_at ON users(created_at);
 
+-- Create user_preferences table
+DROP TABLE IF EXISTS user_preferences CASCADE;
+CREATE TABLE user_preferences (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL UNIQUE,
+  home_screen_layout JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Add indexes for user_preferences
+CREATE INDEX idx_user_preferences_user_id ON user_preferences(user_id);
+
 -- Create food_items table
 DROP TABLE IF EXISTS food_items CASCADE;
 CREATE TABLE food_items (
