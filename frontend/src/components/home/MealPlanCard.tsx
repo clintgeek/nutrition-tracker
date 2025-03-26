@@ -91,7 +91,7 @@ const MealPlanCard: React.FC = () => {
     }
   };
 
-  const renderDayCard = (date: string) => {
+  const renderDayCard = (date: string, isLastInRow: boolean) => {
     const plans = mealPlans[date] || [];
     const formattedDate = format(new Date(date), 'EEE, MMM d');
     const isToday = date === format(new Date(), 'yyyy-MM-dd');
@@ -99,7 +99,10 @@ const MealPlanCard: React.FC = () => {
     return (
       <View key={date} style={[
         styles.dayCard,
-        !isMobile && { width: DAY_CARD_WIDTH }
+        !isMobile && {
+          flex: 1,
+          marginRight: isLastInRow ? 0 : DAY_CARD_MARGIN * 2
+        }
       ]}>
         <View style={styles.dayHeader}>
           <Text style={[styles.dateText, isToday && styles.todayText]}>
@@ -142,14 +145,15 @@ const MealPlanCard: React.FC = () => {
   };
 
   const renderRow = (dates: string[], index: number) => (
-    <ScrollView
+    <View
       key={index}
-      horizontal={!isMobile}
-      showsHorizontalScrollIndicator={false}
-      style={styles.row}
+      style={[
+        styles.row,
+        !isMobile && { flexDirection: 'row' }
+      ]}
     >
-      {dates.map((date) => renderDayCard(date))}
-    </ScrollView>
+      {dates.map((date, idx) => renderDayCard(date, idx === dates.length - 1))}
+    </View>
   );
 
   if (isLoading) {
@@ -211,18 +215,10 @@ const styles = StyleSheet.create({
   divider: {
     marginBottom: 12,
   },
-  seeAllLink: {
-    color: '#2196F3',
-    fontWeight: '500',
-  },
-  daysContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    marginHorizontal: -8,
+  row: {
+    marginBottom: 16,
   },
   dayCard: {
-    marginHorizontal: 8,
     marginBottom: 16,
     padding: 12,
     borderRadius: 8,
@@ -241,91 +237,56 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#495057',
   },
-  addButton: {
-    padding: 4,
-    borderRadius: 12,
-    backgroundColor: '#e9ecef',
+  todayText: {
+    color: '#1976D2',
   },
-  addIcon: {
-    color: '#6c757d',
+  todayBadge: {
+    backgroundColor: '#1976D2',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  todayBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
   },
   mealsContainer: {
-    marginTop: 8,
+    marginTop: -8,
   },
   mealItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginTop: 8,
   },
   mealIcon: {
+    width: 16,
     marginRight: 8,
   },
   mealText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 14,
     color: '#495057',
   },
   emptyState: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    justifyContent: 'center',
+    paddingVertical: 12,
   },
   emptyText: {
-    marginTop: 8,
     color: '#6c757d',
-    fontSize: 13,
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    marginHorizontal: -8,
-  },
-  loadingCard: {
-    width: '100%',
-    marginHorizontal: 8,
-    marginBottom: 16,
-    height: 120,
-    borderRadius: 8,
-    backgroundColor: '#f8f9fa',
+    fontSize: 14,
+    marginLeft: 8,
   },
   skeletonContainer: {
     flexDirection: 'row',
-    marginRight: 16,
   },
   skeletonCard: {
     borderRadius: 8,
-  },
-  todayText: {
-    color: '#2196F3',
-    fontWeight: 'bold',
-  },
-  todayBadge: {
-    backgroundColor: '#2196F3',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 12,
-    marginLeft: 6,
-  },
-  todayBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '500',
-  },
-  emptyMealsContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  noMealsText: {
-    fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
-    marginTop: 4,
-  },
-  row: {
-    marginBottom: 12,
-  },
+    marginBottom: 16,
+    marginRight: 16,
+  }
 });
 
 export default MealPlanCard;
