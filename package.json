@@ -1,4 +1,14 @@
 {
+  "scripts": {
+    "start": "npm run start:frontend",
+    "start:frontend": "cd frontend && npx expo start --web",
+    "start:backend": "cd backend && npm run dev",
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "cd frontend && npx expo export:web",
+    "build:backend": "cd backend && npm run build",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "web:build": "cd frontend && npm run web:build"
+  },
   "dependencies": {
     "react-native-draggable-flatlist": "^4.0.1",
     "zod": "^3.24.2"

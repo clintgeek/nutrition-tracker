@@ -1,6 +1,6 @@
 {
-  "short_name": "Nutrition Tracker",
-  "name": "Nutrition Tracker App",
+  "short_name": "FitnessGeek",
+  "name": "FitnessGeek",
   "icons": [
     {
       "src": "favicon-16x16.png",
@@ -30,6 +30,6 @@
   "orientation": "portrait",
   "scope": "/",
   "prefer_related_applications": false,
-  "categories": ["health", "lifestyle", "food"],
-  "description": "Track your daily nutrition goals and maintain a healthy lifestyle"
+  "categories": ["health", "lifestyle", "fitness"],
+  "description": "Track your fitness journey with comprehensive nutrition tracking"
 }

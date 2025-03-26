@@ -1,5 +1,5 @@
 const { getClient } = require('../config/db');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const logger = require('../config/logger');
 
 class User {

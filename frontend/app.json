@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "Nutrition Tracker",
-    "slug": "nutrition-tracker",
+    "name": "FitnessGeek",
+    "slug": "fitnessgeek",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./src/assets/icon.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./src/assets/splash.png",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -19,7 +19,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.nutritiontracker",
+      "bundleIdentifier": "com.fitnessgeek.app",
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to scan food barcodes for easy food logging.",
         "NSMicrophoneUsageDescription": "This app does not use the microphone."
@@ -27,16 +27,16 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./src/assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
       },
-      "package": "com.yourcompany.nutritiontracker",
+      "package": "com.fitnessgeek.app",
       "permissions": [
         "CAMERA"
       ]
     },
     "web": {
-      "favicon": "./src/assets/favicon.png"
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
       [
