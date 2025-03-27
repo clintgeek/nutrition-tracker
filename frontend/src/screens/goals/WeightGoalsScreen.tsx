@@ -11,8 +11,7 @@ import {
   Dialog,
   Portal,
   ProgressBar,
-  Paragraph,
-  IconButton
+  Paragraph
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useIsFocused, useFocusEffect } from '@react-navigation/native';
@@ -21,6 +20,7 @@ import { LoadingSpinner, SkeletonLoader, SkeletonCard, LoadingOverlay } from '..
 import { weightService, WeightLog, WeightGoal } from '../../services/weightService';
 import { WeightTrendGraph, WeightMetricsCard } from '../../components/dashboard';
 import { IconButton as CustomIconButton } from '../../components/IconButton';
+import { WeightImportButton } from '../../components/weight/WeightImportButton';
 
 // Conditionally import DateTimePicker based on platform
 let DateTimePicker: any = () => null;
@@ -440,6 +440,16 @@ const createStyles = (theme: any) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
+  },
+  bottomButtonContainer: {
+    padding: 16,
+    backgroundColor: theme.colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.outline,
+  },
+  importButtonContainer: {
+    marginTop: 16,
+    marginBottom: 24,
   },
 });
 
@@ -986,6 +996,11 @@ const WeightGoalsScreen: React.FC = () => {
 
         {/* Weight History */}
         {renderWeightHistory()}
+
+        {/* Import Button */}
+        <View style={styles.importButtonContainer}>
+          <WeightImportButton onImportComplete={loadWeightData} />
+        </View>
       </View>
     );
   };
