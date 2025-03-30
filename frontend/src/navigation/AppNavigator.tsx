@@ -14,8 +14,6 @@ import MainTabNavigator from './MainTabNavigator';
 import DrawerContent from './DrawerNavigator';
 import LoadingScreen from '../screens/LoadingScreen';
 import NutritionGoalsScreen from '../screens/goals/NutritionGoalsScreen';
-import WeightGoalsScreen from '../screens/goals/WeightGoalsScreen';
-import BloodPressureScreen from '../screens/BloodPressureScreen';
 import CustomHeader from '../components/CustomHeader';
 
 // Define the stack navigator param list
@@ -87,30 +85,6 @@ const MainDrawerNavigator = () => {
           header: renderHeaderWithMenu('Nutrition Goals'),
           drawerIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons name="target" color={color} size={size} />
-          ),
-        }}
-      />
-      <Drawer.Screen
-        name="WeightGoals"
-        component={WeightGoalsScreen}
-        options={{
-          title: 'Weight Goals',
-          headerShown: true,
-          header: renderHeaderWithMenu('Weight Goals'),
-          drawerIcon: ({ color, size }: { color: string; size: number }) => (
-            <MaterialCommunityIcons name="scale-bathroom" color={color} size={size} />
-          ),
-        }}
-      />
-      <Drawer.Screen
-        name="BloodPressure"
-        component={BloodPressureScreen}
-        options={{
-          title: 'Blood Pressure',
-          headerShown: true,
-          header: renderHeaderWithMenu('Blood Pressure'),
-          drawerIcon: ({ color, size }: { color: string; size: number }) => (
-            <MaterialCommunityIcons name="heart-pulse" color={color} size={size} />
           ),
         }}
       />

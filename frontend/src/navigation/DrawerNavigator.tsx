@@ -13,8 +13,6 @@ import { useAuth } from '../contexts/AuthContext';
 type DrawerParamList = {
   MainTabs: undefined;
   NutritionGoals: undefined;
-  WeightGoals: undefined;
-  BloodPressure: undefined;
 };
 
 // Custom drawer content component
@@ -97,13 +95,13 @@ const DrawerContent = (props: any) => {
         activeTintColor={theme.colors.primary}
       />
 
-      {/* Goals */}
+      {/* Health-related items */}
       <DrawerItem
-        label="Nutrition Goals"
+        label="Blood Pressure"
         icon={({ color, size }) => (
-          <MaterialCommunityIcons name="target" color={color} size={size} />
+          <MaterialCommunityIcons name="heart-pulse" color={color} size={size} />
         )}
-        onPress={() => navigation.navigate('NutritionGoals')}
+        onPress={() => navigateToTab('BloodPressure')}
         activeTintColor={theme.colors.primary}
       />
 
@@ -112,16 +110,17 @@ const DrawerContent = (props: any) => {
         icon={({ color, size }) => (
           <MaterialCommunityIcons name="scale-bathroom" color={color} size={size} />
         )}
-        onPress={() => navigation.navigate('WeightGoals')}
+        onPress={() => navigateToTab('WeightGoals')}
         activeTintColor={theme.colors.primary}
       />
 
+      {/* Goals */}
       <DrawerItem
-        label="Blood Pressure"
+        label="Nutrition Goals"
         icon={({ color, size }) => (
-          <MaterialCommunityIcons name="heart-pulse" color={color} size={size} />
+          <MaterialCommunityIcons name="target" color={color} size={size} />
         )}
-        onPress={() => navigation.navigate('BloodPressure')}
+        onPress={() => navigation.navigate('NutritionGoals')}
         activeTintColor={theme.colors.primary}
       />
 

@@ -226,6 +226,7 @@ const BloodPressureScreen: React.FC = () => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        contentContainerStyle={styles.listContent}
       />
 
       <View style={styles.bottomButtonContainer}>
@@ -325,7 +326,7 @@ const styles = StyleSheet.create({
   },
   addButton: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 80, // Increased to account for tab bar
     right: 20,
     backgroundColor: '#007AFF',
     borderRadius: 30,
@@ -373,7 +374,7 @@ const styles = StyleSheet.create({
   },
   bottomButtonContainer: {
     padding: 16,
-    paddingBottom: 100, // Extra padding to account for the floating add button
+    paddingBottom: 80, // Increased to account for tab bar
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#E5E5E5',
@@ -402,6 +403,9 @@ const styles = StyleSheet.create({
   timeSpanTextActive: {
     color: '#fff',
     fontWeight: '600',
+  },
+  listContent: {
+    paddingBottom: 80, // Added to provide space at the bottom of the list
   },
 });
 

@@ -14,6 +14,7 @@ import RecipeStackNavigator from './RecipeStackNavigator';
 import CustomHeader from '../components/CustomHeader';
 import { MealPlannerStackNavigator } from './MealPlannerStackNavigator';
 import WeightGoalsScreen from '../screens/goals/WeightGoalsScreen';
+import BloodPressureScreen from '../screens/BloodPressureScreen';
 
 // Define navigation types
 type DrawerParamList = {
@@ -33,6 +34,7 @@ export type MainTabParamList = {
   Recipe: undefined;
   MealPlanner: undefined;
   WeightGoals: undefined;
+  BloodPressure: undefined;
 };
 
 // Create the tab navigator
@@ -88,7 +90,7 @@ const MainTabNavigator: React.FC = () => {
         component={HomeScreen}
         options={{
           tabBarLabel: 'Home',
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons name="home" color={color} size={size} />
           ),
           headerShown: true,
@@ -100,7 +102,7 @@ const MainTabNavigator: React.FC = () => {
         component={LogStackNavigator}
         options={{
           tabBarLabel: 'Logs',
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons name="food-apple" color={color} size={size} />
           ),
         }}
@@ -110,7 +112,7 @@ const MainTabNavigator: React.FC = () => {
         component={FoodStackNavigator}
         options={{
           tabBarLabel: 'Foods',
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons name="food" color={color} size={size} />
           ),
         }}
@@ -120,7 +122,7 @@ const MainTabNavigator: React.FC = () => {
         component={RecipeStackNavigator}
         options={{
           tabBarLabel: 'Recipes',
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons name="book-open" color={color} size={size} />
           ),
         }}
@@ -130,18 +132,29 @@ const MainTabNavigator: React.FC = () => {
         component={MealPlannerStackNavigator}
         options={{
           tabBarLabel: 'Planner',
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons name="calendar" color={color} size={size} />
           ),
         }}
       />
+
+      {/* Hidden screens that show the tab bar but aren't in the tab bar */}
       <Tab.Screen
         name="WeightGoals"
         component={WeightGoalsScreen}
         options={{
-          tabBarButton: () => null,
+          tabBarButton: () => null, // Hide from tab bar
           headerShown: true,
           header: () => renderHeader('Weight Goals'),
+        }}
+      />
+      <Tab.Screen
+        name="BloodPressure"
+        component={BloodPressureScreen}
+        options={{
+          tabBarButton: () => null, // Hide from tab bar
+          headerShown: true,
+          header: () => renderHeader('Blood Pressure'),
         }}
       />
     </Tab.Navigator>
