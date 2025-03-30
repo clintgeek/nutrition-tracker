@@ -5,7 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { weightService } from '../../services/weightService';
 import { SkeletonLoader } from '../common';
 import { format, subDays, subMonths, differenceInDays } from 'date-fns';
-import WeightChart from '../weight/WeightChart';
+import NivoWeightChart from '../weight/NivoWeightChart';
 
 interface WeightTrendGraphProps {
   timeRange?: 'week' | 'month' | '3months' | 'year' | 'goal';
@@ -81,26 +81,31 @@ const WeightTrendGraph: React.FC<WeightTrendGraphProps> = ({
 
   const renderTimeRangeSelector = () => {
     const timeRanges = [
-      { key: 'week', label: '7D' },
-      { key: 'month', label: '1M' },
-      { key: '3months', label: '3M' },
-      { key: 'year', label: '1Y' },
-      { key: 'goal', label: 'Goal' },
+      { id: 'week', label: '7D' },
+      { id: 'month', label: '1M' },
+      { id: '3months', label: '3M' },
+      { id: 'year', label: '1Y' },
+      { id: 'goal', label: 'Goal' },
     ];
 
     return (
-      <View style={styles.timeRangeContainer}>
-        {timeRanges.map(range => (
-          <Button
-            key={range.key}
-            mode={selectedTimeRange === range.key ? 'contained' : 'outlined'}
-            compact
-            style={styles.timeRangeButton}
-            labelStyle={styles.timeRangeButtonLabel}
-            onPress={() => setSelectedTimeRange(range.key as any)}
+      <View style={styles.timeSelector}>
+        {timeRanges.map((range) => (
+          <TouchableOpacity
+            key={range.id}
+            style={[
+              styles.timeButton,
+              selectedTimeRange === range.id && styles.timeButtonActive
+            ]}
+            onPress={() => setSelectedTimeRange(range.id as "week" | "month" | "3months" | "year" | "goal")}
           >
-            {range.label}
-          </Button>
+            <Text style={[
+              styles.timeText,
+              selectedTimeRange === range.id && styles.timeTextActive
+            ]}>
+              {range.label}
+            </Text>
+          </TouchableOpacity>
         ))}
       </View>
     );
@@ -172,11 +177,11 @@ const WeightTrendGraph: React.FC<WeightTrendGraphProps> = ({
     }}>
       <Card.Content style={styles.container}>
         <View style={styles.graphContainer}>
-          <WeightChart
-            data={weightLogs}
-            timeRange={selectedTimeRange}
-            showActualWeight={showActualWeight}
-            weightGoal={weightGoal}
+          <NivoWeightChart
+            logs={weightLogs}
+            timeSpan={selectedTimeRange}
+            startWeight={weightGoal?.start_weight}
+            targetWeight={weightGoal?.target_weight}
           />
         </View>
 
@@ -241,18 +246,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  timeRangeContainer: {
+  timeSelector: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 8,
     flexWrap: 'wrap',
   },
-  timeRangeButton: {
+  timeButton: {
     marginHorizontal: 2,
     marginBottom: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: '#f0f0f0',
   },
-  timeRangeButtonLabel: {
+  timeButtonActive: {
+    backgroundColor: '#007AFF',
+  },
+  timeText: {
     fontSize: 12,
+    color: '#666',
+  },
+  timeTextActive: {
+    fontWeight: 'bold',
+    color: '#fff',
   },
   errorContainer: {
     height: 250,

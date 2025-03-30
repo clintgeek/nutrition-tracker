@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import bloodPressureService, { BloodPressureLog } from '../services/bloodPressureService';
 import BloodPressureForm from '../components/BloodPressureForm';
 import { BloodPressureImportButton } from '../components/BloodPressureImportButton';
-import BloodPressureChart from '../components/blood-pressure/BloodPressureChart';
+import NivoBloodPressureChart from '../components/blood-pressure/NivoBloodPressureChart';
 
 interface BloodPressureFormData {
   systolic: number;
@@ -186,7 +186,7 @@ const BloodPressureScreen: React.FC = () => {
     <View style={styles.container}>
       {hasData ? (
         <View style={styles.chartContainer}>
-          <BloodPressureChart data={logs} timeSpan={timeSpan} />
+          <NivoBloodPressureChart data={logs} timeSpan={timeSpan} />
           <View style={styles.timeSpanSelector}>
             {(['7D', '1M', '3M', '6M', '1Y', 'ALL'] as TimeSpan[]).map((span) => (
               <TouchableOpacity
