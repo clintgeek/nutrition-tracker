@@ -1,5 +1,5 @@
 const express = require('express');
-const { check } = require('express-validator');
+const router = express.Router();
 const {
   getWeightGoal,
   saveWeightGoal,
@@ -7,79 +7,30 @@ const {
   addWeightLog,
   deleteWeightLog,
   getLatestWeightLog,
-  getWeightLogsForDateRange,
+  getWeightLogsForDateRange
 } = require('../controllers/weightController');
 const { authenticate } = require('../middleware/auth');
+const { body } = require('express-validator');
 
-const router = express.Router();
+// Weight goals routes
+router.get('/goal', authenticate, getWeightGoal);
+router.post('/goal', [
+  authenticate,
+  body('target_weight').isNumeric().withMessage('Target weight must be a number'),
+  body('start_weight').isNumeric().withMessage('Start weight must be a number'),
+  body('start_date').isISO8601().withMessage('Start date must be in ISO format'),
+  body('target_date').optional().isISO8601().withMessage('Target date must be in ISO format'),
+], saveWeightGoal);
 
-// All routes require authentication
-router.use(authenticate);
-
-/**
- * @route GET /api/weight/goal
- * @desc Get weight goal
- * @access Private
- */
-router.get('/goal', getWeightGoal);
-
-/**
- * @route POST /api/weight/goal
- * @desc Create or update weight goal
- * @access Private
- */
-router.post(
-  '/goal',
-  [
-    check('target_weight', 'Target weight is required').isNumeric(),
-    check('start_weight', 'Start weight is required').isNumeric(),
-    check('start_date', 'Start date must be a valid date').isISO8601().toDate(),
-    check('target_date', 'Target date must be a valid date').optional().isISO8601().toDate(),
-  ],
-  saveWeightGoal
-);
-
-/**
- * @route GET /api/weight/logs
- * @desc Get all weight logs
- * @access Private
- */
-router.get('/logs', getWeightLogs);
-
-/**
- * @route GET /api/weight/logs/latest
- * @desc Get latest weight log
- * @access Private
- */
-router.get('/logs/latest', getLatestWeightLog);
-
-/**
- * @route GET /api/weight/logs/range
- * @desc Get weight logs for a date range
- * @access Private
- */
-router.get('/logs/range', getWeightLogsForDateRange);
-
-/**
- * @route POST /api/weight/logs
- * @desc Add a weight log
- * @access Private
- */
-router.post(
-  '/logs',
-  [
-    check('weight_value', 'Weight is required').isNumeric(),
-    check('log_date', 'Date must be a valid date').isISO8601().toDate(),
-    check('notes', 'Notes must be a string').optional().isString(),
-  ],
-  addWeightLog
-);
-
-/**
- * @route DELETE /api/weight/logs/:id
- * @desc Delete a weight log
- * @access Private
- */
-router.delete('/logs/:id', deleteWeightLog);
+// Weight logs routes
+router.get('/logs', authenticate, getWeightLogs);
+router.post('/logs', [
+  authenticate,
+  body('weight_value').isNumeric().withMessage('Weight must be a number'),
+  body('log_date').isISO8601().withMessage('Log date must be in ISO format'),
+], addWeightLog);
+router.delete('/logs/:id', authenticate, deleteWeightLog);
+router.get('/logs/latest', authenticate, getLatestWeightLog);
+router.get('/logs/range', authenticate, getWeightLogsForDateRange);
 
 module.exports = router;

@@ -34,6 +34,15 @@ const DrawerContent = (props: any) => {
     navigation.navigate('MainTabs', { screen: tabName });
   };
 
+  // Navigate to a stack screen within a tab
+  const navigateToStackScreen = (tabName: string, stackScreen: string) => {
+    navigation.navigate('MainTabs');
+    navigation.navigate('MainTabs', {
+      screen: tabName,
+      params: { screen: stackScreen }
+    });
+  };
+
   return (
     <DrawerContentScrollView
       {...props}
@@ -58,7 +67,7 @@ const DrawerContent = (props: any) => {
         activeTintColor={theme.colors.primary}
       />
 
-      {/* Custom tab navigation items */}
+      {/* Food Logs */}
       <DrawerItem
         label="Food Logs"
         icon={({ color, size }) => (
@@ -68,24 +77,27 @@ const DrawerContent = (props: any) => {
         activeTintColor={theme.colors.primary}
       />
 
+      {/* Weight Goals */}
       <DrawerItem
-        label="Foods"
+        label="Weight Logs"
         icon={({ color, size }) => (
-          <MaterialCommunityIcons name="food" color={color} size={size} />
+          <MaterialCommunityIcons name="scale-bathroom" color={color} size={size} />
         )}
-        onPress={() => navigateToTab('Food')}
+        onPress={() => navigateToTab('WeightGoals')}
         activeTintColor={theme.colors.primary}
       />
 
+      {/* Blood Pressure */}
       <DrawerItem
-        label="Recipes"
+        label="BP Logs"
         icon={({ color, size }) => (
-          <MaterialCommunityIcons name="book-open" color={color} size={size} />
+          <MaterialCommunityIcons name="heart-pulse" color={color} size={size} />
         )}
-        onPress={() => navigateToTab('Recipe')}
+        onPress={() => navigateToTab('BloodPressure')}
         activeTintColor={theme.colors.primary}
       />
 
+      {/* Meal Planner */}
       <DrawerItem
         label="Meal Planner"
         icon={({ color, size }) => (
@@ -95,26 +107,27 @@ const DrawerContent = (props: any) => {
         activeTintColor={theme.colors.primary}
       />
 
-      {/* Health-related items */}
+      {/* Recipes */}
       <DrawerItem
-        label="Blood Pressure"
+        label="Recipes"
         icon={({ color, size }) => (
-          <MaterialCommunityIcons name="heart-pulse" color={color} size={size} />
+          <MaterialCommunityIcons name="book-open" color={color} size={size} />
         )}
-        onPress={() => navigateToTab('BloodPressure')}
+        onPress={() => navigateToTab('Recipe')}
         activeTintColor={theme.colors.primary}
       />
 
+      {/* Foods */}
       <DrawerItem
-        label="Weight Goals"
+        label="Food List"
         icon={({ color, size }) => (
-          <MaterialCommunityIcons name="scale-bathroom" color={color} size={size} />
+          <MaterialCommunityIcons name="food" color={color} size={size} />
         )}
-        onPress={() => navigateToTab('WeightGoals')}
+        onPress={() => navigateToTab('Food')}
         activeTintColor={theme.colors.primary}
       />
 
-      {/* Goals */}
+      {/* Nutrition Goals */}
       <DrawerItem
         label="Nutrition Goals"
         icon={({ color, size }) => (

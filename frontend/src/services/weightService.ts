@@ -68,18 +68,18 @@ export const weightService = {
   // Get all weight logs
   getWeightLogs: async (): Promise<WeightLog[]> => {
     try {
-      const response = await apiService.get<{ logs: any[] }>('/weight');
+      const response = await apiService.get<{ logs: any[] }>('/weight/logs');
 
       // Check if logs exist
-      if (!response || !Array.isArray(response)) {
+      if (!response.logs || !Array.isArray(response.logs)) {
         console.log('No weight logs found in API response');
         return [];
       }
 
-      console.log('Raw weight logs from API:', JSON.stringify(response[0]));
+      console.log('Raw weight logs from API:', JSON.stringify(response.logs[0]));
 
       // Transform the response to match our interface
-      const transformedLogs: WeightLog[] = response.map(log => ({
+      const transformedLogs: WeightLog[] = response.logs.map(log => ({
         id: log.id,
         weight_value: parseFloat(log.weight_value || log.weight || 0),
         log_date: log.log_date || log.date || '',
@@ -102,18 +102,18 @@ export const weightService = {
       const formattedStartDate = formatDate(startDate);
       const formattedEndDate = formatDate(endDate);
 
-      const response = await apiService.get<{ logs: any[] }>(`/weight?start_date=${formattedStartDate}&end_date=${formattedEndDate}`);
+      const response = await apiService.get<{ logs: any[] }>(`/weight/logs/range?start_date=${formattedStartDate}&end_date=${formattedEndDate}`);
 
       // Check if logs exist
-      if (!response || !Array.isArray(response)) {
+      if (!response.logs || !Array.isArray(response.logs)) {
         console.log('No weight logs found in date range API response');
         return [];
       }
 
-      console.log('Raw weight logs from date range API:', JSON.stringify(response[0]));
+      console.log('Raw weight logs from date range API:', JSON.stringify(response.logs[0]));
 
       // Transform the response to match our interface
-      const transformedLogs: WeightLog[] = response.map(log => ({
+      const transformedLogs: WeightLog[] = response.logs.map(log => ({
         id: log.id,
         weight_value: parseFloat(log.weight_value || log.weight || 0),
         log_date: log.log_date || log.date || '',
@@ -133,7 +133,7 @@ export const weightService = {
   // Get latest weight log
   getLatestWeightLog: async (): Promise<WeightLog | null> => {
     try {
-      const response = await apiService.get<{ log: any }>('/weight/latest');
+      const response = await apiService.get<{ log: any }>('/weight/logs/latest');
 
       if (!response || !response.log) {
         console.log('No latest weight log found in API response');
@@ -165,7 +165,7 @@ export const weightService = {
     const syncId = uuid.v4() as string;
     try {
       // Send data with both field names to ensure compatibility
-      const response = await apiService.post<{ message: string; log: any }>('/weight', {
+      const response = await apiService.post<{ message: string; log: any }>('/weight/logs', {
         weight: logData.weight_value,
         weight_value: logData.weight_value,
         date: logData.log_date,
