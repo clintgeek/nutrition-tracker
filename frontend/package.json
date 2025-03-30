@@ -59,6 +59,7 @@
     "react-native-uuid": "^2.0.1",
     "react-native-vector-icons": "^10.2.0",
     "react-native-web": "~0.18.12",
+    "recharts": "^2.15.1",
     "setimmediate": "^1.0.5",
     "styled-components": "^6.1.16",
     "yup": "^1.0.2"
