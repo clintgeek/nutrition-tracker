@@ -365,13 +365,13 @@ export const foodService = {
 
   // Get custom foods
   async getCustomFoods(): Promise<Food[]> {
-    try {
-      const response = await apiService.get<{ foods: ApiFood[] }>('/foods/custom');
-      return response.foods.map(transformFood);
-    } catch (error) {
-      console.error('Error fetching custom foods:', error);
-      throw error;
-    }
+    const response = await apiService.get<CustomFoodsResponse>('/foods/custom');
+    return response.foods.map(food => this.mapFoodItemToFood(food));
+  },
+
+  async getRecipeFoods(): Promise<Food[]> {
+    const response = await apiService.get<CustomFoodsResponse>('/foods/recipes');
+    return response.foods.map(food => this.mapFoodItemToFood(food));
   },
 
   // Get food by ID

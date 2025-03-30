@@ -51,10 +51,10 @@ const getSourceColor = (source: string, theme: any) => {
 };
 
 const mapFoodItemToFood = (item: FoodItem): Food => ({
-  id: typeof item.id === 'string' ? parseInt(item.id, 10) : (item.id || Date.now()),
+  id: typeof item.id === 'string' ? parseInt(item.id, 10) : (item.id || -(Math.floor(Math.random() * 1000000) + 1)),
   name: item.name,
-  barcode: item.barcode,
-  brand: item.brand,
+  barcode: item.barcode || undefined,
+  brand: item.brand || undefined,
   calories: item.calories || 0,
   protein: item.protein || 0,
   carbs: item.carbs || 0,
@@ -104,17 +104,26 @@ export function SearchFoodForRecipeScreen() {
       if (query.trim()) {
         results = await foodService.searchFood(query);
       } else {
-        // Get custom foods
+        // Get custom foods first
         const customFoods = await foodService.getCustomFoods();
 
-        // Sort custom foods alphabetically
-        const sortedCustomFoods = customFoods.sort((a, b) =>
+        // Try to get recipe foods, but handle failure gracefully
+        let recipeFoods: Food[] = [];
+        try {
+          recipeFoods = await foodService.getRecipeFoods();
+        } catch (error) {
+          console.warn('Failed to fetch recipe foods:', error);
+          // Continue without recipe foods
+        }
+
+        // Combine and sort all foods alphabetically
+        const allFoods = [...customFoods, ...recipeFoods].sort((a, b) =>
           a.name.toLowerCase().localeCompare(b.name.toLowerCase())
         );
 
         results = {
-          foods: sortedCustomFoods,
-          total: sortedCustomFoods.length,
+          foods: allFoods,
+          total: allFoods.length,
           page: 1,
           limit: 20
         };
@@ -131,7 +140,7 @@ export function SearchFoodForRecipeScreen() {
         serving_size: food.serving_size || 100,
         serving_unit: food.serving_unit || 'g',
         is_custom: food.source === 'custom',
-        source: food.source === 'custom' ? 'custom' : 'usda'
+        source: food.source
       }));
 
       setFoods(mappedFoods);
@@ -146,6 +155,16 @@ export function SearchFoodForRecipeScreen() {
       setIsLoading(false);
     }
   }, []);
+
+  // Add a focus listener to refresh the list when the screen becomes active
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('SearchFoodForRecipeScreen focused - refreshing foods list');
+      fetchFoods(searchQuery);
+    });
+
+    return unsubscribe;
+  }, [navigation, fetchFoods, searchQuery]);
 
   // Initial load
   useEffect(() => {
@@ -169,8 +188,10 @@ export function SearchFoodForRecipeScreen() {
   // Handle selecting a food item
   const handleSelectFood = async (food: Food) => {
     try {
-      // If the food is not custom, create a custom copy
-      if (!food.is_custom) {
+      let finalFood = food;
+
+      // If the food has a negative ID or is not custom, create a custom copy
+      if (food.id < 0 || !food.is_custom) {
         const customFood = await foodService.createCustomFood({
           name: food.name,
           brand: food.brand,
@@ -184,7 +205,7 @@ export function SearchFoodForRecipeScreen() {
         });
 
         // Ensure all fields are properly set
-        food = {
+        finalFood = {
           ...customFood,
           name: capitalizeFoodName(customFood.name),
           calories: customFood.calories || food.calories || 0,
@@ -203,7 +224,7 @@ export function SearchFoodForRecipeScreen() {
       // Navigate back to recipe detail with the selected food and original recipeId
       navigation.navigate('RecipeDetail', {
         recipeId: typeof recipeId === 'string' ? 'new' : Number(recipeId),
-        selectedIngredient: food
+        selectedIngredient: finalFood
       });
     } catch (error) {
       console.error('Error handling food selection:', error);

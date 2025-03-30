@@ -193,6 +193,24 @@ const AddFoodToLogModal: React.FC = () => {
     setIsCustom(true);
   };
 
+  // State for displayed nutrition values
+  const [displayNutrition, setDisplayNutrition] = useState({
+    calories: food.calories || 0,
+    protein: food.protein || 0,
+    carbs: food.carbs || 0,
+    fat: food.fat || 0
+  });
+
+  // Update displayed nutrition when servings change
+  useEffect(() => {
+    setDisplayNutrition({
+      calories: calculateNutrition(food.calories || 0, true),
+      protein: calculateNutrition(food.protein || 0),
+      carbs: calculateNutrition(food.carbs || 0),
+      fat: calculateNutrition(food.fat || 0)
+    });
+  }, [servings, food]);
+
   // Update the handleAddToLog function to not include serving size/unit in calculations
   const handleAddToLog = async () => {
     try {
@@ -214,10 +232,12 @@ const AddFoodToLogModal: React.FC = () => {
           serving_unit: food.serving_unit,
         };
 
-        if (food.is_custom) {
+        // If it's already a custom food and has a valid ID, update it
+        if (food.is_custom && food.id && !isNaN(Number(food.id))) {
           await foodService.updateCustomFood(Number(food.id), customFood);
           foodToLog = { ...foodToLog, name: capitalizeFoodName(food.name) };
         } else {
+          // Otherwise create a new custom food
           const newFood = await foodService.createCustomFood(customFood);
           foodToLog = newFood;
         }
@@ -267,7 +287,10 @@ const AddFoodToLogModal: React.FC = () => {
                   <TextInput
                     value={food.serving_size?.toString()}
                     onChangeText={(value) => {
-                      setFood(prev => ({ ...prev, serving_size: parseFloat(value) || undefined }));
+                      setFood(prev => ({
+                        ...prev,
+                        serving_size: parseFloat(value) || prev.serving_size
+                      }));
                       setIsCustom(true);
                     }}
                     keyboardType="decimal-pad"
@@ -278,7 +301,10 @@ const AddFoodToLogModal: React.FC = () => {
                   <TextInput
                     value={food.serving_unit}
                     onChangeText={(value) => {
-                      setFood(prev => ({ ...prev, serving_unit: value || undefined }));
+                      setFood(prev => ({
+                        ...prev,
+                        serving_unit: value || prev.serving_unit
+                      }));
                       setIsCustom(true);
                     }}
                     style={styles.servingUnitInput}
@@ -294,7 +320,7 @@ const AddFoodToLogModal: React.FC = () => {
                 <DatePickerInput
                   locale="en"
                   value={selectedDate}
-                  onChange={(d) => d && setSelectedDate(d)}
+                  onChange={(d: Date | undefined) => d && setSelectedDate(d)}
                   inputMode="start"
                   style={styles.dateInput}
                 />
@@ -302,12 +328,17 @@ const AddFoodToLogModal: React.FC = () => {
 
               {/* Nutrition Summary */}
               <View style={styles.nutritionGroup}>
-                <Text style={styles.nutritionTitle}>Nutrition per serving</Text>
+                <Text style={styles.nutritionTitle}>
+                  Nutrition for {parseFloat(servings) || 1} {parseFloat(servings) === 1 ? 'serving' : 'servings'}
+                </Text>
                 <View style={styles.nutritionGrid}>
                   <View style={styles.nutritionItem}>
                     <TextInput
-                      value={food.calories?.toString() || '0'}
-                      onChangeText={(value) => handleNutritionChange('calories', value)}
+                      value={displayNutrition.calories.toString() || '0'}
+                      onChangeText={(value) => {
+                        const baseValue = parseFloat(value) / (parseFloat(servings) || 1);
+                        handleNutritionChange('calories', baseValue.toString());
+                      }}
                       keyboardType="decimal-pad"
                       style={styles.nutritionInput}
                       maxLength={4}
@@ -316,8 +347,11 @@ const AddFoodToLogModal: React.FC = () => {
                   </View>
                   <View style={styles.nutritionItem}>
                     <TextInput
-                      value={food.protein?.toString() || '0'}
-                      onChangeText={(value) => handleNutritionChange('protein', value)}
+                      value={displayNutrition.protein.toString() || '0'}
+                      onChangeText={(value) => {
+                        const baseValue = parseFloat(value) / (parseFloat(servings) || 1);
+                        handleNutritionChange('protein', baseValue.toString());
+                      }}
                       keyboardType="decimal-pad"
                       style={styles.nutritionInput}
                       maxLength={4}
@@ -326,8 +360,11 @@ const AddFoodToLogModal: React.FC = () => {
                   </View>
                   <View style={styles.nutritionItem}>
                     <TextInput
-                      value={food.carbs?.toString() || '0'}
-                      onChangeText={(value) => handleNutritionChange('carbs', value)}
+                      value={displayNutrition.carbs.toString() || '0'}
+                      onChangeText={(value) => {
+                        const baseValue = parseFloat(value) / (parseFloat(servings) || 1);
+                        handleNutritionChange('carbs', baseValue.toString());
+                      }}
                       keyboardType="decimal-pad"
                       style={styles.nutritionInput}
                       maxLength={4}
@@ -336,8 +373,11 @@ const AddFoodToLogModal: React.FC = () => {
                   </View>
                   <View style={styles.nutritionItem}>
                     <TextInput
-                      value={food.fat?.toString() || '0'}
-                      onChangeText={(value) => handleNutritionChange('fat', value)}
+                      value={displayNutrition.fat.toString() || '0'}
+                      onChangeText={(value) => {
+                        const baseValue = parseFloat(value) / (parseFloat(servings) || 1);
+                        handleNutritionChange('fat', baseValue.toString());
+                      }}
                       keyboardType="decimal-pad"
                       style={styles.nutritionInput}
                       maxLength={4}

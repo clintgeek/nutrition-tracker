@@ -218,56 +218,80 @@ class FoodLog {
     }
   }
 
-  // Get daily summary
-  static async getDailySummary(userId, date) {
+  // Get logs for a date with nutrition information
+  static async getLogsForDate(date, userId) {
     const client = await getClient();
 
     try {
-      logger.info(`Getting daily summary for user ${userId} on date ${date}`);
-
-      // Validate inputs
-      if (!userId) {
-        logger.error('getDailySummary called with missing userId');
-        throw new Error('User ID is required');
-      }
-
-      if (!date) {
-        logger.error('getDailySummary called with missing date');
-        throw new Error('Date is required');
-      }
-
       const result = await client.query(
         `SELECT
-          COALESCE(SUM(fi.calories_per_serving * fl.servings), 0) as total_calories,
-          COALESCE(SUM(fi.protein_grams * fl.servings), 0) as total_protein,
-          COALESCE(SUM(fi.carbs_grams * fl.servings), 0) as total_carbs,
-          COALESCE(SUM(fi.fat_grams * fl.servings), 0) as total_fat,
+          fl.id, fl.user_id, fl.food_item_id, fl.log_date, fl.meal_type, fl.servings,
+          fi.name as food_name, fi.calories_per_serving, fi.protein_grams,
+          fi.carbs_grams, fi.fat_grams, fi.serving_size, fi.serving_unit,
+          (fi.calories_per_serving * fl.servings) as total_calories,
+          (fi.protein_grams * fl.servings) as total_protein,
+          (fi.carbs_grams * fl.servings) as total_carbs,
+          (fi.fat_grams * fl.servings) as total_fat
+        FROM food_logs fl
+        JOIN food_items fi ON fl.food_item_id = fi.id
+        WHERE fl.log_date = $1 AND fl.user_id = $2
+        ORDER BY fl.created_at DESC`,
+        [date, userId]
+      );
+
+      return result.rows.map(row => {
+        const log = new FoodLog(row);
+        // Add calculated totals
+        log.total_calories = parseFloat(row.total_calories) || 0;
+        log.total_protein = parseFloat(row.total_protein) || 0;
+        log.total_carbs = parseFloat(row.total_carbs) || 0;
+        log.total_fat = parseFloat(row.total_fat) || 0;
+        return log;
+      });
+    } catch (err) {
+      logger.error(`Error getting logs for date: ${err.message}`);
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Get daily nutrition summary
+  static async getDailySummary(date, userId) {
+    const client = await getClient();
+
+    try {
+      const result = await client.query(
+        `SELECT
+          SUM(fi.calories_per_serving * fl.servings) as total_calories,
+          SUM(fi.protein_grams * fl.servings) as total_protein,
+          SUM(fi.carbs_grams * fl.servings) as total_carbs,
+          SUM(fi.fat_grams * fl.servings) as total_fat,
           COUNT(fl.id) as total_items
         FROM food_logs fl
         JOIN food_items fi ON fl.food_item_id = fi.id
-        WHERE fl.user_id = $1 AND fl.log_date = $2`,
-        [userId, date]
+        WHERE fl.log_date = $1 AND fl.user_id = $2`,
+        [date, userId]
       );
 
-      logger.info(`Daily summary query completed for user ${userId} on date ${date}`);
+      const summary = result.rows[0] || {
+        total_calories: 0,
+        total_protein: 0,
+        total_carbs: 0,
+        total_fat: 0,
+        total_items: 0
+      };
 
-      // Log the result for debugging
-      logger.debug(`Daily summary result: ${JSON.stringify(result.rows[0])}`);
-
-      // Ensure we always return an object with default values
+      // Parse values
       return {
-        total_calories: result.rows[0]?.total_calories || 0,
-        total_protein: result.rows[0]?.total_protein || 0,
-        total_carbs: result.rows[0]?.total_carbs || 0,
-        total_fat: result.rows[0]?.total_fat || 0,
-        total_items: result.rows[0]?.total_items || 0
+        total_calories: parseFloat(summary.total_calories) || 0,
+        total_protein: parseFloat(summary.total_protein) || 0,
+        total_carbs: parseFloat(summary.total_carbs) || 0,
+        total_fat: parseFloat(summary.total_fat) || 0,
+        total_items: parseInt(summary.total_items) || 0
       };
     } catch (err) {
-      logger.error(`Error getting daily summary: ${err.message}`, {
-        userId,
-        date,
-        stack: err.stack
-      });
+      logger.error(`Error getting daily summary: ${err.message}`);
       throw err;
     } finally {
       client.release();

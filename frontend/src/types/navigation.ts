@@ -7,10 +7,26 @@ export type AuthStackParamList = {
   Register: undefined;
 };
 
-// Main Stack Types
-export type MainStackParamList = {
+// Root Stack Types
+export type RootStackParamList = {
+  Login: undefined;
+  Register: undefined;
   Main: undefined;
   Loading: undefined;
+  NutritionGoals: undefined;
+  WeightGoals: undefined;
+  BloodPressure: undefined;
+};
+
+// Main Tab Types
+export type MainTabParamList = {
+  Home: undefined;
+  Log: undefined;
+  Food: undefined;
+  Recipe: undefined;
+  MealPlanner: undefined;
+  WeightGoals: undefined;
+  BloodPressure: undefined;
 };
 
 // Food Stack Types
@@ -32,15 +48,8 @@ export type FoodStackParamList = {
     servings?: number;
   };
   BarcodeScanner: undefined;
-};
-
-// Log Stack Types
-export type LogStackParamList = {
-  LogList: undefined;
-  LogDetails: { logId: string };
-  AddLog: { date: string; mealType?: string };
-  AddFoodToLogModal: { food: Food; mealType?: string; date?: string };
-  SearchFoodForLog: { mealType: string; date: string };
+  RecipeDetail: { recipeId: number | 'new'; selectedIngredient?: Food };
+  SearchFoodForRecipe: { recipeId: number | 'new' };
 };
 
 // Goals Stack Types
@@ -53,21 +62,9 @@ export type GoalsStackParamList = {
 // Recipe Stack Types
 export type RecipeStackParamList = {
   Recipes: undefined;
-  RecipeDetail: { recipeId: string | number | 'new'; selectedIngredient?: Food };
-  SearchFoodForRecipe: { recipeId: string | number | 'new' };
+  RecipeDetail: { recipeId: number | 'new'; selectedIngredient?: Food };
+  SearchFoodForRecipe: { recipeId: number | 'new' };
 };
-
-// Combined Root Stack Type
-export type RootStackParamList =
-  & AuthStackParamList
-  & MainStackParamList
-  & RecipeStackParamList
-  & {
-    FoodStack: undefined;
-    LogStack: undefined;
-    GoalsStack: undefined;
-    RecipeStack: undefined;
-  };
 
 // Type for useNavigation hook
 export type RootStackScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<RootStackParamList, T>;

@@ -64,42 +64,24 @@ const getLogSummary = asyncHandler(async (req, res) => {
 });
 
 /**
- * Get daily summary
+ * Get daily summary for a user
  * @route GET /api/logs/daily-summary
  */
 const getDailySummary = asyncHandler(async (req, res) => {
+  const { date } = req.query;
+
+  if (!date) {
+    return res.status(400).json({ message: 'Date is required' });
+  }
+
   try {
-    const { date } = req.query;
-
-    logger.info(`Daily summary requested for user ${req.user.id} on date ${date}`);
-
-    if (!date) {
-      logger.warn(`Daily summary request missing date parameter from user ${req.user.id}`);
-      return res.status(400).json({ message: 'Date is required' });
-    }
-
-    // Validate date format (YYYY-MM-DD)
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(date)) {
-      logger.warn(`Invalid date format in daily summary request: ${date} from user ${req.user.id}`);
-      return res.status(400).json({ message: 'Invalid date format. Use YYYY-MM-DD' });
-    }
-
-    const summary = await FoodLog.getDailySummary(req.user.id, date);
-
-    logger.info(`Daily summary successfully retrieved for user ${req.user.id} on date ${date}`);
-    logger.debug(`Summary data: ${JSON.stringify(summary)}`);
+    // Use the updated getDailySummary method that multiplies by servings
+    const summary = await FoodLog.getDailySummary(date, req.user.id);
 
     res.json({ summary });
   } catch (error) {
-    logger.error(`Error in getDailySummary controller: ${error.message}`, {
-      userId: req.user?.id,
-      date: req.query?.date,
-      stack: error.stack
-    });
-
-    // Don't expose internal error details to client
-    res.status(500).json({ message: 'Error retrieving daily summary' });
+    logger.error(`Error getting daily summary: ${error.message}`);
+    res.status(500).json({ message: 'Failed to get daily summary' });
   }
 });
 

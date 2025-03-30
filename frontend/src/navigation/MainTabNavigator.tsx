@@ -20,6 +20,7 @@ type DrawerParamList = {
   MainTabs: undefined;
   NutritionGoals: undefined;
   WeightGoals: undefined;
+  BloodPressure: undefined;
 };
 
 type NavigationProp = DrawerNavigationProp<DrawerParamList>;

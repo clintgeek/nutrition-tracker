@@ -160,7 +160,16 @@ export const EditIngredientModal: React.FC<EditIngredientModalProps> = ({
               <View style={styles.amountRow}>
                 <RNTextInput
                   value={amount}
-                  onChangeText={setAmount}
+                  onChangeText={(value) => {
+                    // Make sure the input is a valid positive number
+                    const numValue = parseFloat(value);
+                    if (!isNaN(numValue) && numValue > 0) {
+                      setAmount(value);
+                    } else if (value === '' || value === '.') {
+                      // Allow empty input for typing
+                      setAmount(value);
+                    }
+                  }}
                   keyboardType="decimal-pad"
                   style={styles.amountInput}
                 />

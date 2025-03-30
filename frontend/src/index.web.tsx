@@ -8,6 +8,7 @@ import { SyncProvider } from './contexts/SyncContext';
 import AppNavigator from './navigation/AppNavigator';
 import theme from './utils/theme';
 import React from 'react';
+import 'setimmediate'; // Polyfill for setImmediate
 
 // Error fallback component
 interface ErrorFallbackProps {

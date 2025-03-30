@@ -109,7 +109,14 @@ class FoodItem {
       }
 
       const result = await db.query(
-        'SELECT * FROM food_items WHERE id = $1',  // Removed is_deleted check to find item even if deleted
+        `SELECT f.*,
+                COALESCE(f.calories_per_serving, r.total_calories / r.servings) as calories_per_serving,
+                COALESCE(f.protein_grams, r.total_protein_grams / r.servings) as protein_grams,
+                COALESCE(f.carbs_grams, r.total_carbs_grams / r.servings) as carbs_grams,
+                COALESCE(f.fat_grams, r.total_fat_grams / r.servings) as fat_grams
+         FROM food_items f
+         LEFT JOIN recipes r ON f.recipe_id = r.id
+         WHERE f.id = $1`,
         [id]
       );
 
@@ -329,12 +336,17 @@ class FoodItem {
   static async getCustomFoods(userId, limit = 20, offset = 0) {
     try {
       const result = await db.query(
-        `SELECT *
-         FROM food_items
-         WHERE (source = 'custom' OR source = 'recipe')
-         AND user_id = $1
-         AND is_deleted = FALSE
-         ORDER BY name ASC
+        `SELECT f.*,
+                COALESCE(f.calories_per_serving, r.total_calories / r.servings) as calories_per_serving,
+                COALESCE(f.protein_grams, r.total_protein_grams / r.servings) as protein_grams,
+                COALESCE(f.carbs_grams, r.total_carbs_grams / r.servings) as carbs_grams,
+                COALESCE(f.fat_grams, r.total_fat_grams / r.servings) as fat_grams
+         FROM food_items f
+         LEFT JOIN recipes r ON f.recipe_id = r.id
+         WHERE (f.source = 'custom' OR f.source = 'recipe')
+         AND f.user_id = $1
+         AND f.is_deleted = FALSE
+         ORDER BY f.name ASC
          LIMIT $2 OFFSET $3`,
         [userId, limit, offset]
       );
@@ -342,6 +354,51 @@ class FoodItem {
       return result.rows.map(row => this.transformToFrontend(row));
     } catch (error) {
       logger.error(`Error getting custom foods: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Find all food items matching criteria
+   * @param {Object} criteria - Search criteria
+   * @returns {Promise<Array>} Food items
+   */
+  static async findAll(criteria) {
+    try {
+      const conditions = [];
+      const params = [];
+      let paramIndex = 1;
+
+      // Build WHERE clause based on criteria
+      Object.entries(criteria.where || {}).forEach(([key, value]) => {
+        conditions.push(`${key} = $${paramIndex}`);
+        params.push(value);
+        paramIndex++;
+      });
+
+      // Build ORDER BY clause
+      const orderBy = criteria.order?.map(([field, direction]) =>
+        `${field} ${direction}`
+      ).join(', ') || 'created_at DESC';
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+      // For recipe-based foods, join with recipes table to get nutrition info
+      const query = `
+        SELECT f.*,
+               COALESCE(f.calories_per_serving, r.total_calories / r.servings) as calories_per_serving,
+               COALESCE(f.protein_grams, r.total_protein_grams / r.servings) as protein_grams,
+               COALESCE(f.carbs_grams, r.total_carbs_grams / r.servings) as carbs_grams,
+               COALESCE(f.fat_grams, r.total_fat_grams / r.servings) as fat_grams
+        FROM food_items f
+        LEFT JOIN recipes r ON f.recipe_id = r.id
+        ${whereClause}
+        ORDER BY ${orderBy}`;
+
+      const result = await db.query(query, params);
+      return result.rows.map(row => this.transformToFrontend(row));
+    } catch (error) {
+      logger.error('Error in findAll:', error);
       throw error;
     }
   }

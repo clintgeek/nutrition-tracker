@@ -68,21 +68,21 @@ export const weightService = {
   // Get all weight logs
   getWeightLogs: async (): Promise<WeightLog[]> => {
     try {
-      const response = await apiService.get<{ logs: any[] }>('/weight/logs');
+      const response = await apiService.get<{ logs: any[] }>('/weight');
 
       // Check if logs exist
-      if (!response.logs || response.logs.length === 0) {
+      if (!response || !Array.isArray(response)) {
         console.log('No weight logs found in API response');
         return [];
       }
 
-      console.log('Raw weight logs from API:', JSON.stringify(response.logs[0]));
+      console.log('Raw weight logs from API:', JSON.stringify(response[0]));
 
       // Transform the response to match our interface
-      const transformedLogs: WeightLog[] = response.logs.map(log => ({
+      const transformedLogs: WeightLog[] = response.map(log => ({
         id: log.id,
-        weight_value: parseFloat(log.weight || log.weight_value || 0),
-        log_date: log.date || log.log_date || '',
+        weight_value: parseFloat(log.weight_value || log.weight || 0),
+        log_date: log.log_date || log.date || '',
         notes: log.notes,
         sync_id: log.sync_id || uuid.v4(),
         created_at: log.created_at,
@@ -102,21 +102,21 @@ export const weightService = {
       const formattedStartDate = formatDate(startDate);
       const formattedEndDate = formatDate(endDate);
 
-      const response = await apiService.get<{ logs: any[] }>(`/weight/logs/range?start_date=${formattedStartDate}&end_date=${formattedEndDate}`);
+      const response = await apiService.get<{ logs: any[] }>(`/weight?start_date=${formattedStartDate}&end_date=${formattedEndDate}`);
 
       // Check if logs exist
-      if (!response.logs || response.logs.length === 0) {
+      if (!response || !Array.isArray(response)) {
         console.log('No weight logs found in date range API response');
         return [];
       }
 
-      console.log('Raw weight logs from date range API:', JSON.stringify(response.logs[0]));
+      console.log('Raw weight logs from date range API:', JSON.stringify(response[0]));
 
       // Transform the response to match our interface
-      const transformedLogs: WeightLog[] = response.logs.map(log => ({
+      const transformedLogs: WeightLog[] = response.map(log => ({
         id: log.id,
-        weight_value: parseFloat(log.weight || log.weight_value || 0),
-        log_date: log.date || log.log_date || '',
+        weight_value: parseFloat(log.weight_value || log.weight || 0),
+        log_date: log.log_date || log.date || '',
         notes: log.notes,
         sync_id: log.sync_id || uuid.v4(),
         created_at: log.created_at,
@@ -133,9 +133,9 @@ export const weightService = {
   // Get latest weight log
   getLatestWeightLog: async (): Promise<WeightLog | null> => {
     try {
-      const response = await apiService.get<{ log: any }>('/weight/logs/latest');
+      const response = await apiService.get<{ log: any }>('/weight/latest');
 
-      if (!response.log) {
+      if (!response || !response.log) {
         console.log('No latest weight log found in API response');
         return null;
       }
@@ -145,8 +145,8 @@ export const weightService = {
       // Transform the response to match our interface
       const transformedLog: WeightLog = {
         id: response.log.id,
-        weight_value: parseFloat(response.log.weight || response.log.weight_value || 0),
-        log_date: response.log.date || response.log.log_date || '',
+        weight_value: parseFloat(response.log.weight_value || response.log.weight || 0),
+        log_date: response.log.log_date || response.log.date || '',
         notes: response.log.notes,
         sync_id: response.log.sync_id || uuid.v4(),
         created_at: response.log.created_at,
@@ -164,9 +164,11 @@ export const weightService = {
   addWeightLog: async (logData: Omit<WeightLog, 'id' | 'sync_id' | 'created_at' | 'updated_at'>): Promise<WeightLog> => {
     const syncId = uuid.v4() as string;
     try {
-      // Send data with the correct field names
-      const response = await apiService.post<{ message: string; log: any }>('/weight/logs', {
+      // Send data with both field names to ensure compatibility
+      const response = await apiService.post<{ message: string; log: any }>('/weight', {
+        weight: logData.weight_value,
         weight_value: logData.weight_value,
+        date: logData.log_date,
         log_date: logData.log_date,
         notes: logData.notes,
         sync_id: syncId,
@@ -175,8 +177,8 @@ export const weightService = {
       // Transform the response back to our interface format
       const transformedLog: WeightLog = {
         id: response.log.id,
-        weight_value: parseFloat(response.log.weight_value || 0),
-        log_date: response.log.log_date || '',
+        weight_value: parseFloat(response.log.weight_value || response.log.weight || 0),
+        log_date: response.log.log_date || response.log.date || '',
         notes: response.log.notes,
         sync_id: response.log.sync_id || syncId,
         created_at: response.log.created_at,

@@ -9,6 +9,14 @@ import { StackActions } from '@react-navigation/routers';
 
 import { useAuth } from '../contexts/AuthContext';
 
+// Define drawer navigation type
+type DrawerParamList = {
+  MainTabs: undefined;
+  NutritionGoals: undefined;
+  WeightGoals: undefined;
+  BloodPressure: undefined;
+};
+
 // Custom drawer content component
 const DrawerContent = (props: any) => {
   const theme = useTheme();
@@ -104,7 +112,16 @@ const DrawerContent = (props: any) => {
         icon={({ color, size }) => (
           <MaterialCommunityIcons name="scale-bathroom" color={color} size={size} />
         )}
-        onPress={() => navigation.navigate('MainTabs', { screen: 'WeightGoals' })}
+        onPress={() => navigation.navigate('WeightGoals')}
+        activeTintColor={theme.colors.primary}
+      />
+
+      <DrawerItem
+        label="Blood Pressure"
+        icon={({ color, size }) => (
+          <MaterialCommunityIcons name="heart-pulse" color={color} size={size} />
+        )}
+        onPress={() => navigation.navigate('BloodPressure')}
         activeTintColor={theme.colors.primary}
       />
 

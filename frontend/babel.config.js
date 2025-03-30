@@ -1,7 +1,10 @@
 module.exports = function(api) {
   api.cache(true);
   return {
-    presets: ['babel-preset-expo'],
+    presets: [
+      'babel-preset-expo',
+      '@babel/preset-typescript'
+    ],
     plugins: [
       [
         'module-resolver',
@@ -21,7 +24,9 @@ module.exports = function(api) {
           }
         }
       ],
-      'react-native-reanimated/plugin'
+      'react-native-reanimated/plugin',
+      '@babel/plugin-transform-nullish-coalescing-operator',
+      '@babel/plugin-transform-optional-chaining'
     ],
     env: {
       production: {

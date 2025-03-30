@@ -18,9 +18,9 @@ class RecipeService {
   async getRecipe(id: number): Promise<Recipe> {
     console.log(`[RecipeService] Fetching recipe with id: ${id}`);
     try {
-      const { data } = await apiService.get<AxiosResponse<Recipe>>(`/recipes/${id}`);
-      console.log('[RecipeService] Recipe fetched successfully:', data);
-      return data;
+      const recipe = await apiService.get<Recipe>(`/recipes/${id}`);
+      console.log('[RecipeService] Recipe fetched successfully:', recipe);
+      return recipe;
     } catch (error) {
       console.error(`[RecipeService] Error fetching recipe ${id}:`, error);
       throw error;

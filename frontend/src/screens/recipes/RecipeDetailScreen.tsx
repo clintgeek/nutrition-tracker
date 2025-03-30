@@ -1,5 +1,5 @@
 import React, { useEffect, useState, ReactNode } from 'react';
-import { View, Text, TextInput, ScrollView, StyleSheet, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, ScrollView, StyleSheet, Alert, TouchableOpacity, Platform, FlatList } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useRoute } from '@react-navigation/core';
 import type { RouteProp } from '@react-navigation/core';
@@ -131,6 +131,39 @@ export function RecipeDetailScreen() {
         return;
       }
 
+      // Validate ingredient amounts - ensure they're all positive numbers
+      const invalidIngredients = form.ingredients.filter(ing =>
+        typeof ing.amount !== 'number' ||
+        isNaN(ing.amount) ||
+        ing.amount <= 0
+      );
+
+      if (invalidIngredients.length > 0) {
+        setError(`${invalidIngredients.length} ingredient(s) have invalid amounts. All amounts must be positive numbers.`);
+
+        // Fix amounts to be valid positive numbers
+        const fixedIngredients = form.ingredients.map(ing => ({
+          ...ing,
+          amount: typeof ing.amount !== 'number' || isNaN(ing.amount) || ing.amount <= 0 ? 1 : ing.amount
+        }));
+
+        setForm(prev => ({
+          ...prev,
+          ingredients: fixedIngredients
+        }));
+
+        // Also update ingredients display
+        setIngredients(prev =>
+          prev.map(ing => {
+            const formIngredient = fixedIngredients.find(i => i.food_item_id === ing.food_item_id);
+            return formIngredient ? { ...ing, amount: formIngredient.amount } : ing;
+          })
+        );
+
+        setSaving(false);
+        return;
+      }
+
       // Create or update recipe
       if (isNew) {
         await recipeService.createRecipe(form);
@@ -220,7 +253,7 @@ export function RecipeDetailScreen() {
     }
 
     const newIngredient: DraggableIngredient = {
-      id: Date.now(), // Use timestamp as temporary ID
+      id: ingredients.length + 1, // Use a simple incrementing number instead of timestamp
       recipe_id: Number(recipeId),
       food_item_id: foodItemId,
       amount,
@@ -573,23 +606,36 @@ export function RecipeDetailScreen() {
           <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>
             Ingredients
           </Text>
-          <DraggableFlatList
-            data={ingredients}
-            renderItem={renderIngredient}
-            keyExtractor={(item) => item.food_item_id.toString()}
-            onDragEnd={({ data }) => {
-              setIngredients(data);
-              setForm(prev => ({
-                ...prev,
-                ingredients: data.map((item, index) => ({
-                  food_item_id: item.food_item_id,
-                  amount: item.amount,
-                  unit: item.unit,
-                  order_index: index
-                }))
-              }));
-            }}
-          />
+          {Platform.OS === 'web' ? (
+            <FlatList
+              data={ingredients}
+              renderItem={({ item }) => renderIngredient({
+                item,
+                drag: () => {},
+                isActive: false,
+                getIndex: () => ingredients.indexOf(item)
+              })}
+              keyExtractor={(item) => item.food_item_id.toString()}
+            />
+          ) : (
+            <DraggableFlatList
+              data={ingredients}
+              renderItem={renderIngredient}
+              keyExtractor={(item) => item.food_item_id.toString()}
+              onDragEnd={({ data }) => {
+                setIngredients(data);
+                setForm(prev => ({
+                  ...prev,
+                  ingredients: data.map((item, index) => ({
+                    food_item_id: item.food_item_id,
+                    amount: item.amount,
+                    unit: item.unit,
+                    order_index: index
+                  }))
+                }));
+              }}
+            />
+          )}
           <Button
             mode="contained"
             onPress={handleAddIngredient}
@@ -602,17 +648,30 @@ export function RecipeDetailScreen() {
           <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>
             Steps
           </Text>
-          <DraggableFlatList
-            data={form.steps}
-            renderItem={renderStep}
-            keyExtractor={(item, index) => `step-${index}`}
-            onDragEnd={({ data }) => {
-              setForm(prev => ({
-                ...prev,
-                steps: data.map((item, index) => ({ ...item, order: index }))
-              }));
-            }}
-          />
+          {Platform.OS === 'web' ? (
+            <FlatList
+              data={form.steps}
+              renderItem={({ item }) => renderStep({
+                item,
+                drag: () => {},
+                isActive: false,
+                getIndex: () => form.steps.indexOf(item)
+              })}
+              keyExtractor={(item, index) => `step-${index}`}
+            />
+          ) : (
+            <DraggableFlatList
+              data={form.steps}
+              renderItem={renderStep}
+              keyExtractor={(item, index) => `step-${index}`}
+              onDragEnd={({ data }) => {
+                setForm(prev => ({
+                  ...prev,
+                  steps: data.map((item, index) => ({ ...item, order: index }))
+                }));
+              }}
+            />
+          )}
           <Button
             mode="contained"
             onPress={handleAddStep}

@@ -43,10 +43,6 @@ const debugSearch = asyncHandler(async (req, res) => {
         logger.error(`OpenFoodFacts search error: ${error.message}`);
         return [];
       }),
-      FoodApiService.searchUSDAByName(query, true).catch(error => {
-        logger.error(`USDA search error: ${error.message}`);
-        return [];
-      }),
       nutritionixService.searchByName(query).catch(error => {
         logger.error(`Nutritionix search error: ${error.message}`);
         return [];
@@ -54,16 +50,12 @@ const debugSearch = asyncHandler(async (req, res) => {
     ];
 
     // Wait for all searches to complete
-    const [openFoodResults, usdaResults, nutritionixResults] = await Promise.all(searches);
+    const [openFoodResults, nutritionixResults] = await Promise.all(searches);
 
     res.json({
       openFoodFacts: {
         count: openFoodResults.length,
         results: openFoodResults.slice(0, 3)
-      },
-      usda: {
-        count: usdaResults.length,
-        results: usdaResults.slice(0, 3)
       },
       nutritionix: {
         count: nutritionixResults.length,
@@ -469,6 +461,44 @@ const getRecentFoods = asyncHandler(async (req, res) => {
   }
 });
 
+/**
+ * Get recipe-based food items
+ * @route GET /api/foods/recipes
+ */
+const getRecipeFoods = asyncHandler(async (req, res) => {
+  try {
+    // Query directly instead of using findAll for simplicity
+    const userId = req.user.id;
+    logger.info(`Getting recipe-based foods for user ${userId}`);
+
+    // Direct SQL query instead of using model method
+    const result = await db.query(
+      `SELECT f.*
+       FROM food_items f
+       WHERE f.user_id = $1
+       AND f.source = 'recipe'
+       AND f.is_deleted = false
+       ORDER BY f.name ASC`,
+      [userId]
+    );
+
+    logger.info(`Found ${result.rows.length} recipe-based foods`);
+
+    // Transform to frontend format
+    const foods = result.rows.map(row => FoodItem.transformToFrontend(row));
+
+    res.json({
+      foods,
+      total: foods.length,
+      page: 1,
+      limit: foods.length
+    });
+  } catch (error) {
+    logger.error('Error fetching recipe foods:', error);
+    res.status(500).json({ message: 'Error fetching recipe foods' });
+  }
+});
+
 module.exports = {
   searchFood,
   getFoodByBarcode,
@@ -477,5 +507,6 @@ module.exports = {
   deleteCustomFood,
   getCustomFoods,
   debugSearch,
-  getRecentFoods
+  getRecentFoods,
+  getRecipeFoods
 };

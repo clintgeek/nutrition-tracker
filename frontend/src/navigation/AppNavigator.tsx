@@ -1,6 +1,6 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createDrawerNavigator } from '@react-navigation/drawer';
+import { createDrawerNavigator, DrawerContentComponentProps } from '@react-navigation/drawer';
 import { useAuth } from '../contexts/AuthContext';
 import { TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -15,6 +15,7 @@ import DrawerContent from './DrawerNavigator';
 import LoadingScreen from '../screens/LoadingScreen';
 import NutritionGoalsScreen from '../screens/goals/NutritionGoalsScreen';
 import WeightGoalsScreen from '../screens/goals/WeightGoalsScreen';
+import BloodPressureScreen from '../screens/BloodPressureScreen';
 import CustomHeader from '../components/CustomHeader';
 
 // Define the stack navigator param list
@@ -29,22 +30,24 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Drawer = createDrawerNavigator();
 
+// MenuButton component
+const MenuButton: React.FC = () => {
+  const navigation = useNavigation();
+  return (
+    <TouchableOpacity
+      onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+      style={{ marginLeft: 10 }}
+    >
+      <MaterialCommunityIcons name="menu" size={24} color="#fff" />
+    </TouchableOpacity>
+  );
+};
+
 // Main drawer navigator component
 const MainDrawerNavigator = () => {
   // Function to render header with hamburger menu
   const renderHeaderWithMenu = (title: string) => {
     return () => {
-      const navigation = useNavigation();
-
-      const MenuButton = () => (
-        <TouchableOpacity
-          onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
-          style={{ marginLeft: 10 }}
-        >
-          <MaterialCommunityIcons name="menu" size={24} color="#fff" />
-        </TouchableOpacity>
-      );
-
       return (
         <CustomHeader
           title={title}
@@ -57,7 +60,7 @@ const MainDrawerNavigator = () => {
 
   return (
     <Drawer.Navigator
-      drawerContent={(props) => <DrawerContent {...props} />}
+      drawerContent={(props: DrawerContentComponentProps) => <DrawerContent {...props} />}
       screenOptions={{
         headerShown: false,
         drawerStyle: {
@@ -70,7 +73,7 @@ const MainDrawerNavigator = () => {
         component={MainTabNavigator}
         options={{
           title: 'Home',
-          drawerIcon: ({ color, size }) => (
+          drawerIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons name="home" color={color} size={size} />
           ),
         }}
@@ -82,7 +85,7 @@ const MainDrawerNavigator = () => {
           title: 'Nutrition Goals',
           headerShown: true,
           header: renderHeaderWithMenu('Nutrition Goals'),
-          drawerIcon: ({ color, size }) => (
+          drawerIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons name="target" color={color} size={size} />
           ),
         }}
@@ -94,8 +97,20 @@ const MainDrawerNavigator = () => {
           title: 'Weight Goals',
           headerShown: true,
           header: renderHeaderWithMenu('Weight Goals'),
-          drawerIcon: ({ color, size }) => (
+          drawerIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons name="scale-bathroom" color={color} size={size} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="BloodPressure"
+        component={BloodPressureScreen}
+        options={{
+          title: 'Blood Pressure',
+          headerShown: true,
+          header: renderHeaderWithMenu('Blood Pressure'),
+          drawerIcon: ({ color, size }: { color: string; size: number }) => (
+            <MaterialCommunityIcons name="heart-pulse" color={color} size={size} />
           ),
         }}
       />
