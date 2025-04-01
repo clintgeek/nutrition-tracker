@@ -3,9 +3,19 @@ services:
   frontend-web:
     build:
       context: ./frontend
+      # If you encounter npm registry issues, try using the simplified Dockerfile:
+      # dockerfile: Dockerfile.web.simple
       dockerfile: Dockerfile.web
       args:
         - NODE_OPTIONS=--max_old_space_size=4096
+        - NPM_CONFIG_REGISTRY=http://registry.npmjs.org/
+        - NPM_CONFIG_LOGLEVEL=verbose
+        - NPM_CONFIG_STRICT_SSL=false
+        - NPM_CONFIG_TIMEOUT=300000
+        - NPM_CONFIG_FETCH_RETRIES=5
+        - NPM_CONFIG_FETCH_RETRY_FACTOR=2
+        - NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000
+        - NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000
     environment:
       - NODE_ENV=development
       - EXPO_NO_DOCTOR=1
@@ -24,6 +34,16 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        - NODE_OPTIONS=--max_old_space_size=4096
+        - NPM_CONFIG_REGISTRY=http://registry.npmjs.org/
+        - NPM_CONFIG_LOGLEVEL=verbose
+        - NPM_CONFIG_STRICT_SSL=false
+        - NPM_CONFIG_TIMEOUT=300000
+        - NPM_CONFIG_FETCH_RETRIES=5
+        - NPM_CONFIG_FETCH_RETRY_FACTOR=2
+        - NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000
+        - NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000
     ports:
       - "${BACKEND_PORT:-4081}:3000"
     restart: always

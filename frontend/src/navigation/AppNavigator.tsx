@@ -16,6 +16,12 @@ import LoadingScreen from '../screens/LoadingScreen';
 import NutritionGoalsScreen from '../screens/goals/NutritionGoalsScreen';
 import CustomHeader from '../components/CustomHeader';
 import SettingsStackNavigator from './SettingsStackNavigator';
+import DiagnosticScreen from '../screens/DiagnosticScreen';
+import BarcodeScanner from '../screens/food/BarcodeScanner';
+import QuaggaBarcodeScanner from '../screens/food/QuaggaBarcodeScanner';
+import ZXingBarcodeScanner from '../screens/food/ZXingBarcodeScanner';
+import BarcodeScannerSelector from '../screens/food/BarcodeScannerSelector';
+import SimplifiedBarcodeScanner from '../screens/food/SimplifiedBarcodeScanner';
 
 // Define the stack navigator param list
 export type RootStackParamList = {
@@ -100,6 +106,18 @@ const MainDrawerNavigator = () => {
           ),
         }}
       />
+      <Drawer.Screen
+        name="Diagnostics"
+        component={DiagnosticScreen}
+        options={{
+          title: 'Camera Diagnostics',
+          headerShown: true,
+          header: renderHeaderWithMenu('Camera Diagnostics'),
+          drawerIcon: ({ color, size }: { color: string; size: number }) => (
+            <MaterialCommunityIcons name="tools" color={color} size={size} />
+          ),
+        }}
+      />
     </Drawer.Navigator>
   );
 };
@@ -123,7 +141,13 @@ const AppNavigator: React.FC = () => {
     >
       {user ? (
         // Authenticated routes
-        <Stack.Screen name="Main" component={MainDrawerNavigator} />
+        <>
+          <Stack.Screen name="Main" component={MainDrawerNavigator} />
+          <Stack.Screen name="BarcodeScanner" component={BarcodeScanner} options={{ headerShown: false }} />
+          <Stack.Screen name="QuaggaBarcodeScanner" component={QuaggaBarcodeScanner} options={{ headerShown: false }} />
+          <Stack.Screen name="ZXingBarcodeScanner" component={ZXingBarcodeScanner} options={{ headerShown: false }} />
+          <Stack.Screen name="BarcodeScannerSelector" component={BarcodeScannerSelector} options={{ headerShown: false }} />
+        </>
       ) : (
         // Unauthenticated routes
         <>

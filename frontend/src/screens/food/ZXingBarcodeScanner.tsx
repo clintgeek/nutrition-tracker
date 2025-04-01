@@ -9,8 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SCAN_AREA_SIZE = Math.min(Dimensions.get('window').width * 0.8, 300);
 
-// Unified barcode scanner using ZXing library for better PWA compatibility
-export default function BarcodeScanner() {
+// This component is specifically designed for the PWA on Android using ZXing barcode scanning
+export default function ZXingBarcodeScanner() {
   const [hasInitialized, setHasInitialized] = useState(false);
   const [hasScriptLoaded, setHasScriptLoaded] = useState(false);
   const [scanned, setScanned] = useState(false);
@@ -22,6 +22,7 @@ export default function BarcodeScanner() {
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
   const [scannerStarted, setScannerStarted] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
+  const [videoDevices, setVideoDevices] = useState<{deviceId: string, label: string}[]>([]);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const codeReaderRef = useRef<any>(null);
@@ -36,6 +37,8 @@ export default function BarcodeScanner() {
         try {
           // Check if ZXing is already loaded
           if (!(window as any).ZXing) {
+            loggingService.info('Loading ZXing script');
+
             // Create script element for ZXing
             const script = document.createElement('script');
             script.src = 'https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js';
@@ -47,10 +50,13 @@ export default function BarcodeScanner() {
               script.onerror = reject;
               document.body.appendChild(script);
             });
+
+            loggingService.info('ZXing script loaded successfully');
           }
 
           setHasScriptLoaded(true);
         } catch (err) {
+          loggingService.error('Failed to load ZXing script', { error: err });
           setError('Failed to load barcode scanner library. Please try again or use manual entry.');
           setShowErrorDialog(true);
         }
@@ -83,23 +89,33 @@ export default function BarcodeScanner() {
           // Get available video devices
           const devices = await codeReaderRef.current.listVideoInputDevices();
 
-          // Filter to only back cameras
+          // Filter to only back cameras if possible and select a device
           const backDevices = devices.filter((device: any) =>
             device.label.toLowerCase().includes('back') ||
             device.label.toLowerCase().includes('rear')
           );
 
-          // Select a device - prioritize back camera
+          const availableDevices = devices.map((device: any) => ({
+            deviceId: device.deviceId,
+            label: device.label || `Camera ${device.deviceId.substring(0, 5)}...`
+          }));
+
+          setVideoDevices(availableDevices);
+
+          // Select a default device (prefer back camera)
           if (backDevices.length > 0) {
-            // Use the first back camera
             setSelectedDeviceId(backDevices[0].deviceId);
           } else if (devices.length > 0) {
-            // If no back camera, use any available camera
             setSelectedDeviceId(devices[0].deviceId);
           }
 
           setHasInitialized(true);
+          loggingService.info('ZXing scanner initialized', {
+            deviceCount: devices.length,
+            backCameraCount: backDevices.length
+          });
         } catch (err) {
+          loggingService.error('Error initializing ZXing scanner', { error: err });
           setError('Failed to initialize barcode scanner. Please try again or use manual entry.');
           setShowErrorDialog(true);
         }
@@ -126,6 +142,8 @@ export default function BarcodeScanner() {
       stopScanner();
 
       // Start continuous scanning
+      loggingService.info('Starting ZXing scanner', { deviceId: selectedDeviceId });
+
       await codeReaderRef.current.decodeFromVideoDevice(
         selectedDeviceId,
         videoRef.current,
@@ -135,13 +153,15 @@ export default function BarcodeScanner() {
           }
 
           if (error && !(error instanceof (window as any).ZXing.NotFoundException)) {
-            // Silently handle normal scanning errors
+            loggingService.error('ZXing scanning error', { error });
           }
         }
       );
 
       setScannerStarted(true);
+      loggingService.info('ZXing scanner started successfully');
     } catch (err) {
+      loggingService.error('Failed to start ZXing scanner', { error: err });
       setError('Failed to start camera for barcode scanning. Please try again or use manual entry.');
       setShowErrorDialog(true);
     }
@@ -152,8 +172,9 @@ export default function BarcodeScanner() {
       try {
         codeReaderRef.current.reset();
         setScannerStarted(false);
+        loggingService.info('ZXing scanner stopped');
       } catch (e) {
-        console.error('Error stopping scanner:', e);
+        loggingService.error('Error stopping ZXing scanner', { error: e });
       }
     }
   };
@@ -167,6 +188,7 @@ export default function BarcodeScanner() {
 
       setScanned(true);
       setLastScannedCode(code);
+      loggingService.info('Barcode detected', { code });
 
       // Provide haptic feedback if possible
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -269,9 +291,8 @@ export default function BarcodeScanner() {
           ref={videoRef}
           style={{
             width: '100%',
-            height: '100%',
+            height: SCAN_AREA_SIZE,
             objectFit: 'cover',
-            maxHeight: SCAN_AREA_SIZE * 1.5,
           }}
         />
         <View style={styles.scanArea}>
@@ -287,10 +308,44 @@ export default function BarcodeScanner() {
     );
   };
 
+  // Camera selector dropdown
+  const renderCameraSelector = () => {
+    if (Platform.OS !== 'web' || videoDevices.length <= 1) {
+      return null;
+    }
+
+    return (
+      <View style={styles.cameraSelector}>
+        <Text style={styles.cameraSelectorLabel}>Select Camera:</Text>
+        <View style={styles.cameraSelectorButtons}>
+          {videoDevices.map((device) => (
+            <Button
+              key={device.deviceId}
+              mode={selectedDeviceId === device.deviceId ? "contained" : "outlined"}
+              onPress={() => {
+                setSelectedDeviceId(device.deviceId);
+                // Restart scanner with new device
+                if (scannerStarted) {
+                  stopScanner();
+                  setTimeout(() => startScanner(), 500);
+                }
+              }}
+              style={styles.cameraSelectorButton}
+            >
+              {device.label.substring(0, 20)}
+              {device.label.length > 20 ? '...' : ''}
+            </Button>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerText}>Scan Barcode</Text>
+        <Text style={styles.headerText}>ZXing Barcode Scanner</Text>
+        <Text style={styles.subHeaderText}>Enhanced for PWA on Android</Text>
       </View>
 
       {!hasInitialized && (
@@ -299,6 +354,9 @@ export default function BarcodeScanner() {
           <Text style={styles.scannerText}>Initializing scanner...</Text>
         </View>
       )}
+
+      {/* Camera selector */}
+      {renderCameraSelector()}
 
       {/* Scanner view */}
       {renderScanner()}
@@ -399,6 +457,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
+  subHeaderText: {
+    color: '#ccc',
+    fontSize: 14,
+    marginTop: 4,
+  },
   scannerContainer: {
     flex: 1,
     position: 'relative',
@@ -497,5 +560,24 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 8,
     marginTop: 8,
+  },
+  cameraSelector: {
+    padding: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 8,
+    margin: 8,
+  },
+  cameraSelectorLabel: {
+    color: '#fff',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  cameraSelectorButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  cameraSelectorButton: {
+    margin: 4,
+    fontSize: 12,
   },
 });

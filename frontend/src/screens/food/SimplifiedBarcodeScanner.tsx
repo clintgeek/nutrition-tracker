@@ -9,8 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SCAN_AREA_SIZE = Math.min(Dimensions.get('window').width * 0.8, 300);
 
-// Unified barcode scanner using ZXing library for better PWA compatibility
-export default function BarcodeScanner() {
+// Simplified barcode scanner that always uses ZXing
+export default function SimplifiedBarcodeScanner() {
   const [hasInitialized, setHasInitialized] = useState(false);
   const [hasScriptLoaded, setHasScriptLoaded] = useState(false);
   const [scanned, setScanned] = useState(false);

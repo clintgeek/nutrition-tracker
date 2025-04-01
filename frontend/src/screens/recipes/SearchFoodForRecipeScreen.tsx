@@ -13,7 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useRoute } from '@react-navigation/core';
 import type { RouteProp } from '@react-navigation/core';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import debounce from 'lodash/debounce';
 
 import { foodService, FoodItem } from '../../services/foodService';
@@ -246,6 +246,8 @@ export function SearchFoodForRecipeScreen() {
       backgroundColor: theme.colors.background,
     },
     searchContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
       padding: 16,
       backgroundColor: theme.colors.surface,
       elevation: 4,
@@ -256,8 +258,18 @@ export function SearchFoodForRecipeScreen() {
       zIndex: 1,
     },
     searchBar: {
+      flex: 1,
+      marginRight: 8,
       elevation: 0,
       backgroundColor: theme.colors.background,
+    },
+    scanButton: {
+      padding: 8,
+      borderRadius: 8,
+      backgroundColor: theme.colors.surfaceVariant,
+      elevation: 2,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     scrollView: {
       flex: 1,
@@ -394,6 +406,13 @@ export function SearchFoodForRecipeScreen() {
           icon="magnify"
           clearIcon="close"
         />
+
+        <TouchableOpacity
+          style={styles.scanButton}
+          onPress={() => navigation.navigate('BarcodeScanner')}
+        >
+          <Ionicons name="barcode-outline" size={24} color={theme.colors.primary} />
+        </TouchableOpacity>
       </View>
 
       {isLoading ? (

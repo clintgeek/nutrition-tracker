@@ -8,11 +8,12 @@ import { validateBarcode } from '../../utils/validation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SCAN_AREA_SIZE = Math.min(Dimensions.get('window').width * 0.8, 300);
+const SCAN_AREA_BORDER_WIDTH = 2;
+const SCAN_AREA_CORNER_SIZE = 20;
 
-// Unified barcode scanner using ZXing library for better PWA compatibility
-export default function BarcodeScanner() {
+// This component is specifically designed for the PWA on Android
+export default function QuaggaBarcodeScanner() {
   const [hasInitialized, setHasInitialized] = useState(false);
-  const [hasScriptLoaded, setHasScriptLoaded] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,24 +22,23 @@ export default function BarcodeScanner() {
   const [manualBarcode, setManualBarcode] = useState('');
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
   const [scannerStarted, setScannerStarted] = useState(false);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const codeReaderRef = useRef<any>(null);
+  const scannerRef = useRef<HTMLDivElement | null>(null);
   const navigation = useNavigation();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
-  // Load ZXing script dynamically
+  // Load Quagga script dynamically
   useEffect(() => {
-    const loadZXingScript = async () => {
-      if (!hasScriptLoaded && Platform.OS === 'web') {
+    const loadQuaggaScript = async () => {
+      if (!hasInitialized && Platform.OS === 'web') {
         try {
-          // Check if ZXing is already loaded
-          if (!(window as any).ZXing) {
-            // Create script element for ZXing
+          // Check if Quagga is already loaded
+          if (!(window as any).Quagga) {
+            loggingService.info('Loading Quagga script');
+            // Create script element
             const script = document.createElement('script');
-            script.src = 'https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js';
+            script.src = 'https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js';
             script.async = true;
 
             // Wait for script to load
@@ -47,119 +47,125 @@ export default function BarcodeScanner() {
               script.onerror = reject;
               document.body.appendChild(script);
             });
-          }
 
-          setHasScriptLoaded(true);
-        } catch (err) {
-          setError('Failed to load barcode scanner library. Please try again or use manual entry.');
-          setShowErrorDialog(true);
-        }
-      }
-    };
-
-    loadZXingScript();
-
-    // Cleanup function
-    return () => {
-      if (codeReaderRef.current) {
-        try {
-          codeReaderRef.current.reset();
-        } catch (e) {
-          console.error('Error resetting code reader:', e);
-        }
-      }
-    };
-  }, []);
-
-  // Initialize scanner when script is loaded
-  useEffect(() => {
-    const initializeScanner = async () => {
-      if (hasScriptLoaded && !hasInitialized && Platform.OS === 'web') {
-        try {
-          // Initialize ZXing
-          const { BrowserMultiFormatReader } = (window as any).ZXing;
-          codeReaderRef.current = new BrowserMultiFormatReader();
-
-          // Get available video devices
-          const devices = await codeReaderRef.current.listVideoInputDevices();
-
-          // Filter to only back cameras
-          const backDevices = devices.filter((device: any) =>
-            device.label.toLowerCase().includes('back') ||
-            device.label.toLowerCase().includes('rear')
-          );
-
-          // Select a device - prioritize back camera
-          if (backDevices.length > 0) {
-            // Use the first back camera
-            setSelectedDeviceId(backDevices[0].deviceId);
-          } else if (devices.length > 0) {
-            // If no back camera, use any available camera
-            setSelectedDeviceId(devices[0].deviceId);
+            loggingService.info('Quagga script loaded successfully');
           }
 
           setHasInitialized(true);
         } catch (err) {
-          setError('Failed to initialize barcode scanner. Please try again or use manual entry.');
+          loggingService.error('Failed to load Quagga script', { error: err });
+          setError('Failed to load barcode scanner. Please try again or use manual entry.');
           setShowErrorDialog(true);
         }
       }
     };
 
-    initializeScanner();
-  }, [hasScriptLoaded]);
+    loadQuaggaScript();
 
-  // Start scanner when device is selected
+    // Cleanup function
+    return () => {
+      stopScanner();
+    };
+  }, []);
+
+  // Initialize Quagga when component mounts and script is loaded
   useEffect(() => {
-    if (hasInitialized && selectedDeviceId && !scannerStarted) {
+    if (hasInitialized && !scannerStarted && Platform.OS === 'web') {
       startScanner();
     }
-  }, [hasInitialized, selectedDeviceId, scannerStarted]);
+  }, [hasInitialized]);
 
   const startScanner = async () => {
-    if (!hasInitialized || !codeReaderRef.current || !selectedDeviceId || !videoRef.current) {
+    if (!hasInitialized || !scannerRef.current || !(window as any).Quagga) {
       return;
     }
 
     try {
-      // Stop any existing scanner
-      stopScanner();
+      const Quagga = (window as any).Quagga;
 
-      // Start continuous scanning
-      await codeReaderRef.current.decodeFromVideoDevice(
-        selectedDeviceId,
-        videoRef.current,
-        (result: any, error: any) => {
-          if (result && !scanned) {
-            handleBarcodeDetected(result.getText());
-          }
+      // Clear any previous instances
+      Quagga.stop();
 
-          if (error && !(error instanceof (window as any).ZXing.NotFoundException)) {
-            // Silently handle normal scanning errors
+      // Initialize Quagga
+      await Quagga.init({
+        inputStream: {
+          name: "Live",
+          type: "LiveStream",
+          target: scannerRef.current,
+          constraints: {
+            width: { min: 640 },
+            height: { min: 480 },
+            facingMode: "environment", // Use back camera
+            aspectRatio: { min: 1, max: 2 }
+          },
+        },
+        decoder: {
+          readers: [
+            "ean_reader", // EAN-13 & EAN-8
+            "ean_8_reader",
+            "upc_reader", // UPC-A & UPC-E
+            "upc_e_reader",
+            "code_128_reader", // Code 128
+            "code_39_reader", // Code 39
+            "code_39_vin_reader", // Code 39 VIN
+            "i2of5_reader" // Interleaved 2 of 5
+          ],
+          debug: {
+            showCanvas: true,
+            showPatches: true,
+            showFoundPatches: true,
+            showSkeleton: true,
+            showLabels: true,
+            showPatchLabels: true,
+            showRemainingPatchLabels: true,
+            boxFromPatches: {
+              showTransformed: true,
+              showTransformedBox: true,
+              showBB: true
+            }
           }
+        },
+        locator: {
+          patchSize: "medium",
+          halfSample: true
+        },
+        numOfWorkers: 2,
+        frequency: 10,
+        locate: true
+      }, (err: any) => {
+        if (err) {
+          loggingService.error('Failed to initialize Quagga', { error: err });
+          setError('Failed to initialize barcode scanner. Please try again or use manual entry.');
+          setShowErrorDialog(true);
+          return;
         }
-      );
 
-      setScannerStarted(true);
+        loggingService.info('Quagga initialized successfully');
+        Quagga.start();
+        setScannerStarted(true);
+
+        // Add barcode detection listener
+        Quagga.onDetected(handleBarcodeDetected);
+      });
     } catch (err) {
-      setError('Failed to start camera for barcode scanning. Please try again or use manual entry.');
+      loggingService.error('Error starting Quagga scanner', { error: err });
+      setError('Failed to start barcode scanner. Please try again or use manual entry.');
       setShowErrorDialog(true);
     }
   };
 
   const stopScanner = () => {
-    if (codeReaderRef.current && scannerStarted) {
-      try {
-        codeReaderRef.current.reset();
-        setScannerStarted(false);
-      } catch (e) {
-        console.error('Error stopping scanner:', e);
-      }
+    if (Platform.OS === 'web' && (window as any).Quagga && scannerStarted) {
+      (window as any).Quagga.stop();
+      setScannerStarted(false);
     }
   };
 
-  const handleBarcodeDetected = async (code: string) => {
+  const handleBarcodeDetected = async (result: any) => {
     try {
+      // Get barcode
+      const code = result.codeResult.code;
+
       // Don't process the same code twice in a row
       if (scanned || code === lastScannedCode) {
         return;
@@ -167,6 +173,7 @@ export default function BarcodeScanner() {
 
       setScanned(true);
       setLastScannedCode(code);
+      loggingService.info('Barcode detected', { code });
 
       // Provide haptic feedback if possible
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -263,34 +270,28 @@ export default function BarcodeScanner() {
     }
 
     return (
-      <View style={styles.scannerContainer}>
-        {/* Video element for ZXing */}
-        <video
-          ref={videoRef}
+      <>
+        <div
+          ref={scannerRef}
           style={{
+            position: 'relative',
             width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            maxHeight: SCAN_AREA_SIZE * 1.5,
+            height: '70%',
+            overflow: 'hidden',
           }}
         />
-        <View style={styles.scanArea}>
-          <View style={[styles.scanAreaCorner, styles.cornerTopLeft]} />
-          <View style={[styles.scanAreaCorner, styles.cornerTopRight]} />
-          <View style={[styles.scanAreaCorner, styles.cornerBottomLeft]} />
-          <View style={[styles.scanAreaCorner, styles.cornerBottomRight]} />
-        </View>
         <Text style={styles.instructions}>
-          Position a barcode in the center of the screen
+          Position a barcode in view to scan
         </Text>
-      </View>
+      </>
     );
   };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerText}>Scan Barcode</Text>
+        <Text style={styles.headerText}>QuaggaJS Barcode Scanner</Text>
+        <Text style={styles.subHeaderText}>Enhanced for PWA on Android</Text>
       </View>
 
       {!hasInitialized && (
@@ -399,57 +400,16 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
-  scannerContainer: {
-    flex: 1,
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
+  subHeaderText: {
+    color: '#ccc',
+    fontSize: 14,
+    marginTop: 4,
   },
   text: {
     color: '#fff',
     fontSize: 16,
     textAlign: 'center',
     marginTop: 16,
-  },
-  scanArea: {
-    width: SCAN_AREA_SIZE,
-    height: SCAN_AREA_SIZE,
-    borderWidth: 2,
-    borderColor: '#2196F3',
-    backgroundColor: 'transparent',
-    position: 'absolute',
-  },
-  scanAreaCorner: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderColor: '#2196F3',
-    borderWidth: 2,
-    backgroundColor: 'transparent',
-  },
-  cornerTopLeft: {
-    top: -1,
-    left: -1,
-    borderBottomWidth: 0,
-    borderRightWidth: 0,
-  },
-  cornerTopRight: {
-    top: -1,
-    right: -1,
-    borderBottomWidth: 0,
-    borderLeftWidth: 0,
-  },
-  cornerBottomLeft: {
-    bottom: -1,
-    left: -1,
-    borderTopWidth: 0,
-    borderRightWidth: 0,
-  },
-  cornerBottomRight: {
-    bottom: -1,
-    right: -1,
-    borderTopWidth: 0,
-    borderLeftWidth: 0,
   },
   instructions: {
     color: '#fff',
@@ -460,8 +420,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 8,
     borderRadius: 4,
-    position: 'absolute',
-    bottom: 10,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,

@@ -270,6 +270,14 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
       elevation: 0,
       backgroundColor: theme.colors.background,
     },
+    scanButton: {
+      padding: 8,
+      borderRadius: 8,
+      backgroundColor: theme.colors.surfaceVariant,
+      elevation: 2,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
     scrollView: {
       flex: 1,
     },
@@ -360,6 +368,13 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
           icon="magnify"
           clearIcon="close"
         />
+
+        <TouchableOpacity
+          style={styles.scanButton}
+          onPress={() => navigation.navigate('BarcodeScanner')}
+        >
+          <Ionicons name="barcode-outline" size={24} color={theme.colors.primary} />
+        </TouchableOpacity>
       </View>
 
       {isLoading ? (

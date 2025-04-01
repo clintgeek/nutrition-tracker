@@ -14,6 +14,7 @@ type DrawerParamList = {
   MainTabs: undefined;
   NutritionGoals: undefined;
   Settings: undefined;
+  Diagnostics: undefined;
 };
 
 // Custom drawer content component
@@ -147,6 +148,16 @@ const DrawerContent = (props: any) => {
           <MaterialCommunityIcons name="cog" color={color} size={size} />
         )}
         onPress={() => navigation.navigate('Settings')}
+        activeTintColor={theme.colors.primary}
+      />
+
+      {/* Camera Diagnostics */}
+      <DrawerItem
+        label="Camera Diagnostics"
+        icon={({ color, size }) => (
+          <MaterialCommunityIcons name="tools" color={color} size={size} />
+        )}
+        onPress={() => navigation.navigate('Diagnostics')}
         activeTintColor={theme.colors.primary}
       />
 
