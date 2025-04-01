@@ -12,6 +12,7 @@ import {
 import { format, subDays, subMonths } from 'date-fns';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { FAB, useTheme } from 'react-native-paper';
 import bloodPressureService, { BloodPressureLog } from '../services/bloodPressureService';
 import BloodPressureForm from '../components/BloodPressureForm';
 import { BloodPressureImportButton } from '../components/BloodPressureImportButton';
@@ -35,6 +36,7 @@ const BloodPressureScreen: React.FC = () => {
   const [timeSpan, setTimeSpan] = useState<TimeSpan>('7D');
 
   const navigation = useNavigation();
+  const theme = useTheme();
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -145,27 +147,27 @@ const BloodPressureScreen: React.FC = () => {
   };
 
   const renderItem = ({ item }: { item: BloodPressureLog }) => (
-    <View style={styles.logItem}>
+    <View style={styles(theme).logItem}>
       <TouchableOpacity
-        style={styles.mainContent}
+        style={styles(theme).mainContent}
         onPress={() => {
           setSelectedLog(item);
           setShowForm(true);
         }}
       >
-        <View style={styles.readingContainer}>
-          <View style={styles.readings}>
-            <Text style={styles.mainReading}>{item.systolic}</Text>
-            <Text style={styles.separator}>/</Text>
-            <Text style={styles.mainReading}>{item.diastolic}</Text>
+        <View style={styles(theme).readingContainer}>
+          <View style={styles(theme).readings}>
+            <Text style={styles(theme).mainReading}>{item.systolic}</Text>
+            <Text style={styles(theme).separator}>/</Text>
+            <Text style={styles(theme).mainReading}>{item.diastolic}</Text>
             {item.pulse && (
               <>
-                <Text style={styles.separator}>•</Text>
-                <Text style={styles.mainReading}>{item.pulse}</Text>
+                <Text style={styles(theme).separator}>•</Text>
+                <Text style={styles(theme).mainReading}>{item.pulse}</Text>
               </>
             )}
           </View>
-          <Text style={styles.date}>{format(new Date(item.log_date), 'MMM dd, yyyy')}</Text>
+          <Text style={styles(theme).date}>{format(new Date(item.log_date), 'MMM dd, yyyy')}</Text>
         </View>
       </TouchableOpacity>
       <TouchableOpacity
@@ -173,7 +175,7 @@ const BloodPressureScreen: React.FC = () => {
           console.log('Delete button pressed for log:', item.id);
           handleDeleteLog(item);
         }}
-        style={styles.deleteButton}
+        style={styles(theme).deleteButton}
       >
         <Ionicons name="trash" size={24} color="#FF3B30" />
       </TouchableOpacity>
@@ -183,17 +185,17 @@ const BloodPressureScreen: React.FC = () => {
   const hasData = logs.length > 0;
 
   return (
-    <View style={styles.container}>
+    <View style={styles(theme).container}>
       {hasData ? (
-        <View style={styles.chartContainer}>
+        <View style={styles(theme).chartCard}>
           <NivoBloodPressureChart data={logs} timeSpan={timeSpan} />
-          <View style={styles.timeSpanSelector}>
+          <View style={styles(theme).timeSpanSelector}>
             {(['7D', '1M', '3M', '6M', '1Y', 'ALL'] as TimeSpan[]).map((span) => (
               <TouchableOpacity
                 key={span}
                 style={[
-                  styles.timeSpanButton,
-                  timeSpan === span && styles.timeSpanButtonActive
+                  styles(theme).timeSpanButton,
+                  timeSpan === span && styles(theme).timeSpanButtonActive
                 ]}
                 onPress={() => {
                   setTimeSpan(span);
@@ -202,8 +204,8 @@ const BloodPressureScreen: React.FC = () => {
               >
                 <Text
                   style={[
-                    styles.timeSpanText,
-                    timeSpan === span && styles.timeSpanTextActive
+                    styles(theme).timeSpanText,
+                    timeSpan === span && styles(theme).timeSpanTextActive
                   ]}
                 >
                   {span}
@@ -213,42 +215,51 @@ const BloodPressureScreen: React.FC = () => {
           </View>
         </View>
       ) : (
-        <View style={styles.noDataContainer}>
-          <Text style={styles.noDataText}>No blood pressure logs yet</Text>
-          <Text style={styles.noDataSubtext}>Add your first log using the + button below</Text>
+        <View style={styles(theme).noDataCard}>
+          <Text style={styles(theme).noDataText}>No blood pressure logs yet</Text>
+          <Text style={styles(theme).noDataSubtext}>Add your first log using the + button below</Text>
         </View>
       )}
 
-      <FlatList
-        data={logs}
-        renderItem={renderItem}
-        keyExtractor={item => item.id.toString()}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        contentContainerStyle={styles.listContent}
-      />
-
-      <View style={styles.bottomButtonContainer}>
-        <BloodPressureImportButton
-          onImportComplete={fetchLogs}
-          existingLogs={logs}
+      <View style={styles(theme).logsCard}>
+        <Text style={styles(theme).sectionTitle}>Blood Pressure Logs</Text>
+        <FlatList
+          data={logs}
+          renderItem={renderItem}
+          keyExtractor={item => item.id.toString()}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          contentContainerStyle={styles(theme).listContent}
+          ListEmptyComponent={
+            <Text style={styles(theme).emptyListText}>No logs to display for the selected time period</Text>
+          }
+          ListFooterComponent={
+            <View style={styles(theme).listFooter}>
+              <BloodPressureImportButton
+                onImportComplete={fetchLogs}
+                existingLogs={logs}
+              />
+            </View>
+          }
         />
       </View>
 
-      <TouchableOpacity
-        style={styles.addButton}
+      <FAB
+        icon="plus"
+        style={styles(theme).fab}
         onPress={() => {
           setSelectedLog(undefined);
           setShowForm(true);
         }}
-      >
-        <Ionicons name="add" size={24} color="#fff" />
-      </TouchableOpacity>
+        label="Add Reading"
+        labelTextColor="white"
+        theme={{ colors: { onSecondaryContainer: 'white' }}}
+      />
 
       <Modal visible={showForm} animationType="slide" transparent>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+        <View style={styles(theme).modalContainer}>
+          <View style={styles(theme).modalContent}>
             <BloodPressureForm
               initialValues={selectedLog ? {
                 ...selectedLog,
@@ -268,14 +279,41 @@ const BloodPressureScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  chartContainer: {
+    backgroundColor: '#f5f5f5',
     padding: 16,
-    backgroundColor: '#fff',
+  },
+  chartCard: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    marginBottom: 16,
+    padding: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  logsCard: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    marginBottom: 16,
+    padding: 16,
+    paddingBottom: 0,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    color: '#333',
   },
   logItem: {
     flexDirection: 'row',
@@ -284,7 +322,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
   },
   mainContent: {
     flex: 1,
@@ -320,10 +358,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chart: {
-    marginVertical: 8,
-    borderRadius: 16,
-  },
   addButton: {
     position: 'absolute',
     bottom: 80, // Increased to account for tab bar
@@ -340,12 +374,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
   },
-  noDataContainer: {
-    backgroundColor: '#fff',
+  noDataCard: {
+    backgroundColor: 'white',
     padding: 32,
-    margin: 16,
     borderRadius: 8,
     alignItems: 'center',
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   noDataText: {
     fontSize: 18,
@@ -358,6 +397,11 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
   },
+  emptyListText: {
+    textAlign: 'center',
+    color: '#666',
+    padding: 20,
+  },
   modalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -365,32 +409,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
     borderRadius: 8,
     width: '90%',
     maxWidth: 500,
     maxHeight: '90%',
     overflow: 'hidden',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   bottomButtonContainer: {
-    padding: 16,
-    paddingBottom: 80, // Increased to account for tab bar
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
+    marginBottom: 80, // Increased to account for tab bar and add button
   },
   timeSpanSelector: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 16,
-    paddingHorizontal: 16,
+    flexWrap: 'wrap',
   },
   timeSpanButton: {
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 16,
     marginHorizontal: 4,
+    marginBottom: 8,
     backgroundColor: '#f0f0f0',
   },
   timeSpanButtonActive: {
@@ -401,11 +447,23 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   timeSpanTextActive: {
-    color: '#fff',
+    color: 'white',
     fontWeight: '600',
   },
   listContent: {
-    paddingBottom: 80, // Added to provide space at the bottom of the list
+    paddingBottom: 20, // Added to provide space at the bottom of the list
+  },
+  listFooter: {
+    marginTop: 20,
+    marginBottom: 20,
+    paddingHorizontal: 10,
+  },
+  fab: {
+    position: 'absolute',
+    margin: 16,
+    right: 0,
+    bottom: 4, // Reduced to be closer to the tab bar
+    backgroundColor: theme.colors.primary,
   },
 });
 

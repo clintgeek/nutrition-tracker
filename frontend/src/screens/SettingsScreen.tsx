@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import {
   List,
@@ -20,8 +20,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { AuthContext } from '../contexts/AuthContext';
-import { SyncContext } from '../contexts/SyncContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useSync } from '../contexts/SyncContext';
 import { syncService } from '../services/syncService';
 
 const SettingsScreen: React.FC = () => {
@@ -34,8 +34,8 @@ const SettingsScreen: React.FC = () => {
 
   const theme = useTheme();
   const navigation = useNavigation<StackNavigationProp<any>>();
-  const { user, logout } = useContext(AuthContext);
-  const { pendingChanges, syncData } = useContext(SyncContext);
+  const { user, logout } = useAuth();
+  const { pendingChanges, syncNow } = useSync();
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -76,7 +76,7 @@ const SettingsScreen: React.FC = () => {
   const handleManualSync = async () => {
     try {
       setIsSyncing(true);
-      await syncData();
+      await syncNow();
       const now = new Date().toISOString();
       setLastSyncTime(now);
       await AsyncStorage.setItem('lastSyncTime', now);
@@ -108,7 +108,7 @@ const SettingsScreen: React.FC = () => {
                   {
                     text: 'Sync & Logout',
                     onPress: async () => {
-                      await syncData();
+                      await syncNow();
                       logout();
                     }
                   },
@@ -131,6 +131,10 @@ const SettingsScreen: React.FC = () => {
 
   const navigateToEditProfile = () => {
     navigation.navigate('EditProfile');
+  };
+
+  const navigateToChangePassword = () => {
+    navigation.navigate('ChangePassword');
   };
 
   const pickImage = async () => {
@@ -163,124 +167,128 @@ const SettingsScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Card style={styles.profileCard}>
+    <ScrollView style={styles(theme).container}>
+      <Card style={styles(theme).profileCard}>
         <TouchableOpacity onPress={pickImage}>
-          <View style={styles.profileHeader}>
+          <View style={styles(theme).profileHeader}>
             {user?.profilePicture ? (
               <Avatar.Image
                 source={{ uri: user.profilePicture }}
                 size={80}
-                style={styles.profilePicture}
+                style={styles(theme).profilePicture}
               />
             ) : (
               <Avatar.Icon
                 icon="account"
                 size={80}
-                style={[styles.profilePicture, { backgroundColor: theme.colors.primary }]}
+                style={[styles(theme).profilePicture, { backgroundColor: theme.colors.primary }]}
               />
             )}
-            <View style={styles.cameraIconContainer}>
+            <View style={styles(theme).cameraIconContainer}>
               <MaterialCommunityIcons name="camera" size={20} color="white" />
             </View>
           </View>
         </TouchableOpacity>
 
-        <View style={styles.profileInfo}>
-          <Text style={styles.userName}>{user?.name || 'User'}</Text>
-          <Text style={styles.userEmail}>{user?.email || 'user@example.com'}</Text>
+        <View style={styles(theme).profileInfo}>
+          <Text style={styles(theme).userName}>{user?.name || 'User'}</Text>
+          <Text style={styles(theme).userEmail}>{user?.email || 'user@example.com'}</Text>
 
           <Button
             mode="outlined"
             onPress={navigateToEditProfile}
-            style={styles.editProfileButton}
+            style={styles(theme).editProfileButton}
           >
             Edit Profile
           </Button>
         </View>
       </Card>
 
-      <List.Section>
-        <List.Subheader>App Settings</List.Subheader>
+      <Card style={styles(theme).sectionCard}>
+        <List.Section>
+          <List.Subheader>App Settings</List.Subheader>
 
-        <List.Item
-          title="Dark Mode"
-          description="Enable dark theme"
-          left={props => <List.Icon {...props} icon="theme-light-dark" />}
-          right={props => <Switch value={darkMode} onValueChange={handleDarkModeToggle} />}
-        />
+          <List.Item
+            title="Dark Mode"
+            description="Enable dark theme"
+            left={(props: any) => <List.Icon {...props} icon="theme-light-dark" />}
+            right={(props: any) => <Switch value={darkMode} onValueChange={handleDarkModeToggle} />}
+          />
 
-        <Divider />
+          <Divider />
 
-        <List.Item
-          title="Notifications"
-          description="Enable push notifications"
-          left={props => <List.Icon {...props} icon="bell" />}
-          right={props => <Switch value={notificationsEnabled} onValueChange={handleNotificationsToggle} />}
-        />
+          <List.Item
+            title="Notifications"
+            description="Enable push notifications"
+            left={(props: any) => <List.Icon {...props} icon="bell" />}
+            right={(props: any) => <Switch value={notificationsEnabled} onValueChange={handleNotificationsToggle} />}
+          />
 
-        <Divider />
+          <Divider />
 
-        <List.Item
-          title="Sync on Cellular Data"
-          description="Allow syncing when not on Wi-Fi"
-          left={props => <List.Icon {...props} icon="cellphone-wireless" />}
-          right={props => <Switch value={syncOnCellular} onValueChange={handleSyncOnCellularToggle} />}
-        />
+          <List.Item
+            title="Sync on Cellular Data"
+            description="Allow syncing when not on Wi-Fi"
+            left={(props: any) => <List.Icon {...props} icon="cellphone-wireless" />}
+            right={(props: any) => <Switch value={syncOnCellular} onValueChange={handleSyncOnCellularToggle} />}
+          />
 
-        <Divider />
+          <Divider />
 
-        <List.Item
-          title="Sync Data"
-          description={`Last sync: ${formatSyncTime(lastSyncTime)}`}
-          left={props => <List.Icon {...props} icon="sync" />}
-          onPress={() => setSyncDialogVisible(true)}
-        />
-      </List.Section>
+          <List.Item
+            title="Sync Data"
+            description={`Last sync: ${formatSyncTime(lastSyncTime)}`}
+            left={(props: any) => <List.Icon {...props} icon="sync" />}
+            onPress={() => setSyncDialogVisible(true)}
+          />
+        </List.Section>
+      </Card>
 
-      <List.Section>
-        <List.Subheader>Account</List.Subheader>
+      <Card style={styles(theme).sectionCard}>
+        <List.Section>
+          <List.Subheader>Account</List.Subheader>
 
-        <List.Item
-          title="Change Password"
-          left={props => <List.Icon {...props} icon="lock-reset" />}
-          onPress={() => navigation.navigate('ChangePassword')}
-        />
+          <List.Item
+            title="Change Password"
+            left={(props: any) => <List.Icon {...props} icon="lock-reset" />}
+            onPress={navigateToChangePassword}
+          />
 
-        <Divider />
+          <Divider />
 
-        <List.Item
-          title="Privacy Policy"
-          left={props => <List.Icon {...props} icon="shield-account" />}
-          onPress={() => navigation.navigate('PrivacyPolicy')}
-        />
+          <List.Item
+            title="Privacy Policy"
+            left={(props: any) => <List.Icon {...props} icon="shield-account" />}
+            onPress={() => navigation.navigate('PrivacyPolicy')}
+          />
 
-        <Divider />
+          <Divider />
 
-        <List.Item
-          title="Terms of Service"
-          left={props => <List.Icon {...props} icon="file-document" />}
-          onPress={() => navigation.navigate('TermsOfService')}
-        />
+          <List.Item
+            title="Terms of Service"
+            left={(props: any) => <List.Icon {...props} icon="file-document" />}
+            onPress={() => navigation.navigate('TermsOfService')}
+          />
 
-        <Divider />
+          <Divider />
 
-        <List.Item
-          title="About"
-          description="Version 1.0.0"
-          left={props => <List.Icon {...props} icon="information" />}
-          onPress={() => navigation.navigate('About')}
-        />
+          <List.Item
+            title="About"
+            description="Version 1.0.0"
+            left={(props: any) => <List.Icon {...props} icon="information" />}
+            onPress={() => navigation.navigate('About')}
+          />
 
-        <Divider />
+          <Divider />
 
-        <List.Item
-          title="Logout"
-          titleStyle={{ color: theme.colors.error }}
-          left={props => <List.Icon {...props} icon="logout" color={theme.colors.error} />}
-          onPress={handleLogout}
-        />
-      </List.Section>
+          <List.Item
+            title="Logout"
+            titleStyle={{ color: theme.colors.error }}
+            left={(props: any) => <List.Icon {...props} icon="logout" color={theme.colors.error} />}
+            onPress={handleLogout}
+          />
+        </List.Section>
+      </Card>
 
       <Portal>
         <Dialog visible={syncDialogVisible} onDismiss={() => setSyncDialogVisible(false)}>
@@ -312,15 +320,16 @@ const SettingsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.dark ? theme.colors.background : '#f5f5f5',
   },
   profileCard: {
     margin: 16,
     padding: 16,
     alignItems: 'center',
+    backgroundColor: theme.colors.surface,
   },
   profileHeader: {
     position: 'relative',
@@ -332,7 +341,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 5,
     right: 0,
-    backgroundColor: '#2196F3',
+    backgroundColor: theme.colors.primary,
     borderRadius: 15,
     width: 30,
     height: 30,
@@ -346,13 +355,20 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 4,
+    color: theme.colors.text,
   },
   userEmail: {
-    color: '#757575',
+    color: theme.colors.placeholder,
     marginBottom: 16,
   },
   editProfileButton: {
     marginTop: 8,
+  },
+  sectionCard: {
+    margin: 16,
+    marginTop: 0,
+    marginBottom: 16,
+    backgroundColor: theme.colors.surface,
   },
 });
 

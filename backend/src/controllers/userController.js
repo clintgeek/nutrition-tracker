@@ -19,6 +19,13 @@ const getProfile = async (req, res, next) => {
         id: user.id,
         name: user.name,
         email: user.email,
+        weight: user.weight,
+        height: user.height,
+        gender: user.gender,
+        birthdate: user.birthdate,
+        activity_level: user.activity_level,
+        weight_goal: user.weight_goal,
+        profile_picture: user.profile_picture,
         created_at: user.created_at,
         updated_at: user.updated_at,
       },
@@ -40,10 +47,28 @@ const updateProfile = async (req, res, next) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name } = req.body;
+    const {
+      name,
+      weight,
+      height,
+      gender,
+      birthdate,
+      activity_level,
+      weight_goal,
+      profile_picture
+    } = req.body;
 
-    // Update user
-    const updatedUser = await User.update(req.user.id, { name });
+    // Update user with all provided fields
+    const updatedUser = await User.update(req.user.id, {
+      name,
+      weight,
+      height,
+      gender,
+      birthdate,
+      activity_level,
+      weight_goal,
+      profile_picture
+    });
 
     if (!updatedUser) {
       return res.status(404).json({ message: 'User not found' });

@@ -1,13 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '../services/authService';
-
-// Define the shape of the user object
-interface User {
-  id: number;
-  name: string;
-  email: string;
-}
+import { User } from '../types/User';
 
 // Define the shape of the auth context
 interface AuthContextData {
@@ -19,6 +13,7 @@ interface AuthContextData {
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (name: string) => Promise<void>;
+  updateUserData: (userData: Partial<User>) => Promise<void>;
   updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   clearError: () => void;
 }
@@ -33,6 +28,7 @@ const defaultContextValue: AuthContextData = {
   register: async () => {},
   logout: async () => {},
   updateProfile: async () => {},
+  updateUserData: async () => {},
   updatePassword: async () => {},
   clearError: () => {},
 };
@@ -188,6 +184,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Add a new function to update the full user data
+  const updateUserData = async (userData: Partial<User>) => {
+    try {
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Update the user in the context with merged data
+      const updatedUser = { ...user, ...userData };
+      setUser(updatedUser);
+
+      // Update the user in AsyncStorage
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+      console.log('AuthContext: Updated user data in context and storage');
+    } catch (error: any) {
+      console.error('Error updating user data in context:', error);
+      setError(error.message || 'Failed to update user data');
+      throw error;
+    }
+  };
+
   // Clear error function
   const clearError = () => {
     setError(null);
@@ -203,6 +220,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     register,
     logout,
     updateProfile,
+    updateUserData,
     updatePassword,
     clearError,
   };

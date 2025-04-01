@@ -6,6 +6,7 @@ export interface User {
   height?: number;
   age?: number;
   gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
+  birthdate?: string;
   activityLevel?: 'sedentary' | 'lightly_active' | 'moderately_active' | 'very_active' | 'extremely_active';
   weightGoal?: 'lose' | 'maintain' | 'gain';
   profilePicture?: string;
@@ -37,9 +38,9 @@ export interface UpdateProfileData {
   name?: string;
   weight?: number;
   height?: number;
-  age?: number;
   gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
-  activityLevel?: 'sedentary' | 'lightly_active' | 'moderately_active' | 'very_active' | 'extremely_active';
-  weightGoal?: 'lose' | 'maintain' | 'gain';
-  profilePicture?: string;
+  birthdate?: string;
+  activity_level?: 'sedentary' | 'lightly_active' | 'moderately_active' | 'very_active' | 'extremely_active';
+  weight_goal?: 'lose' | 'maintain' | 'gain';
+  profile_picture?: string;
 }

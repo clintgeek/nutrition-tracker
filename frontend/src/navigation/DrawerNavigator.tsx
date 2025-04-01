@@ -13,6 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 type DrawerParamList = {
   MainTabs: undefined;
   NutritionGoals: undefined;
+  Settings: undefined;
 };
 
 // Custom drawer content component
@@ -138,6 +139,16 @@ const DrawerContent = (props: any) => {
       />
 
       <Divider />
+
+      {/* Settings */}
+      <DrawerItem
+        label="Settings"
+        icon={({ color, size }) => (
+          <MaterialCommunityIcons name="cog" color={color} size={size} />
+        )}
+        onPress={() => navigation.navigate('Settings')}
+        activeTintColor={theme.colors.primary}
+      />
 
       <DrawerItem
         label="Logout"

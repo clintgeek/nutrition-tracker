@@ -79,7 +79,10 @@ export const formatMacro = (grams: number): string => {
   return `${Math.round(grams)}g`;
 };
 
-export const formatDate = (date: string): string => {
+export const formatDate = (date: string | Date): string => {
+  if (date instanceof Date) {
+    return date.toLocaleDateString();
+  }
   return new Date(date).toLocaleDateString();
 };
 

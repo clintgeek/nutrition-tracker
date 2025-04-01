@@ -24,6 +24,12 @@ router.put(
   '/profile',
   [
     check('name', 'Name is required').not().isEmpty(),
+    check('weight').optional().isNumeric().withMessage('Weight must be a number'),
+    check('height').optional().isNumeric().withMessage('Height must be a number'),
+    check('gender').optional().isIn(['male', 'female', 'other', 'prefer_not_to_say']).withMessage('Invalid gender'),
+    check('birthdate').optional().isDate().withMessage('Birthdate must be a valid date'),
+    check('activity_level').optional().isIn(['sedentary', 'lightly_active', 'moderately_active', 'very_active', 'extremely_active']).withMessage('Invalid activity level'),
+    check('weight_goal').optional().isIn(['lose', 'maintain', 'gain']).withMessage('Invalid weight goal'),
   ],
   updateProfile
 );

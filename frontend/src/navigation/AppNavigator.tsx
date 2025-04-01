@@ -15,6 +15,7 @@ import DrawerContent from './DrawerNavigator';
 import LoadingScreen from '../screens/LoadingScreen';
 import NutritionGoalsScreen from '../screens/goals/NutritionGoalsScreen';
 import CustomHeader from '../components/CustomHeader';
+import SettingsStackNavigator from './SettingsStackNavigator';
 
 // Define the stack navigator param list
 export type RootStackParamList = {
@@ -22,6 +23,7 @@ export type RootStackParamList = {
   Register: undefined;
   Main: undefined;
   Loading: undefined;
+  Settings: undefined;
 };
 
 // Create the navigators
@@ -85,6 +87,16 @@ const MainDrawerNavigator = () => {
           header: renderHeaderWithMenu('Nutrition Goals'),
           drawerIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons name="target" color={color} size={size} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="Settings"
+        component={SettingsStackNavigator}
+        options={{
+          title: 'Settings',
+          drawerIcon: ({ color, size }: { color: string; size: number }) => (
+            <MaterialCommunityIcons name="cog" color={color} size={size} />
           ),
         }}
       />
