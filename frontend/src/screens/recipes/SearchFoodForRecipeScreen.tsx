@@ -28,6 +28,8 @@ const getSourceIcon = (source: string) => {
   switch (source?.toLowerCase()) {
     case 'usda':
       return 'leaf';
+    case 'nutritionix':
+      return 'check-decagram';
     case 'openfoodfacts':
       return 'database';
     case 'custom':
@@ -41,10 +43,12 @@ const getSourceColor = (source: string, theme: any) => {
   switch (source?.toLowerCase()) {
     case 'usda':
       return '#4CAF50';
-    case 'openfoodfacts':
+    case 'nutritionix':
       return '#2196F3';
-    case 'custom':
+    case 'openfoodfacts':
       return '#FF9800';
+    case 'custom':
+      return '#9C27B0';
     default:
       return theme.colors.primary;
   }

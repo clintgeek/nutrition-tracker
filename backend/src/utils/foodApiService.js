@@ -413,23 +413,39 @@ class FoodApiService {
       }
 
       logger.info(`Searching OpenFoodFacts for: ${query}`);
+      console.log(`🔍 Searching OpenFoodFacts for: "${query}"`);
 
       // Call OpenFoodFacts search API with timeout
+      const requestUrl = `${OPENFOODFACTS_API_URL}/cgi/search.pl`;
+      console.log(`🌐 OpenFoodFacts request URL: ${requestUrl}`);
+
+      const params = {
+        search_terms: query,
+        search_simple: 1,
+        action: 'process',
+        json: 1,
+        page_size: 25,
+        fields: 'code,product_name,brands,nutriments,serving_size,serving_quantity,nutrition_data_per'
+      };
+      console.log('📋 Request params:', params);
+
       const response = await fetchWithTimeout(
-        `${OPENFOODFACTS_API_URL}/cgi/search.pl`,
-        {
-          params: {
-            search_terms: query,
-            search_simple: 1,
-            action: 'process',
-            json: 1,
-            page_size: 25,
-            fields: 'code,product_name,brands,nutriments,serving_size,serving_quantity,nutrition_data_per'
-          }
-        }
+        requestUrl,
+        { params }
       );
 
+      console.log(`✅ OpenFoodFacts response status: ${response.status}`);
+      logger.info(`OpenFoodFacts API responded with status: ${response.status}`);
+
       const data = response.data;
+
+      if (!data) {
+        logger.warn('OpenFoodFacts returned empty data');
+        console.log('⚠️ OpenFoodFacts returned empty data');
+        return [];
+      }
+
+      console.log(`📊 OpenFoodFacts results count: ${data.count || 0}`);
 
       if (data.products && data.products.length > 0) {
         const transformedResults = data.products.map(product => {
@@ -509,12 +525,34 @@ class FoodApiService {
         // Cache the transformed data
         setCacheData(cacheKey, validResults);
         return validResults;
+      } else {
+        logger.info(`No products found in OpenFoodFacts for query: ${query}`);
+        console.log(`ℹ️ No products found in OpenFoodFacts for query: "${query}"`);
+        return [];
       }
-
-      logger.info(`No products found in OpenFoodFacts for query: ${query}`);
-      return [];
     } catch (error) {
       logger.error(`Error searching OpenFoodFacts: ${error.message}`);
+      console.error(`❌ OpenFoodFacts search error: ${error.message}`);
+
+      // Log detailed error information
+      if (error.response) {
+        // The request was made and the server responded with a non-2xx status
+        logger.error(`OpenFoodFacts returned status ${error.response.status}`);
+        console.error(`   Status: ${error.response.status}`);
+        if (error.response.data) {
+          console.error(`   Response data:`, JSON.stringify(error.response.data).substring(0, 200) + '...');
+        }
+      } else if (error.request) {
+        // The request was made but no response was received
+        logger.error('No response received from OpenFoodFacts API');
+        console.error('   No response received (network issue or timeout)');
+        if (error.code === 'ECONNABORTED') {
+          logger.error('OpenFoodFacts request timed out');
+          console.error('   Request timed out');
+        }
+      }
+
+      // Always return an empty array on error to allow fallback to other sources
       return [];
     }
   }

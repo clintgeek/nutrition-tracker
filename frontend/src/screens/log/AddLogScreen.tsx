@@ -7,37 +7,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { foodService } from '../../services/foodService';
 import { foodLogService } from '../../services/foodLogService';
+import { getSourceIcon, getSourceColor } from '../../utils/foodUtils';
 
 // Define the route params type
 type RouteParams = {
   date?: string;
   mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-};
-
-const getSourceIcon = (source: string) => {
-  switch (source?.toLowerCase()) {
-    case 'usda':
-      return 'leaf';
-    case 'openfoodfacts':
-      return 'database';
-    case 'custom':
-      return 'food-apple';
-    default:
-      return 'food';
-  }
-};
-
-const getSourceColor = (source: string, theme: any) => {
-  switch (source?.toLowerCase()) {
-    case 'usda':
-      return '#4CAF50';
-    case 'openfoodfacts':
-      return '#2196F3';
-    case 'custom':
-      return '#FF9800';
-    default:
-      return theme.colors.primary;
-  }
 };
 
 const AddLogScreen: React.FC = () => {

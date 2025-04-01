@@ -28,6 +28,7 @@ import axios from 'axios';
 import { apiService, setAuthToken } from '../../services/apiService';
 import { useAuth } from '../../contexts/AuthContext';
 import { foodLogService } from '../../services/foodLogService';
+import { getSourceIcon, getSourceColor } from '../../utils/foodUtils';
 
 // API response interface
 interface FoodApiResponse {
@@ -98,34 +99,21 @@ interface SimplifiedFoodItem {
   source?: string;
 }
 
-// Helper functions for source display
-const getSourceIcon = (source: string) => {
+// Add a function to get user-friendly source names
+const getSourceName = (source: string): string => {
   switch (source?.toLowerCase()) {
     case 'usda':
-      return 'leaf';  // Leaf icon for USDA
+      return 'USDA';
     case 'nutritionix':
-      return 'check-decagram';  // Verified icon for Nutritionix
+      return 'Nutritionix';
     case 'openfoodfacts':
-      return 'database';  // Database icon for OpenFoodFacts
+      return 'Open Food Facts';
     case 'custom':
-      return 'food-apple';  // Apple icon for custom foods
+      return 'My Foods';
+    case 'recipe':
+      return 'Recipe';
     default:
-      return 'food';
-  }
-};
-
-const getSourceColor = (source: string, theme: any) => {
-  switch (source?.toLowerCase()) {
-    case 'usda':
-      return '#4CAF50';  // Green for USDA
-    case 'nutritionix':
-      return '#2196F3';  // Blue for Nutritionix
-    case 'openfoodfacts':
-      return '#FF9800';  // Orange for OpenFoodFacts
-    case 'custom':
-      return theme.colors.primary;  // Theme color for custom foods
-    default:
-      return theme.colors.primary;
+      return source || 'Unknown';
   }
 };
 
@@ -440,45 +428,50 @@ const FoodSearchScreen: React.FC = ({ route, navigation }: any) => {
     }
   };
 
-  // Render a food item
-  const renderFoodItem = ({ item }: { item: SimplifiedFoodItem }) => (
-    <TouchableOpacity onPress={() => setSelectedFood(item)}>
-      <Card style={[styles.foodCard, selectedFood?.id === item.id && { borderColor: theme.colors.primary, borderWidth: 2 }]}>
-        <Card.Content style={styles.foodCardContent}>
-          <Avatar.Icon
-            size={40}
-            icon={getSourceIcon(item.source || '')}
-            style={{ backgroundColor: getSourceColor(item.source || '', theme) }}
-            color="#fff"
-          />
-          <View style={styles.foodInfo}>
-            <Title numberOfLines={1}>{item.name}</Title>
-            {item.brand && <Text style={styles.brandText}>{item.brand}</Text>}
-            {item.source && <Text style={styles.sourceText}>Source: {item.source}</Text>}
+  // Update renderFoodItem to add source chip
+  const renderFoodItem = ({ item }: { item: SimplifiedFoodItem }) => {
+    const sourceColor = getSourceColor(item.source || '', theme);
 
-            <View style={styles.macroContainer}>
-              <View style={styles.macroItem}>
-                <Text style={styles.macroValue}>{item.calories}</Text>
-                <Text style={styles.macroLabel}>Calories</Text>
-              </View>
-              <View style={styles.macroItem}>
-                <Text style={styles.macroValue}>{item.protein}g</Text>
-                <Text style={styles.macroLabel}>Protein</Text>
-              </View>
-              <View style={styles.macroItem}>
-                <Text style={styles.macroValue}>{item.carbs}g</Text>
-                <Text style={styles.macroLabel}>Carbs</Text>
-              </View>
-              <View style={styles.macroItem}>
-                <Text style={styles.macroValue}>{item.fat}g</Text>
-                <Text style={styles.macroLabel}>Fat</Text>
+    return (
+      <TouchableOpacity onPress={() => setSelectedFood(item)}>
+        <Card style={styles.card}>
+          <Card.Content style={styles.cardContent}>
+            <View style={styles.leftContent}>
+              <Avatar.Icon
+                size={40}
+                icon={getSourceIcon(item.source || '')}
+                style={[styles.sourceIcon, { backgroundColor: `${sourceColor}20` }]}
+                color={sourceColor}
+              />
+              <View style={styles.nameContainer}>
+                <Text style={styles.foodName} numberOfLines={1}>{item.name}</Text>
+                {item.brand && <Text style={styles.brandText} numberOfLines={1}>{item.brand}</Text>}
+                <Chip
+                  style={[styles.sourceChip, { backgroundColor: `${sourceColor}15` }]}
+                  textStyle={{ color: sourceColor, fontSize: 12 }}
+                  compact
+                >
+                  {getSourceName(item.source || '')}
+                </Chip>
               </View>
             </View>
-          </View>
-        </Card.Content>
-      </Card>
-    </TouchableOpacity>
-  );
+
+            <View style={styles.rightContent}>
+              <Text style={styles.caloriesText}>{Math.round(item.calories)} cal</Text>
+              {isAddingToLog && (
+                <MaterialCommunityIcons
+                  name="plus-circle"
+                  size={24}
+                  color={theme.colors.primary}
+                  style={styles.addIcon}
+                />
+              )}
+            </View>
+          </Card.Content>
+        </Card>
+      </TouchableOpacity>
+    );
+  };
 
   // Add cleanup for add-to-log mode when screen is unfocused
   React.useEffect(() => {
@@ -733,44 +726,43 @@ const styles = StyleSheet.create({
   resultsList: {
     padding: 16,
   },
-  foodCard: {
+  card: {
     marginBottom: 12,
     borderRadius: 8,
   },
-  foodCardContent: {
+  cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  foodInfo: {
+  leftContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sourceIcon: {
+    marginRight: 12,
+  },
+  nameContainer: {
     flex: 1,
-    marginLeft: 12,
+  },
+  foodName: {
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   brandText: {
     fontSize: 14,
     opacity: 0.7,
     marginBottom: 4,
   },
-  sourceText: {
-    fontSize: 12,
-    opacity: 0.6,
-    marginBottom: 8,
-    fontStyle: 'italic',
-  },
-  macroContainer: {
+  rightContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-  },
-  macroItem: {
     alignItems: 'center',
   },
-  macroValue: {
-    fontWeight: 'bold',
+  caloriesText: {
     fontSize: 16,
+    fontWeight: 'bold',
   },
-  macroLabel: {
-    fontSize: 12,
-    opacity: 0.7,
+  addIcon: {
+    marginLeft: 8,
   },
   emptyContainer: {
     flex: 1,
@@ -877,6 +869,11 @@ const styles = StyleSheet.create({
     margin: 16,
     right: 0,
     bottom: 0,
+  },
+  sourceChip: {
+    marginTop: 4,
+    height: 22,
+    alignSelf: 'flex-start',
   },
 });
 

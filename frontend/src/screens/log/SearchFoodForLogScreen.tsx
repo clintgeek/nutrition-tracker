@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Avatar,
   useTheme,
+  Chip
 } from 'react-native-paper';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LogStackParamList, RootStackScreenProps } from '../../types/navigation';
@@ -20,6 +21,7 @@ import { foodService, FoodItem } from '../../services/foodService';
 import { Food } from '../../types/Food';
 import EmptyState from '../../components/common/EmptyState';
 import { foodLogService } from '../../services/foodLogService';
+import { getSourceIcon, getSourceColor } from '../../utils/foodUtils';
 
 const mapFoodItemToFood = (item: FoodItem): Food => {
   // Ensure id is a number
@@ -47,29 +49,21 @@ const mapFoodItemToFood = (item: FoodItem): Food => {
   };
 };
 
-const getSourceIcon = (source: string) => {
+// Add a function to get user-friendly source names
+const getSourceName = (source: string): string => {
   switch (source?.toLowerCase()) {
     case 'usda':
-      return 'leaf';
+      return 'USDA';
+    case 'nutritionix':
+      return 'Nutritionix';
     case 'openfoodfacts':
-      return 'database';
+      return 'Open Food Facts';
     case 'custom':
-      return 'food-apple';
+      return 'My Foods';
+    case 'recipe':
+      return 'Recipe';
     default:
-      return 'food';
-  }
-};
-
-const getSourceColor = (source: string, theme: MD3Theme) => {
-  switch (source?.toLowerCase()) {
-    case 'usda':
-      return theme.colors.tertiary;
-    case 'openfoodfacts':
-      return theme.colors.secondary;
-    case 'custom':
-      return theme.colors.primary;
-    default:
-      return theme.colors.primary;
+      return source || 'Unknown';
   }
 };
 
@@ -220,6 +214,14 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
                 </TouchableOpacity>
               </View>
 
+              <Chip
+                style={[styles.sourceChip, { backgroundColor: `${sourceColor}15` }]}
+                textStyle={{ color: sourceColor, fontSize: 12 }}
+                compact
+              >
+                {getSourceName(item.source || '')}
+              </Chip>
+
               <View style={styles.nutritionGrid}>
                 <View style={styles.nutritionItem}>
                   <Text style={styles.nutritionValue}>{Math.round(item.calories || 0)}</Text>
@@ -341,6 +343,9 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
       fontSize: 12,
       color: theme.colors.onSurfaceVariant,
       textAlign: 'center',
+    },
+    sourceChip: {
+      marginBottom: 8,
     },
   });
 
