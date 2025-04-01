@@ -120,6 +120,48 @@ const EditProfileScreen: React.FC = () => {
     }
   }, [token, user]);
 
+  // Add a new effect to fetch fresh profile data when component mounts
+  useEffect(() => {
+    const fetchLatestProfileData = async () => {
+      try {
+        console.log('EditProfileScreen: Fetching latest profile data from server');
+        const result = await userService.getProfile();
+
+        if (result && result.user) {
+          console.log('EditProfileScreen: Successfully fetched latest profile data');
+
+          // Update the user data in context
+          await updateUserData({
+            name: result.user.name,
+            gender: result.user.gender,
+            birthdate: result.user.birthdate,
+            weight: result.user.weight,
+            height: result.user.height,
+            activityLevel: result.user.activityLevel,
+            weightGoal: result.user.weightGoal,
+            profilePicture: result.user.profilePicture
+          });
+
+          // Update local state with new data
+          setName(result.user.name || '');
+          setGender(result.user.gender || '');
+          setBirthdate(result.user.birthdate ? new Date(result.user.birthdate) : undefined);
+          setWeightLbs(result.user.weight ? kgToLbs(result.user.weight) : '');
+          setHeightFeet(result.user.height ? cmToFeet(result.user.height).toString() : '');
+          setHeightInches(result.user.height ? cmToInches(result.user.height).toString() : '');
+          setActivityLevel(result.user.activityLevel as ActivityLevel || '');
+          setWeightGoal(result.user.weightGoal as WeightGoal || '');
+          setProfilePicture(result.user.profilePicture || '');
+        }
+      } catch (error) {
+        console.error('Error fetching latest profile data:', error);
+        // Don't show alert to user - just fall back to stored data
+      }
+    };
+
+    fetchLatestProfileData();
+  }, []); // Empty dependency array means this runs once when component mounts
+
   // Form state
   const [name, setName] = useState(user?.name || '');
   const [gender, setGender] = useState<Gender | ''>(user?.gender || '');

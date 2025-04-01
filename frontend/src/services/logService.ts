@@ -7,9 +7,9 @@ export interface FoodLog {
   food_name: string;
   serving_size: number;
   servings: number;
-  calories: number;
-  calories_per_serving: number;
-  total_calories: number;
+  calories: number | null;
+  calories_per_serving: number | null;
+  total_calories: number | null;
   protein: number;
   carbs: number;
   fat: number;
@@ -23,35 +23,61 @@ class LogService {
       // Get logs with food details in a single query
       const response = await apiService.get<any[]>(`/logs/recent?limit=${limit}`);
 
+      console.log('FULL RAW API RESPONSE:', response);
+
       // Transform the response to handle field name differences
       return response.map(log => {
         // Parse servings as a number
-        const servings = parseFloat(log.servings || 0);
+        const servings = parseFloat(log.servings || '1');
 
-        // Hard-code calories for specific food items based on database values
-        let caloriesPerServing = 0;
-        switch (log.food_item_id) {
-          case 7: // Animal Crackers
-            caloriesPerServing = 120;
-            break;
-          case 11: // Bacon
-            caloriesPerServing = 161;
-            break;
-          case 4: // Pancake
-            caloriesPerServing = 91;
-            break;
-          case 6: // Grits
-            caloriesPerServing = 151;
-            break;
-          case 10: // Peanuts
-            caloriesPerServing = 571;
-            break;
-          default:
-            caloriesPerServing = 100; // Default value
+        console.log(`Log Object Keys: ${Object.keys(log).join(', ')}`);
+        console.log(`Raw Log Object for ${log.food_name}:`, log);
+
+        // Try all possible sources for calories
+        let caloriesPerServing = null;
+
+        // Check for calories_per_serving first (this is what LogScreen uses)
+        if (typeof log.calories_per_serving === 'number' || typeof log.calories_per_serving === 'string') {
+          const parsed = parseFloat(log.calories_per_serving);
+          if (!isNaN(parsed) && parsed > 0) {
+            caloriesPerServing = parsed;
+            console.log(`Found calories_per_serving: ${caloriesPerServing}`);
+          }
         }
 
-        // Calculate total calories
-        const totalCalories = Math.round(servings * caloriesPerServing);
+        // For food items from the database, they might have a different structure
+        if (caloriesPerServing === null && log.calories && servings > 0) {
+          const parsed = parseFloat(log.calories) / servings;
+          if (!isNaN(parsed) && parsed > 0) {
+            caloriesPerServing = parsed;
+            console.log(`Calculated from calories: ${caloriesPerServing}`);
+          }
+        }
+
+        // If we have values from the LogScreen format
+        if (caloriesPerServing === null && (log.protein_grams || log.carbs_grams || log.fat_grams)) {
+          // This is likely from the foodLogService format - check for the proper field
+          if (log.calories_per_serving) {
+            const parsed = parseFloat(log.calories_per_serving);
+            if (!isNaN(parsed) && parsed > 0) {
+              caloriesPerServing = parsed;
+              console.log(`Found in nutritional data: ${caloriesPerServing}`);
+            }
+          }
+        }
+
+        // Try some additional fields that might exist
+        if (caloriesPerServing === null && log.nutrition && log.nutrition.calories) {
+          const parsed = parseFloat(log.nutrition.calories);
+          if (!isNaN(parsed) && parsed > 0) {
+            caloriesPerServing = parsed;
+            console.log(`Found in nutrition object: ${caloriesPerServing}`);
+          }
+        }
+
+        // Calculate total calories based on servings
+        const totalCalories = caloriesPerServing !== null ? Math.round(servings * caloriesPerServing) : null;
+        console.log(`Final calories for ${log.food_name}: ${totalCalories === null ? 'MISSING DATA' : totalCalories} (${caloriesPerServing === null ? 'missing' : caloriesPerServing} × ${servings})`);
 
         return {
           id: log.id,
@@ -61,17 +87,18 @@ class LogService {
           serving_size: servings,
           servings: servings,
           calories: totalCalories,
-          calories_per_serving: Math.round(caloriesPerServing),
+          calories_per_serving: caloriesPerServing,
           total_calories: totalCalories,
-          protein: 0, // We don't have this data
-          carbs: 0,   // We don't have this data
-          fat: 0,     // We don't have this data
+          protein: log.protein_grams || 0,
+          carbs: log.carbs_grams || 0,
+          fat: log.fat_grams || 0,
           created_at: log.created_at,
           log_date: log.log_date,
           meal_type: log.meal_type
         };
       });
     } catch (error) {
+      console.error('Error in getRecentLogs:', error);
       return [];
     }
   }

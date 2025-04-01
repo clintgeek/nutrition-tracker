@@ -14,6 +14,7 @@ import type { HomeScreenCard } from '../components/home/HomeScreenEditor';
 import { WeightProgressCard, WeightMiniGraph, WeightMetricsCard } from '../components/dashboard';
 import { weightService } from '../services/weightService';
 import { logService } from '../services/logService';
+import { foodLogService, FoodLog } from '../services/foodLogService';
 import { SkeletonLoader } from '../components/common';
 import { useAuth } from '../contexts/AuthContext';
 import { setAuthToken } from '../services/apiService';
@@ -38,8 +39,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     currentStreak: 0,
     hasMultipleLogs: false,
     hasWeightGoal: false,
-    weightGoal: null,
-    weightLogs: []
+    weightGoal: null as any,
+    weightLogs: [] as any[]
   });
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
   const [tipOfTheDay, setTipOfTheDay] = useState('');
@@ -106,9 +107,13 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
         // Load recent food logs
         try {
+          // Use the original logService.getRecentLogs which was working before
+          // but keep our improved calorie calculation
           const recentFoodLogs = await logService.getRecentLogs(5);
+          console.log(`Found ${recentFoodLogs?.length || 0} recent logs using logService`);
           setRecentLogs(recentFoodLogs || []);
         } catch (error) {
+          console.error('Error fetching recent logs:', error);
           setRecentLogs([]);
         }
 
@@ -311,16 +316,46 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                         </View>
                         <Text style={styles.activityCalories}>
                           {(() => {
-                            let calories = 0;
-                            if (log.calories_per_serving && log.servings) {
-                              calories = log.calories_per_serving * log.servings;
-                            } else if (log.calories) {
-                              calories = log.calories;
-                            } else if (log.total_calories) {
-                              calories = log.total_calories;
+                            // Debug the log data structure
+                            console.log(`Food log data for ${log.food_name}:`, log);
+
+                            // Extract the correct calories value from the log
+                            // Using a more thorough approach to capture all possible formats
+
+                            // Check if we have a food item from the LogScreen format
+                            if (log.calories_per_serving !== undefined && log.calories_per_serving !== null) {
+                              // This is from logService
+                              const servings = parseFloat(log.servings?.toString() || "1");
+                              return Math.round(log.calories_per_serving * servings) + " cal";
                             }
-                            return Math.round(calories) || 0;
-                          })()} cal
+
+                            // Check alternate format (calories_per_serving vs caloriesPerServing)
+                            if (log.caloriesPerServing !== undefined && log.caloriesPerServing !== null) {
+                              const servings = parseFloat(log.servings?.toString() || "1");
+                              return Math.round(log.caloriesPerServing * servings) + " cal";
+                            }
+
+                            // Check for protein_grams format (from LogScreen)
+                            if (log.protein_grams !== undefined) {
+                              // This log came from the foodLogService format
+                              if (log.calories_per_serving) {
+                                return Math.round(log.calories_per_serving) + " cal";
+                              }
+                            }
+
+                            // Check for direct calories field
+                            if (log.calories) {
+                              return Math.round(log.calories) + " cal";
+                            }
+
+                            // Last resort - total calories
+                            if (log.total_calories) {
+                              return Math.round(log.total_calories) + " cal";
+                            }
+
+                            // No valid calorie data found
+                            return "--- cal";
+                          })()}
                         </Text>
                       </View>
                       {index < recentLogs.length - 1 && <Divider style={styles.activityDivider} />}

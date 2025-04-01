@@ -55,14 +55,23 @@ router.get('/recent', async (req, res) => {
     const userId = req.user.id;
     const limit = parseInt(req.query.limit) || 5;
 
-    // Get recent logs with food name
+    // Get recent logs with complete nutritional information
     const logs = await db.query(
-      `SELECT l.*, f.name as food_name
-       FROM food_logs l
-       LEFT JOIN food_items f ON l.food_item_id = f.id
-       WHERE l.user_id = $1
-       ORDER BY l.created_at DESC
-       LIMIT $2`,
+      `SELECT
+        l.*,
+        f.name as food_name,
+        f.calories_per_serving,
+        f.protein_grams,
+        f.carbs_grams,
+        f.fat_grams,
+        f.serving_size,
+        f.serving_unit,
+        (f.calories_per_serving * l.servings) as total_calories
+      FROM food_logs l
+      LEFT JOIN food_items f ON l.food_item_id = f.id
+      WHERE l.user_id = $1
+      ORDER BY l.created_at DESC
+      LIMIT $2`,
       [userId, limit]
     );
 

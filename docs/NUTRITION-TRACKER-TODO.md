@@ -36,12 +36,9 @@
       - [x] Create progress metrics cards (total change, weekly average, projected date)
       - [x] Add color coding to show progress toward goal
     - [ ] **Phase 3: Advanced Visualizations** (Future)
-      - [ ] Interactive Calendar View with weight entry heatmap
       - [ ] Milestone Markers for significant achievements
-      - [ ] Comparison Visualizations (equivalent weight objects)
       - [ ] Multi-metric Tracking with body measurements
       - [ ] Goal Projection with adjustable parameters
-      - [ ] Contextual Insights connecting weight and nutrition
 
 ## Roadmap
 
@@ -60,11 +57,10 @@
 ### Medium Priority
 - [ ] Allow setting of default page in user profile settings (Low)
 - [ ] Create data visualization for nutrition trends (Medium)
-- [ ] Implement handling of recipes in the food database (High)
-  - [ ] Create, save, and log custom recipes
-  - [ ] Calculate nutritional information for recipes
-- [ ] Add user profile management (High)
-- [ ] Implement OAUTH through Google account (High)
+- [x] Implement handling of recipes in the food database (High)
+  - [x] Create, save, and log custom recipes
+  - [x] Calculate nutritional information for recipes
+- [x] Add user profile management (High)
 - [ ] Implement SASS for styling (Medium)
   - [ ] Convert existing CSS/inline styles to SASS
   - [ ] Create variables for colors, spacing, and typography
@@ -72,15 +68,14 @@
   - [ ] Set up proper build process for SASS compilation
 
 ### Future Improvements
-- [ ] Implement swipe between screens for mobile (Low)
 - [ ] Dark mode theme with toggle in hamburger menu (Low)
 - [ ] Implement user avatars (Low)
-- [ ] CSV import functionality for food and weight data (Medium)
-- [ ] Make the web page "installable" as a PWA in browsers (Medium)
+- [x] CSV import functionality for food and weight data (Medium)
+- [x] Make the web page "installable" as a PWA in browsers (Medium)
 - [ ] Implement "milestones" as badges (e.g., each 5 pounds lost, every 30 days logged) (Medium)
 - [ ] Add insights dashboard (most logged foods, total calories, logging streaks, etc.) (Medium)
 - [ ] Add barcode scanning with food lookup (High)
-- [ ] Add meal planning and scheduling (High)
+- [x] Add meal planning and scheduling (High)
 - [ ] Create an admin interface for user management and system configuration (High)
 - [ ] Integrate with fitness trackers (e.g., Garmin) (High)
 
@@ -121,20 +116,9 @@
 ## Future Enhancements
 
 ### New Integrations
-- [ ] Weather API Integration: Adjust calorie recommendations based on weather conditions
 - [ ] Recipe APIs: Connect to services like Spoonacular or Edamam for recipe suggestions
 - [ ] AI Image Recognition: Take photos of meals for automatic food identification and logging
 - [ ] Barcode Scanning: Quickly log packaged foods and compare alternatives while shopping
-
-### Meal Planning System
-- [ ] Create comprehensive meal planning functionality
-  - [ ] Recipe management with custom recipes and nutritional calculation
-  - [ ] Meal scheduling calendar with drag-and-drop interface
-  - [ ] Google Calendar integration for meal plan synchronization
-  - [ ] Automatic food logging based on scheduled meals
-  - [ ] Shopping list generation from planned meals
-  - [ ] Family sharing for collaborative meal planning
-  - [ ] Meal rotation suggestions to prevent repetition
 
 ## Completed Features Archive
 - [x] Break up food log into Breakfast, Lunch, Dinner, Snacks each with an add food button
@@ -153,8 +137,6 @@
 - [x] Improve loading indicators across the application
 
 ## Development Notes
-- Consider replacing manual SVG charts with a library like Nivo for better visualizations
 - Explore offline functionality for logging when internet connection is unavailable
-- Consider implementing a progressive web app (PWA) approach for installability
 - Insights page could use a tabbed interface to show information without overwhelming the user
 
