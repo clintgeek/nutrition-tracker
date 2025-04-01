@@ -106,30 +106,20 @@ const EditProfileScreen: React.FC = () => {
   const navigation = useNavigation();
   const theme = useTheme();
 
-  // Add debug code
+  // Set token for API calls
   useEffect(() => {
-    console.log('EditProfileScreen: User from context:', user ? 'User exists' : 'No user');
-    console.log('EditProfileScreen: Token from context:', token ? 'Token exists' : 'No token');
-
-    // Ensure token is set for api calls
     if (token) {
-      console.log('EditProfileScreen: Setting auth token');
       setAuthToken(token);
-    } else {
-      console.log('EditProfileScreen: No token available for API calls');
     }
-  }, [token, user]);
+  }, [token]);
 
-  // Add a new effect to fetch fresh profile data when component mounts
+  // Fetch fresh profile data when component mounts
   useEffect(() => {
     const fetchLatestProfileData = async () => {
       try {
-        console.log('EditProfileScreen: Fetching latest profile data from server');
         const result = await userService.getProfile();
 
         if (result && result.user) {
-          console.log('EditProfileScreen: Successfully fetched latest profile data');
-
           // Update the user data in context
           await updateUserData({
             name: result.user.name,
@@ -210,16 +200,6 @@ const EditProfileScreen: React.FC = () => {
     setLoading(true);
 
     try {
-      // Debug before API call
-      console.log('EditProfileScreen: About to make updateProfile API call');
-      console.log('EditProfileScreen: Submit with data:', {
-        name,
-        gender: gender || undefined,
-        birthdate: birthdate ? 'Date exists' : 'No date',
-        weight: weightLbs ? 'Weight exists' : 'No weight',
-        height: (heightFeet && heightInches) ? 'Height exists' : 'No height'
-      });
-
       // Convert imperial to metric for API
       const weight = weightLbs ? lbsToKg(parseFloat(weightLbs)) : undefined;
       const height = (heightFeet && heightInches)
@@ -247,8 +227,6 @@ const EditProfileScreen: React.FC = () => {
         profile_picture: profilePicture || undefined
       };
 
-      console.log('EditProfileScreen: Final data being sent:', updatedData);
-
       const result = await userService.updateProfile(updatedData);
 
       if (result && result.user) {
@@ -263,8 +241,6 @@ const EditProfileScreen: React.FC = () => {
           weightGoal: result.user.weightGoal,
           profilePicture: result.user.profilePicture
         });
-
-        console.log('EditProfileScreen: Updated user data in global context');
 
         Alert.alert('Success', 'Profile updated successfully');
         navigation.goBack();

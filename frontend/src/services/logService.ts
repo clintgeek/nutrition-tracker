@@ -23,15 +23,10 @@ class LogService {
       // Get logs with food details in a single query
       const response = await apiService.get<any[]>(`/logs/recent?limit=${limit}`);
 
-      console.log('FULL RAW API RESPONSE:', response);
-
       // Transform the response to handle field name differences
       return response.map(log => {
         // Parse servings as a number
         const servings = parseFloat(log.servings || '1');
-
-        console.log(`Log Object Keys: ${Object.keys(log).join(', ')}`);
-        console.log(`Raw Log Object for ${log.food_name}:`, log);
 
         // Try all possible sources for calories
         let caloriesPerServing = null;
@@ -41,7 +36,6 @@ class LogService {
           const parsed = parseFloat(log.calories_per_serving);
           if (!isNaN(parsed) && parsed > 0) {
             caloriesPerServing = parsed;
-            console.log(`Found calories_per_serving: ${caloriesPerServing}`);
           }
         }
 
@@ -50,7 +44,6 @@ class LogService {
           const parsed = parseFloat(log.calories) / servings;
           if (!isNaN(parsed) && parsed > 0) {
             caloriesPerServing = parsed;
-            console.log(`Calculated from calories: ${caloriesPerServing}`);
           }
         }
 
@@ -61,7 +54,6 @@ class LogService {
             const parsed = parseFloat(log.calories_per_serving);
             if (!isNaN(parsed) && parsed > 0) {
               caloriesPerServing = parsed;
-              console.log(`Found in nutritional data: ${caloriesPerServing}`);
             }
           }
         }
@@ -71,13 +63,11 @@ class LogService {
           const parsed = parseFloat(log.nutrition.calories);
           if (!isNaN(parsed) && parsed > 0) {
             caloriesPerServing = parsed;
-            console.log(`Found in nutrition object: ${caloriesPerServing}`);
           }
         }
 
         // Calculate total calories based on servings
         const totalCalories = caloriesPerServing !== null ? Math.round(servings * caloriesPerServing) : null;
-        console.log(`Final calories for ${log.food_name}: ${totalCalories === null ? 'MISSING DATA' : totalCalories} (${caloriesPerServing === null ? 'missing' : caloriesPerServing} × ${servings})`);
 
         return {
           id: log.id,
@@ -98,7 +88,7 @@ class LogService {
         };
       });
     } catch (error) {
-      console.error('Error in getRecentLogs:', error);
+      console.error('Error fetching recent logs:', error);
       return [];
     }
   }

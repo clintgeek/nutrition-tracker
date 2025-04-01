@@ -110,7 +110,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           // Use the original logService.getRecentLogs which was working before
           // but keep our improved calorie calculation
           const recentFoodLogs = await logService.getRecentLogs(5);
-          console.log(`Found ${recentFoodLogs?.length || 0} recent logs using logService`);
           setRecentLogs(recentFoodLogs || []);
         } catch (error) {
           console.error('Error fetching recent logs:', error);
@@ -316,11 +315,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                         </View>
                         <Text style={styles.activityCalories}>
                           {(() => {
-                            // Debug the log data structure
-                            console.log(`Food log data for ${log.food_name}:`, log);
-
                             // Extract the correct calories value from the log
-                            // Using a more thorough approach to capture all possible formats
 
                             // Check if we have a food item from the LogScreen format
                             if (log.calories_per_serving !== undefined && log.calories_per_serving !== null) {

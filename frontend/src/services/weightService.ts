@@ -136,11 +136,8 @@ export const weightService = {
       const response = await apiService.get<{ log: any }>('/weight/logs/latest');
 
       if (!response || !response.log) {
-        console.log('No latest weight log found in API response');
         return null;
       }
-
-      console.log('Raw latest weight log from API:', JSON.stringify(response.log));
 
       // Transform the response to match our interface
       const transformedLog: WeightLog = {
@@ -199,6 +196,26 @@ export const weightService = {
     } catch (error) {
       console.error('Error deleting weight log:', error);
       throw error;
+    }
+  },
+
+  // Get the latest weight log to display as current weight
+  async getLatestWeightLogForDisplay(): Promise<{ weight: number; date: string; unit: string } | null> {
+    try {
+      const response = await apiService.get<any>('/weights/latest');
+
+      if (!response || !response.log) {
+        return null;
+      }
+
+      return {
+        weight: response.log.weight,
+        date: response.log.log_date,
+        unit: 'kg'
+      };
+    } catch (error) {
+      console.error('Error getting latest weight log:', error);
+      return null;
     }
   },
 };
