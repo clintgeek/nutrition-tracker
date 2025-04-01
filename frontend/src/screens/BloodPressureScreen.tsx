@@ -8,11 +8,14 @@ import {
   Modal,
   RefreshControl,
   Alert,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { format, subDays, subMonths } from 'date-fns';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { FAB, useTheme } from 'react-native-paper';
+import { FAB, useTheme, Button, Portal } from 'react-native-paper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import bloodPressureService, { BloodPressureLog } from '../services/bloodPressureService';
 import BloodPressureForm from '../components/BloodPressureForm';
 import { BloodPressureImportButton } from '../components/BloodPressureImportButton';
@@ -34,6 +37,8 @@ const BloodPressureScreen: React.FC = () => {
   const [selectedLog, setSelectedLog] = useState<BloodPressureLog | undefined>();
   const [refreshing, setRefreshing] = useState(false);
   const [timeSpan, setTimeSpan] = useState<TimeSpan>('7D');
+  const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [showPdfTooltip, setShowPdfTooltip] = useState(false);
 
   const navigation = useNavigation();
   const theme = useTheme();
@@ -87,6 +92,34 @@ const BloodPressureScreen: React.FC = () => {
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
+
+  useEffect(() => {
+    const checkPdfTooltipStatus = async () => {
+      try {
+        const hasSeenTooltip = await AsyncStorage.getItem('hasSeenPdfTooltip');
+
+        if (hasSeenTooltip !== 'true' && logs.length > 0) {
+          // Only show tooltip if there's data and user hasn't seen it before
+          setShowPdfTooltip(true);
+
+          // Mark tooltip as seen
+          await AsyncStorage.setItem('hasSeenPdfTooltip', 'true');
+
+          // Auto-hide tooltip after 8 seconds
+          setTimeout(() => {
+            setShowPdfTooltip(false);
+          }, 8000);
+        }
+      } catch (error) {
+        console.error('Error checking PDF tooltip status:', error);
+      }
+    };
+
+    // Check if we should show tooltip when logs are loaded
+    if (logs.length > 0) {
+      checkPdfTooltipStatus();
+    }
+  }, [logs]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -146,6 +179,59 @@ const BloodPressureScreen: React.FC = () => {
     }
   };
 
+  const handleGeneratePDF = async () => {
+    try {
+      setGeneratingPDF(true);
+
+      // Get date range based on current timeSpan
+      const now = new Date();
+      let startDate: string | undefined;
+
+      switch (timeSpan) {
+        case '7D':
+          startDate = format(subDays(now, 7), 'yyyy-MM-dd');
+          break;
+        case '1M':
+          startDate = format(subMonths(now, 1), 'yyyy-MM-dd');
+          break;
+        case '3M':
+          startDate = format(subMonths(now, 3), 'yyyy-MM-dd');
+          break;
+        case '6M':
+          startDate = format(subMonths(now, 6), 'yyyy-MM-dd');
+          break;
+        case '1Y':
+          startDate = format(subMonths(now, 12), 'yyyy-MM-dd');
+          break;
+        case 'ALL':
+          // For ALL, undefined will fetch all logs
+          break;
+      }
+
+      const endDate = format(now, 'yyyy-MM-dd');
+
+      // Generate PDF report with current timespan data
+      const blob = await bloodPressureService.generateReport(startDate, endDate, timeSpan);
+
+      // Download the PDF
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `blood-pressure-report-${timeSpan}-${format(now, 'yyyy-MM-dd')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+
+      Alert.alert('Success', 'Blood pressure report generated successfully');
+    } catch (error) {
+      console.error('Error generating PDF report:', error);
+      Alert.alert('Error', 'Failed to generate blood pressure report');
+    } finally {
+      setGeneratingPDF(false);
+    }
+  };
+
   const renderItem = ({ item }: { item: BloodPressureLog }) => (
     <View style={styles(theme).logItem}>
       <TouchableOpacity
@@ -188,6 +274,21 @@ const BloodPressureScreen: React.FC = () => {
     <View style={styles(theme).container}>
       {hasData ? (
         <View style={styles(theme).chartCard}>
+          <View style={styles(theme).chartHeader}>
+            <Text style={styles(theme).chartTitle}>Blood Pressure Trends</Text>
+            {Platform.OS === 'web' && (
+              <Button
+                mode="contained"
+                icon="file-pdf-box"
+                onPress={handleGeneratePDF}
+                loading={generatingPDF}
+                disabled={generatingPDF || logs.length === 0}
+                style={styles(theme).pdfButton}
+              >
+                Export PDF
+              </Button>
+            )}
+          </View>
           <NivoBloodPressureChart data={logs} timeSpan={timeSpan} />
           <View style={styles(theme).timeSpanSelector}>
             {(['7D', '1M', '3M', '6M', '1Y', 'ALL'] as TimeSpan[]).map((span) => (
@@ -222,7 +323,22 @@ const BloodPressureScreen: React.FC = () => {
       )}
 
       <View style={styles(theme).logsCard}>
-        <Text style={styles(theme).sectionTitle}>Blood Pressure Logs</Text>
+        <View style={styles(theme).logsHeader}>
+          <Text style={styles(theme).sectionTitle}>Blood Pressure Logs</Text>
+          {Platform.OS === 'web' && logs.length > 0 && (
+            <Button
+              mode="outlined"
+              icon="file-pdf-box"
+              onPress={handleGeneratePDF}
+              loading={generatingPDF}
+              disabled={generatingPDF}
+              compact
+              style={styles(theme).pdfButtonSmall}
+            >
+              PDF
+            </Button>
+          )}
+        </View>
         <FlatList
           data={logs}
           renderItem={renderItem}
@@ -275,6 +391,42 @@ const BloodPressureScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* PDF Generation Loading Modal */}
+      <Portal>
+        <Modal
+          visible={generatingPDF}
+          transparent={true}
+          animationType="fade"
+        >
+          <View style={styles(theme).loadingModalContainer}>
+            <View style={styles(theme).loadingModalContent}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={styles(theme).loadingModalText}>
+                Generating PDF report...
+              </Text>
+            </View>
+          </View>
+        </Modal>
+      </Portal>
+
+      {/* PDF Feature Tooltip - Using custom tooltip instead of Snackbar */}
+      {showPdfTooltip && Platform.OS === 'web' && (
+        <View style={[styles(theme).customTooltip, { backgroundColor: theme.colors.primary }]}>
+          <View style={styles(theme).tooltipContent}>
+            <Ionicons name="information-circle" size={20} color="white" />
+            <Text style={styles(theme).tooltipText}>
+              NEW: You can now export your blood pressure data as a PDF report!
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => setShowPdfTooltip(false)}
+            style={styles(theme).tooltipButton}
+          >
+            <Text style={styles(theme).tooltipButtonText}>Got it</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
@@ -464,6 +616,87 @@ const styles = (theme: any) => StyleSheet.create({
     right: 0,
     bottom: 4, // Reduced to be closer to the tab bar
     backgroundColor: theme.colors.primary,
+  },
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  chartTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.primary,
+  },
+  pdfButton: {
+    marginLeft: 'auto',
+  },
+  pdfButtonSmall: {
+    marginLeft: 8,
+    height: 36,
+  },
+  logsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  loadingModalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  loadingModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  loadingModalText: {
+    marginTop: 10,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  customTooltip: {
+    position: 'absolute',
+    bottom: 70, // Position above FAB
+    left: 16,
+    right: 16,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 4,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    elevation: 6,
+    zIndex: 1000,
+  },
+  tooltipContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  tooltipText: {
+    color: 'white',
+    marginLeft: 8,
+    fontSize: 14,
+  },
+  tooltipButton: {
+    marginLeft: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: 4,
+  },
+  tooltipButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 
