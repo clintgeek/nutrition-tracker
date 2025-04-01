@@ -218,6 +218,33 @@ export const weightService = {
       return null;
     }
   },
+
+  // Generate PDF report for weight logs
+  async generateReport(startDate?: string, endDate?: string, timeSpan?: string): Promise<Blob> {
+    let url = '/weight/report';
+
+    // Add parameters to query string
+    const params = new URLSearchParams();
+
+    if (startDate && endDate) {
+      params.append('start_date', startDate);
+      params.append('end_date', endDate);
+    }
+
+    if (timeSpan) {
+      params.append('time_span', timeSpan);
+    }
+
+    // Add parameters to URL if any exist
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+
+    const response = await apiService.get<Blob>(url, {
+      responseType: 'blob'
+    });
+    return response;
+  }
 };
 
 export default weightService;

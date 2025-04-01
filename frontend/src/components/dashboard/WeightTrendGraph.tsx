@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Dimensions, TouchableOpacity, Platform, Alert } from 'react-native';
 import { Card, Text, useTheme, Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { weightService } from '../../services/weightService';
@@ -209,6 +209,64 @@ const WeightTrendGraph: React.FC<WeightTrendGraphProps> = ({
               </Text>
             </View>
           )}
+
+          {Platform.OS === 'web' && weightLogs.length > 0 && (
+            <TouchableOpacity
+              style={styles.exportButton}
+              onPress={async () => {
+                try {
+                  // Get date range based on current timeRange
+                  const now = new Date();
+                  let startDate: string | undefined;
+
+                  switch (selectedTimeRange) {
+                    case 'week':
+                      startDate = format(subDays(now, 7), 'yyyy-MM-dd');
+                      break;
+                    case 'month':
+                      startDate = format(subDays(now, 30), 'yyyy-MM-dd');
+                      break;
+                    case '3months':
+                      startDate = format(subMonths(now, 3), 'yyyy-MM-dd');
+                      break;
+                    case 'year':
+                      startDate = format(subMonths(now, 12), 'yyyy-MM-dd');
+                      break;
+                    case 'goal':
+                      if (weightGoal && weightGoal.start_date) {
+                        startDate = format(new Date(weightGoal.start_date), 'yyyy-MM-dd');
+                      } else {
+                        startDate = format(subMonths(now, 3), 'yyyy-MM-dd');
+                      }
+                      break;
+                  }
+
+                  const endDate = format(now, 'yyyy-MM-dd');
+
+                  // Generate PDF report
+                  const blob = await weightService.generateReport(startDate, endDate, selectedTimeRange);
+
+                  // Download the PDF
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.style.display = 'none';
+                  a.href = url;
+                  a.download = `weight-report-${selectedTimeRange}-${format(now, 'yyyy-MM-dd')}.pdf`;
+                  document.body.appendChild(a);
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+
+                  Alert.alert('Success', 'Weight report generated successfully');
+                } catch (error) {
+                  console.error('Error generating PDF report:', error);
+                  Alert.alert('Error', 'Failed to generate weight report');
+                }
+              }}
+            >
+              <MaterialCommunityIcons name="file-pdf-box" size={16} color="white" style={styles.buttonIcon} />
+              <Text style={styles.exportButtonText}>Export PDF</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {renderTimeRangeSelector()}
@@ -230,8 +288,9 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    alignItems: 'center',
+    marginTop: 8,
+    paddingHorizontal: 8,
   },
   statItem: {
     flex: 1,
@@ -261,7 +320,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
   },
   timeButtonActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#4285F4',
   },
   timeText: {
     fontSize: 12,
@@ -279,6 +338,24 @@ const styles = StyleSheet.create({
   errorText: {
     color: 'red',
     textAlign: 'center',
+  },
+  exportButton: {
+    backgroundColor: '#4285F4',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    alignSelf: 'center',
+    marginLeft: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  buttonIcon: {
+    marginRight: 6,
+  },
+  exportButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

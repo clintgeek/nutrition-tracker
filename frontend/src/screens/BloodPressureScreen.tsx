@@ -325,19 +325,6 @@ const BloodPressureScreen: React.FC = () => {
       <View style={styles(theme).logsCard}>
         <View style={styles(theme).logsHeader}>
           <Text style={styles(theme).sectionTitle}>Blood Pressure Logs</Text>
-          {Platform.OS === 'web' && logs.length > 0 && (
-            <Button
-              mode="outlined"
-              icon="file-pdf-box"
-              onPress={handleGeneratePDF}
-              loading={generatingPDF}
-              disabled={generatingPDF}
-              compact
-              style={styles(theme).pdfButtonSmall}
-            >
-              PDF
-            </Button>
-          )}
         </View>
         <FlatList
           data={logs}
