@@ -15,6 +15,7 @@ import CustomHeader from '../components/CustomHeader';
 import { MealPlannerStackNavigator } from './MealPlannerStackNavigator';
 import WeightGoalsScreen from '../screens/goals/WeightGoalsScreen';
 import BloodPressureScreen from '../screens/BloodPressureScreen';
+import FitnessScreen from '../screens/FitnessScreen';
 
 // Define navigation types
 type DrawerParamList = {
@@ -33,6 +34,7 @@ export type MainTabParamList = {
   MealPlanner: undefined;
   Food: undefined;
   Recipe: undefined;
+  Fitness: undefined;
 };
 
 // Create the tab navigator
@@ -113,6 +115,17 @@ const MainTabNavigator: React.FC = () => {
           ),
           headerShown: true,
           header: () => renderHeader('Weight Goals'),
+        }}
+      />
+      <Tab.Screen
+        name="Fitness"
+        component={FitnessScreen}
+        options={{
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
+            <MaterialCommunityIcons name="watch-variant" color={color} size={size} />
+          ),
+          headerShown: true,
+          header: () => renderHeader('Fitness'),
         }}
       />
       <Tab.Screen

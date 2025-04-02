@@ -1,44 +1,39 @@
 const { Pool } = require('pg');
-const logger = require('./logger');
+const logger = require('../utils/logger');
 
-// Create a new pool instance using environment variables
+// Create a connection pool using environment variables
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || undefined,
   user: process.env.POSTGRES_USER,
   password: process.env.POSTGRES_PASSWORD,
-  host: process.env.POSTGRES_HOST,
-  port: parseInt(process.env.POSTGRES_PORT, 10),
   database: process.env.POSTGRES_DB,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  host: process.env.POSTGRES_HOST,
+  port: process.env.POSTGRES_PORT || 5432,
 });
 
-// Log pool events
-pool.on('connect', () => {
-  logger.info('Connected to PostgreSQL database');
-});
+// Log connection info for debugging
+logger.info(`Connecting to PostgreSQL database at ${process.env.POSTGRES_HOST}:${process.env.POSTGRES_PORT || 5432} as ${process.env.POSTGRES_USER}`);
 
+// Setup error handling on the pool
 pool.on('error', (err) => {
-  logger.error('PostgreSQL error:', err);
+  logger.error('Unexpected error on idle client', err);
+  process.exit(-1);
 });
 
-// Get a client from the pool
-async function getClient() {
-  try {
-    const client = await pool.connect();
-    return client;
-  } catch (err) {
-    logger.error('Error getting client:', err);
-    throw err;
+// Test the connection
+pool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    logger.error('Error connecting to PostgreSQL database:', err);
+  } else {
+    logger.info('Connected to PostgreSQL database');
   }
-}
+});
 
+// Export the pool
 module.exports = {
   query: (text, params) => {
-    logger.debug(`Executing query: ${text}`);
+    logger.debug(`Executing query: ${text.substring(0, 150)}${text.length > 150 ? '...' : ''}`);
     return pool.query(text, params);
   },
-  getPool: () => pool,
-  getClient
+  getClient: () => pool.connect(),
+  pool
 };

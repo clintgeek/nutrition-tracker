@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import TodaySummary from '../components/home/TodaySummary';
 import MealPlanCard from '../components/home/MealPlanCard';
 import HomeScreenEditor from '../components/home/HomeScreenEditor';
+import { FitnessSummaryCard } from '../components/home';
 import type { HomeScreenCard } from '../components/home/HomeScreenEditor';
 import { WeightProgressCard, WeightMiniGraph, WeightMetricsCard } from '../components/dashboard';
 import { weightService } from '../services/weightService';
@@ -19,6 +20,7 @@ import { SkeletonLoader } from '../components/common';
 import { useAuth } from '../contexts/AuthContext';
 import { setAuthToken } from '../services/apiService';
 import { userPreferencesService } from '../services/userPreferencesService';
+import { fitnessService, GarminDailySummary } from '../services/fitnessService';
 
 // Remove the storage key for weight display preference
 // const SHOW_WEIGHT_VALUES_KEY = 'showWeightValuesOnDashboard';
@@ -44,13 +46,16 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   });
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
   const [tipOfTheDay, setTipOfTheDay] = useState('');
+  const [dailySummary, setDailySummary] = useState<GarminDailySummary | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<{connected: boolean}>({connected: false});
 
   const DEFAULT_CARDS: HomeScreenCard[] = [
     { id: 'todaySummary', title: 'Today\'s Summary', enabled: true, order: 0 },
     { id: 'weightProgress', title: 'Weight Progress', enabled: true, order: 1 },
     { id: 'weightTrend', title: 'Goal Weight Trend', enabled: true, order: 2 },
-    { id: 'mealPlan', title: 'Meal Plan', enabled: true, order: 3 },
-    { id: 'recentActivity', title: 'Recent Activity', enabled: true, order: 4 },
+    { id: 'fitnessData', title: 'Fitness Activity', enabled: true, order: 3 },
+    { id: 'mealPlan', title: 'Meal Plan', enabled: true, order: 4 },
+    { id: 'recentActivity', title: 'Recent Activity', enabled: true, order: 5 },
   ];
 
   // Set token when it changes
@@ -61,71 +66,91 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   }, [token]);
 
   // Load user preference and data
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
+  // Define loadData outside useEffect so we can call it from the reset button
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
 
-        // Load card layout first
-        await loadCardLayout();
+      // Load card layout first
+      await loadCardLayout();
 
-        // Ensure we have a token
-        if (!token) {
-          setIsLoading(false);
-          return;
-        }
-
-        // Load weight data
-        const weightGoal = await weightService.getWeightGoal();
-        const weightLogs = await weightService.getWeightLogs();
-
-        // Calculate stats
-        if (weightGoal && weightLogs.length > 0) {
-          const startWeight = parseFloat(weightGoal.start_weight.toString());
-          const targetWeight = parseFloat(weightGoal.target_weight.toString());
-          const currentWeight = parseFloat(weightLogs[0].weight_value.toString());
-          const totalLost = startWeight - currentWeight;
-
-          // Calculate percent complete
-          const totalToLose = Math.abs(targetWeight - startWeight);
-          const amountLost = Math.abs(currentWeight - startWeight);
-          const percentComplete = totalToLose > 0 ? Math.min(100, Math.round((amountLost / totalToLose) * 100)) : 0;
-
-          // Check if multiple logs exist
-          const hasMultipleLogs = weightLogs.length > 1;
-
-          setWeightStats({
-            totalLost,
-            percentComplete,
-            currentStreak: calculateStreak(weightLogs),
-            hasMultipleLogs,
-            hasWeightGoal: true,
-            weightGoal,
-            weightLogs
-          });
-        }
-
-        // Load recent food logs
-        try {
-          // Use the original logService.getRecentLogs which was working before
-          // but keep our improved calorie calculation
-          const recentFoodLogs = await logService.getRecentLogs(5);
-          setRecentLogs(recentFoodLogs || []);
-        } catch (error) {
-          console.error('Error fetching recent logs:', error);
-          setRecentLogs([]);
-        }
-
-        // Set tip of the day
-        setTipOfTheDay(getTipOfTheDay());
-
-      } catch (error) {
-        // Minimal error logging
-      } finally {
+      // Ensure we have a token
+      if (!token) {
         setIsLoading(false);
+        return;
       }
-    };
 
+      // Load weight data
+      const weightGoal = await weightService.getWeightGoal();
+      const weightLogs = await weightService.getWeightLogs();
+
+      // Calculate stats
+      if (weightGoal && weightLogs.length > 0) {
+        const startWeight = parseFloat(weightGoal.start_weight.toString());
+        const targetWeight = parseFloat(weightGoal.target_weight.toString());
+        const currentWeight = parseFloat(weightLogs[0].weight_value.toString());
+        const totalLost = startWeight - currentWeight;
+
+        // Calculate percent complete
+        const totalToLose = Math.abs(targetWeight - startWeight);
+        const amountLost = Math.abs(currentWeight - startWeight);
+        const percentComplete = totalToLose > 0 ? Math.min(100, Math.round((amountLost / totalToLose) * 100)) : 0;
+
+        // Check if multiple logs exist
+        const hasMultipleLogs = weightLogs.length > 1;
+
+        setWeightStats({
+          totalLost,
+          percentComplete,
+          currentStreak: calculateStreak(weightLogs),
+          hasMultipleLogs,
+          hasWeightGoal: true,
+          weightGoal,
+          weightLogs
+        });
+      }
+
+      // Load fitness data
+      try {
+        // Check connection status first
+        const status = await fitnessService.checkGarminConnectionStatus();
+        setConnectionStatus(status);
+
+        if (status.connected) {
+          // Get today's date in YYYY-MM-DD format
+          const today = new Date();
+          const todayStr = format(today, 'yyyy-MM-dd');
+
+          // Attempt to get today's summary
+          const summary = await fitnessService.getGarminDailySummary(todayStr);
+          setDailySummary(summary);
+        }
+      } catch (error) {
+        console.error('Error fetching fitness data:', error);
+      }
+
+      // Load recent food logs
+      try {
+        // Use the original logService.getRecentLogs which was working before
+        // but keep our improved calorie calculation
+        const recentFoodLogs = await logService.getRecentLogs(5);
+        setRecentLogs(recentFoodLogs || []);
+      } catch (error) {
+        console.error('Error fetching recent logs:', error);
+        setRecentLogs([]);
+      }
+
+      // Set tip of the day
+      setTipOfTheDay(getTipOfTheDay());
+
+    } catch (error) {
+      // Minimal error logging
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadData();
   }, [token]);
 
@@ -159,6 +184,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     navigation.navigate('Log');
   };
 
+  const navigateToFitness = () => {
+    navigation.navigate('Fitness' as never);
+  };
+
   // Format date for recent logs
   const formatLogDate = (dateString: string) => {
     if (!dateString) return '';
@@ -184,6 +213,23 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       // Try to load from server first
       const serverLayout = await userPreferencesService.getHomeScreenLayout();
       if (serverLayout) {
+        // Check if fitnessData card exists in the layout
+        const hasfitnessData = serverLayout.some(card => card.id === 'fitnessData');
+
+        if (!hasfitnessData) {
+          // Add fitnessData to the layout if it doesn't exist
+          const newLayout = [...serverLayout, {
+            id: 'fitnessData' as const,
+            title: 'Fitness Activity',
+            enabled: true,
+            order: serverLayout.length
+          }];
+          // Save the updated layout to server
+          await userPreferencesService.updateHomeScreenLayout(newLayout);
+          setCardLayout(newLayout);
+          return;
+        }
+
         setCardLayout(serverLayout);
         return;
       }
@@ -192,6 +238,25 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       const savedLayout = await AsyncStorage.getItem('@home_screen_layout');
       if (savedLayout) {
         const parsedLayout = JSON.parse(savedLayout);
+
+        // Check if fitnessData card exists in the local layout
+        const hasfitnessData = parsedLayout.some((card: HomeScreenCard) => card.id === 'fitnessData');
+
+        if (!hasfitnessData) {
+          // Add fitnessData to the layout if it doesn't exist
+          const newLayout = [...parsedLayout, {
+            id: 'fitnessData' as const,
+            title: 'Fitness Activity',
+            enabled: true,
+            order: parsedLayout.length
+          }];
+          // Save the updated layout to server and local storage
+          await userPreferencesService.updateHomeScreenLayout(newLayout);
+          await AsyncStorage.setItem('@home_screen_layout', JSON.stringify(newLayout));
+          setCardLayout(newLayout);
+          return;
+        }
+
         // Save to server for future use
         await userPreferencesService.updateHomeScreenLayout(parsedLayout);
         setCardLayout(parsedLayout);
@@ -277,6 +342,15 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               )}
             </Card.Content>
           </Card>
+        );
+      case 'fitnessData':
+        return (
+          <TouchableOpacity onPress={navigateToFitness} activeOpacity={0.7}>
+            <FitnessSummaryCard
+              fitnessSummary={dailySummary}
+              isLoading={isLoading}
+            />
+          </TouchableOpacity>
         );
       case 'mealPlan':
         return <MealPlanCard />;

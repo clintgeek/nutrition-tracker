@@ -246,6 +246,19 @@ const SettingsScreen: React.FC = () => {
 
       <Card style={styles(theme).sectionCard}>
         <List.Section>
+          <List.Subheader>Integrations</List.Subheader>
+
+          <List.Item
+            title="Garmin Connect"
+            description="Sync your fitness data"
+            left={(props: any) => <List.Icon {...props} icon="watch" />}
+            onPress={() => navigation.navigate('GarminSettings')}
+          />
+        </List.Section>
+      </Card>
+
+      <Card style={styles(theme).sectionCard}>
+        <List.Section>
           <List.Subheader>Account</List.Subheader>
 
           <List.Item
