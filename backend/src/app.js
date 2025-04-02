@@ -17,6 +17,7 @@ const bloodPressureRoutes = require('./routes/bloodPressure');
 const mealPlansRouter = require('./routes/mealPlans');
 const loggingRouter = require('./routes/logging');
 const userPreferencesRoutes = require('./routes/userPreferencesRoutes');
+const fitnessRoutes = require('./routes/fitnessRoutes');
 
 // Create Express app
 const app = express();
@@ -46,6 +47,7 @@ app.use('/api/blood-pressure', bloodPressureRoutes);
 app.use('/api/meal-plans', mealPlansRouter);
 app.use('/api/logging', loggingRouter);
 app.use('/api/user-preferences', userPreferencesRoutes);
+app.use('/api/fitness', fitnessRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
