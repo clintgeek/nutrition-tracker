@@ -2,7 +2,7 @@ const axios = require('axios');
 const logger = require('./logger');
 const nutritionixService = require('./nutritionixService');
 
-const OPENFOODFACTS_API_URL = 'https://world.openfoodfacts.org';
+// Keep only USDA API URL and remove OpenFoodFacts URLs
 const USDA_API_URL = 'https://api.nal.usda.gov/fdc/v1';
 
 // Debug logging for environment variables
@@ -206,7 +206,7 @@ class FoodApiService {
     let score = 0;
 
     // Source quality score (base points)
-    const sourceScores = { nutritionix: 20, openfoodfacts: 20, usda: 20 };
+    const sourceScores = { nutritionix: 20, usda: 20 };
     score += sourceScores[food.source] || 0;
 
     // Name matching score
@@ -312,11 +312,6 @@ class FoodApiService {
         return [];
       });
 
-      const openFoodPromise = this.searchOpenFoodFacts(query).catch(error => {
-        logger.error('OpenFoodFacts search error:', error.message);
-        return [];
-      });
-
       const usdaPromise = this.searchUSDAByName(query, true).catch(error => {
         logger.error('USDA search error:', error.message);
         return [];
@@ -324,20 +319,17 @@ class FoodApiService {
 
       // Wait for all searches to complete
       const nutritionixResults = await nutritionixPromise;
-      const openFoodResults = await openFoodPromise;
       const usdaResults = await usdaPromise;
 
       // Combine all results
       const allResults = [
         ...nutritionixResults,
-        ...(Array.isArray(openFoodResults) ? openFoodResults : [openFoodResults].filter(Boolean)),
         ...usdaResults
       ];
 
       // Log results from each source
       logger.info('Search results from each source:', {
         nutritionix: nutritionixResults.length,
-        openFoodFacts: Array.isArray(openFoodResults) ? openFoodResults.length : (openFoodResults ? 1 : 0),
         usda: usdaResults.length,
         total: allResults.length
       });
@@ -360,7 +352,7 @@ class FoodApiService {
   }
 
   /**
-   * Fetch food data from OpenFoodFacts API by barcode
+   * Fetch food data by barcode
    * @param {string} barcode - Barcode
    * @returns {Promise<Object|null>} Food data or null
    */
@@ -376,184 +368,27 @@ class FoodApiService {
 
       logger.info(`Fetching food data for barcode: ${barcode}`);
 
-      // Try Nutritionix first
+      // Try Nutritionix
       const nutritionixResult = await nutritionixService.searchByUPC(barcode);
       if (nutritionixResult) {
         logger.info('Food found in Nutritionix');
-        return nutritionixResult;
+
+        // Ensure the barcode is included in the result
+        const resultWithBarcode = {
+          ...nutritionixResult,
+          barcode: barcode
+        };
+
+        // Cache the result
+        setCacheData(cacheKey, resultWithBarcode);
+        return resultWithBarcode;
       }
 
-      // Fallback to OpenFoodFacts
-      logger.info('Food not found in Nutritionix, trying OpenFoodFacts...');
-      const openFoodFactsResult = await this.fetchFromOpenFoodFacts(barcode);
-      if (openFoodFactsResult) {
-        return openFoodFactsResult;
-      }
-
+      logger.info('No results found for barcode lookup');
       return null;
     } catch (error) {
       logger.error('Error fetching food by barcode:', error);
       return null;
-    }
-  }
-
-  /**
-   * Search food data from OpenFoodFacts API by name
-   * @param {string} query - Search query
-   * @returns {Promise<Array>} Food data array
-   */
-  static async searchOpenFoodFacts(query) {
-    try {
-      // Check cache first
-      const cacheKey = `off:${query}`;
-      const cachedData = getCachedData(cacheKey);
-      if (cachedData) {
-        logger.info(`Cache hit for OpenFoodFacts query: ${query}`);
-        return cachedData;
-      }
-
-      logger.info(`Searching OpenFoodFacts for: ${query}`);
-      console.log(`🔍 Searching OpenFoodFacts for: "${query}"`);
-
-      // Call OpenFoodFacts search API with timeout
-      const requestUrl = `${OPENFOODFACTS_API_URL}/cgi/search.pl`;
-      console.log(`🌐 OpenFoodFacts request URL: ${requestUrl}`);
-
-      const params = {
-        search_terms: query,
-        search_simple: 1,
-        action: 'process',
-        json: 1,
-        page_size: 25,
-        fields: 'code,product_name,brands,nutriments,serving_size,serving_quantity,nutrition_data_per'
-      };
-      console.log('📋 Request params:', params);
-
-      const response = await fetchWithTimeout(
-        requestUrl,
-        { params }
-      );
-
-      console.log(`✅ OpenFoodFacts response status: ${response.status}`);
-      logger.info(`OpenFoodFacts API responded with status: ${response.status}`);
-
-      const data = response.data;
-
-      if (!data) {
-        logger.warn('OpenFoodFacts returned empty data');
-        console.log('⚠️ OpenFoodFacts returned empty data');
-        return [];
-      }
-
-      console.log(`📊 OpenFoodFacts results count: ${data.count || 0}`);
-
-      if (data.products && data.products.length > 0) {
-        const transformedResults = data.products.map(product => {
-          // Get nutrition values, converting to per 100g if needed
-          const getNutrientValue = (keys, defaultValue = 0) => {
-            for (const key of keys) {
-              const value = product.nutriments[key];
-              if (value !== undefined && value !== null) {
-                // If the value is per serving, convert to per 100g
-                if (product.nutrition_data_per === 'serving') {
-                  const servingSize = parseFloat(product.serving_quantity) || 100;
-                  return (parseFloat(value) * 100) / servingSize;
-                }
-                return parseFloat(value);
-              }
-            }
-            return defaultValue;
-          };
-
-          // Try multiple possible field names for each nutrient
-          const calories = getNutrientValue([
-            'energy-kcal_100g',
-            'energy-kcal',
-            'energy_100g',
-            'energy'
-          ]);
-
-          const protein = getNutrientValue([
-            'proteins_100g',
-            'proteins',
-            'protein_100g',
-            'protein'
-          ]);
-
-          const carbs = getNutrientValue([
-            'carbohydrates_100g',
-            'carbohydrates',
-            'carbs_100g',
-            'carbs'
-          ]);
-
-          const fat = getNutrientValue([
-            'fat_100g',
-            'fat',
-            'fats_100g',
-            'fats'
-          ]);
-
-          const result = {
-            name: product.product_name || '',
-            barcode: product.code || null,
-            brand: product.brands || null,
-            calories: calories,
-            protein: protein,
-            carbs: carbs,
-            fat: fat,
-            serving_size: parseFloat(product.serving_quantity || 100),
-            serving_unit: 'g',
-            source: 'openfoodfacts',
-            source_id: product.code
-          };
-
-          logger.debug('Transformed OpenFoodFacts food:', result);
-          return result;
-        });
-
-        // Filter out items without basic nutritional info
-        const validResults = transformedResults.filter(item =>
-          item.name && (item.calories > 0 || item.protein > 0 || item.carbs > 0 || item.fat > 0)
-        );
-
-        logger.info(`Found ${validResults.length} valid foods in OpenFoodFacts for "${query}"`);
-        if (validResults.length > 0) {
-          logger.debug('Sample food item:', validResults[0]);
-        }
-
-        // Cache the transformed data
-        setCacheData(cacheKey, validResults);
-        return validResults;
-      } else {
-        logger.info(`No products found in OpenFoodFacts for query: ${query}`);
-        console.log(`ℹ️ No products found in OpenFoodFacts for query: "${query}"`);
-        return [];
-      }
-    } catch (error) {
-      logger.error(`Error searching OpenFoodFacts: ${error.message}`);
-      console.error(`❌ OpenFoodFacts search error: ${error.message}`);
-
-      // Log detailed error information
-      if (error.response) {
-        // The request was made and the server responded with a non-2xx status
-        logger.error(`OpenFoodFacts returned status ${error.response.status}`);
-        console.error(`   Status: ${error.response.status}`);
-        if (error.response.data) {
-          console.error(`   Response data:`, JSON.stringify(error.response.data).substring(0, 200) + '...');
-        }
-      } else if (error.request) {
-        // The request was made but no response was received
-        logger.error('No response received from OpenFoodFacts API');
-        console.error('   No response received (network issue or timeout)');
-        if (error.code === 'ECONNABORTED') {
-          logger.error('OpenFoodFacts request timed out');
-          console.error('   Request timed out');
-        }
-      }
-
-      // Always return an empty array on error to allow fallback to other sources
-      return [];
     }
   }
 
@@ -613,14 +448,25 @@ class FoodApiService {
               return nutrient ? nutrient.value : 0;
             };
 
+            // Standardize nutrients to the serving size
+            const standardizeNutrient = (value, servingSize = 100) => {
+              return value * (servingSize / 100);
+            };
+
+            const servingSize = food.servingSize || 100;
+            const calories = standardizeNutrient(getNutrientValue(1008), servingSize);
+            const protein = standardizeNutrient(getNutrientValue(1003), servingSize);
+            const carbs = standardizeNutrient(getNutrientValue(1005), servingSize);
+            const fat = standardizeNutrient(getNutrientValue(1004), servingSize);
+
             return {
               name: food.description,
               brand: food.brandOwner || food.brandName || null,
-              calories: Math.round(getNutrientValue(1008) || 0), // Energy (kcal)
-              protein: Number((getNutrientValue(1003) || 0).toFixed(1)), // Protein
-              carbs: Number((getNutrientValue(1005) || 0).toFixed(1)), // Carbohydrates
-              fat: Number((getNutrientValue(1004) || 0).toFixed(1)), // Total lipid (fat)
-              serving_size: food.servingSize || 100,
+              calories: Math.round(calories || 0),
+              protein: Number((protein || 0).toFixed(1)),
+              carbs: Number((carbs || 0).toFixed(1)),
+              fat: Number((fat || 0).toFixed(1)),
+              serving_size: servingSize,
               serving_unit: food.servingSizeUnit?.toLowerCase() || 'g',
               source: 'usda',
               source_id: food.fdcId.toString()
@@ -646,97 +492,6 @@ class FoodApiService {
     } catch (error) {
       logger.error(`Error searching USDA: ${error.message}`);
       return returnArray ? [] : null;
-    }
-  }
-
-  /**
-   * Fetch food data from OpenFoodFacts API by barcode
-   * @param {string} barcode - Barcode
-   * @returns {Promise<Object|null>} Food data or null
-   */
-  static async fetchFromOpenFoodFacts(barcode) {
-    try {
-      logger.info(`Fetching from OpenFoodFacts for barcode: ${barcode}`);
-
-      const response = await fetchWithTimeout(
-        `${OPENFOODFACTS_API_URL}/api/v0/product/${barcode}.json`      );
-      const data = response.data;
-
-      if (data.status === 1 && data.product) {
-        logger.info('Food found in OpenFoodFacts');
-
-        // Get nutrition values, converting to per 100g if needed
-        const getNutrientValue = (keys, defaultValue = 0) => {
-          for (const key of keys) {
-            const value = data.product.nutriments[key];
-            if (value !== undefined && value !== null) {
-              // If the value is per serving, convert to per 100g
-              if (data.product.nutrition_data_per === 'serving') {
-                const servingSize = parseFloat(data.product.serving_quantity) || 100;
-                return (parseFloat(value) * 100) / servingSize;
-              }
-              return parseFloat(value);
-            }
-          }
-          return defaultValue;
-        };
-
-        // Try multiple possible field names for each nutrient
-        const calories = getNutrientValue([
-          'energy-kcal_100g',
-          'energy-kcal',
-          'energy_100g',
-          'energy'
-        ]);
-
-        const protein = getNutrientValue([
-          'proteins_100g',
-          'proteins',
-          'protein_100g',
-          'protein'
-        ]);
-
-        const carbs = getNutrientValue([
-          'carbohydrates_100g',
-          'carbohydrates',
-          'carbs_100g',
-          'carbs'
-        ]);
-
-        const fat = getNutrientValue([
-          'fat_100g',
-          'fat',
-          'fats_100g',
-          'fats'
-        ]);
-
-        // Transform to our format
-        const transformedData = {
-          name: data.product.product_name || '',
-          barcode: data.product.code,
-          brand: data.product.brands || null,
-          calories: calories,
-          protein: protein,
-          carbs: carbs,
-          fat: fat,
-          serving_size: parseFloat(data.product.serving_quantity || 100),
-          serving_unit: 'g',
-          source: 'openfoodfacts',
-          source_id: data.product.code
-        };
-
-        logger.debug('Transformed OpenFoodFacts food by barcode:', transformedData);
-
-        // Cache the result
-        setCacheData(`barcode:${barcode}`, transformedData);
-        return transformedData;
-      }
-
-      logger.info('Food not found in OpenFoodFacts');
-      return null;
-    } catch (error) {
-      logger.error('Error fetching from OpenFoodFacts:', error);
-      return null;
     }
   }
 }

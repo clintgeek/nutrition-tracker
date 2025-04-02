@@ -39,27 +39,27 @@ const debugSearch = asyncHandler(async (req, res) => {
 
     // Run API searches in parallel
     const searches = [
-      FoodApiService.searchOpenFoodFacts(query).catch(error => {
-        logger.error(`OpenFoodFacts search error: ${error.message}`);
-        return [];
-      }),
       nutritionixService.searchByName(query).catch(error => {
         logger.error(`Nutritionix search error: ${error.message}`);
+        return [];
+      }),
+      FoodApiService.searchUSDAByName(query, true).catch(error => {
+        logger.error(`USDA search error: ${error.message}`);
         return [];
       })
     ];
 
     // Wait for all searches to complete
-    const [openFoodResults, nutritionixResults] = await Promise.all(searches);
+    const [nutritionixResults, usdaResults] = await Promise.all(searches);
 
     res.json({
-      openFoodFacts: {
-        count: openFoodResults.length,
-        results: openFoodResults.slice(0, 3)
-      },
       nutritionix: {
         count: nutritionixResults.length,
         results: nutritionixResults.slice(0, 3)
+      },
+      usda: {
+        count: usdaResults.length,
+        results: usdaResults.slice(0, 3)
       }
     });
   } catch (error) {
