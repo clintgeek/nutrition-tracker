@@ -118,8 +118,8 @@ const CACHE_TTL = {
   profile: 12 * 60 * 60 * 1000, // 12 hours
   activities: 30 * 60 * 1000, // 30 minutes
   activity_details: 24 * 60 * 60 * 1000, // 24 hours
-  daily_summary: 15 * 60 * 1000, // 15 minutes (was 2 hours)
-  daily_summaries: 15 * 60 * 1000, // 15 minutes (was 2 hours)
+  daily_summary: 5 * 60 * 1000, // 5 minutes (was 15 minutes)
+  daily_summaries: 5 * 60 * 1000, // 5 minutes (was 15 minutes)
 };
 
 /**

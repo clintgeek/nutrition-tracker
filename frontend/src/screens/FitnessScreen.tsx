@@ -241,12 +241,16 @@ const FitnessScreen: React.FC = () => {
 
   // Navigate to see all activities
   const viewAllActivities = () => {
-    navigation.navigate('GarminActivities' as never);
+    navigation.navigate('Settings', {
+      screen: 'GarminActivities'
+    });
   };
 
   // Navigate to see all daily summaries
   const viewAllSummaries = () => {
-    navigation.navigate('GarminDailySummaries' as never);
+    navigation.navigate('Settings', {
+      screen: 'GarminDailySummaries'
+    });
   };
 
   // Get icon for activity type
@@ -268,30 +272,51 @@ const FitnessScreen: React.FC = () => {
     return iconMap[type.toLowerCase()] || 'run-fast';
   };
 
-  // Render a connection status card
+  // Render connection status section
   const renderConnectionStatus = () => {
-    if (!connectionStatus) {
-      return null;
+    if (loading && !refreshing && !forceRefreshing) {
+      return (
+        <Card style={styles(theme).loadingCard}>
+          <ActivityIndicator animating={true} color={theme.colors.primary} />
+          <Text style={styles(theme).loadingText}>Loading Garmin data...</Text>
+        </Card>
+      );
     }
 
-    if (!connectionStatus.connected) {
+    if (!connectionStatus?.connected) {
       return (
-        <Card style={styles(theme, fitnessColors).connectionCard}>
+        <Card style={styles(theme).notConnectedCard}>
           <Card.Content>
-            <View style={styles(theme, fitnessColors).connectionContent}>
-              <MaterialCommunityIcons name="watch-variant" size={48} color={fitnessColors.primary} />
-              <View style={styles(theme, fitnessColors).connectionTextContainer}>
-                <Title style={{ color: fitnessColors.text }}>Connect Garmin</Title>
-                <Paragraph style={{ color: fitnessColors.placeholder }}>Sync your fitness data from Garmin Connect</Paragraph>
-              </View>
-            </View>
+            <Title style={styles(theme).cardTitle}>Connect Garmin</Title>
+            <Paragraph style={styles(theme).cardText}>
+              Connect your Garmin account to see your activity and health data.
+            </Paragraph>
             <Button
               mode="contained"
               onPress={navigateToSettings}
-              style={styles(theme, fitnessColors).connectButton}
-              color={fitnessColors.primary}
+              style={styles(theme).buttonMargin}
             >
-              Connect
+              Connect Account
+            </Button>
+          </Card.Content>
+        </Card>
+      );
+    }
+
+    if (!connectionStatus.isActive) {
+      return (
+        <Card style={styles(theme).notConnectedCard}>
+          <Card.Content>
+            <Title style={styles(theme).cardTitle}>Reconnect Garmin</Title>
+            <Paragraph style={styles(theme).cardText}>
+              Your Garmin account is not active. Please reconnect to see your data.
+            </Paragraph>
+            <Button
+              mode="contained"
+              onPress={navigateToSettings}
+              style={styles(theme).buttonMargin}
+            >
+              Reconnect Account
             </Button>
           </Card.Content>
         </Card>
@@ -299,62 +324,46 @@ const FitnessScreen: React.FC = () => {
     }
 
     return (
-      <Card style={styles(theme, fitnessColors).connectionCard}>
+      <Card style={styles(theme).statusCard}>
         <Card.Content>
-          <View style={styles(theme, fitnessColors).connectionContent}>
-            <View style={styles(theme, fitnessColors).connectionIconContainer}>
-              <MaterialCommunityIcons name="check-circle" size={24} color="#4CAF50" />
+          <View style={styles(theme).statusHeader}>
+            <View>
+              <Title style={styles(theme).cardTitle}>Garmin Connected</Title>
+              <Paragraph style={styles(theme).lastSyncText}>
+                Last sync: {connectionStatus.lastSyncTime
+                  ? format(new Date(connectionStatus.lastSyncTime), 'MMM d, h:mm a')
+                  : 'Never'}
+              </Paragraph>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles(theme, fitnessColors).connectionText}>Connected to Garmin</Text>
-              {connectionStatus.lastSyncTime && (
-                <Text style={styles(theme, fitnessColors).lastSyncText}>
-                  Last sync: {format(new Date(connectionStatus.lastSyncTime), 'MMM d, h:mm a')}
-                </Text>
-              )}
-              {(syncing || forceRefreshing) && (
-                <Text style={[styles(theme, fitnessColors).lastSyncText, { color: fitnessColors.primary }]}>
-                  <MaterialCommunityIcons name="sync" size={14} color={fitnessColors.primary} />
-                  {forceRefreshing ? 'Force refreshing from Garmin API...' : 'Syncing with Garmin...'}
-                </Text>
-              )}
-            </View>
-            <View style={{ flexDirection: 'column' }}>
+
+            <View style={styles(theme).syncButtonContainer}>
               <Button
                 mode="contained"
-                compact
-                onPress={loadData}
-                style={{ backgroundColor: fitnessColors.primary, marginBottom: 8 }}
                 icon="sync"
-                loading={syncing && !forceRefreshing}
-                disabled={syncing || forceRefreshing}
+                loading={syncing}
+                onPress={() => loadData(true)}
+                style={styles(theme).syncNowButton}
               >
-                Sync
+                Sync Now
               </Button>
-              <View style={{ flexDirection: 'row' }}>
-                <Button
-                  mode="outlined"
-                  compact
-                  onPress={onForceRefresh}
-                  style={{ borderColor: fitnessColors.primary, marginRight: 4, flex: 1 }}
-                  icon="refresh"
-                  loading={forceRefreshing}
-                  disabled={syncing || forceRefreshing}
-                >
-                  Force
-                </Button>
-                <Button
-                  mode="outlined"
-                  compact
-                  onPress={debugGarminIntegration}
-                  style={{ borderColor: fitnessColors.lightBlue, flex: 1 }}
-                  icon="bug"
-                  disabled={syncing || forceRefreshing}
-                >
-                  Debug
-                </Button>
-              </View>
             </View>
+          </View>
+
+          <View style={styles(theme).buttonsRow}>
+            <Button
+              mode="outlined"
+              onPress={viewAllActivities}
+              style={[styles(theme).smallButton, styles(theme).buttonMargin]}
+            >
+              All Activities
+            </Button>
+            <Button
+              mode="outlined"
+              onPress={viewAllSummaries}
+              style={styles(theme).smallButton}
+            >
+              All Summaries
+            </Button>
           </View>
         </Card.Content>
       </Card>
@@ -900,6 +909,74 @@ const styles = (theme: any, colors?: any) => StyleSheet.create({
   legendText: {
     fontSize: 12,
     color: colors?.text || theme.colors.text,
+  },
+  statusCard: {
+    marginBottom: 16,
+    backgroundColor: colors?.surface || theme.colors.surface,
+    borderRadius: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: colors?.borderColor || 'transparent',
+  },
+  statusHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  syncButtonContainer: {
+    alignItems: 'flex-end',
+  },
+  syncNowButton: {
+    backgroundColor: theme.colors.primary,
+  },
+  buttonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  smallButton: {
+    flex: 1,
+  },
+  buttonMargin: {
+    marginHorizontal: 4,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors?.text || theme.colors.text,
+  },
+  cardText: {
+    fontSize: 14,
+    color: colors?.placeholder || theme.colors.placeholder,
+  },
+  loadingCard: {
+    marginBottom: 16,
+    backgroundColor: colors?.surface || theme.colors.surface,
+    borderRadius: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: colors?.borderColor || 'transparent',
+  },
+  notConnectedCard: {
+    marginBottom: 16,
+    backgroundColor: colors?.surface || theme.colors.surface,
+    borderRadius: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: colors?.borderColor || 'transparent',
   },
 });
 
