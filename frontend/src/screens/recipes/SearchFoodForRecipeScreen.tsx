@@ -160,25 +160,13 @@ export function SearchFoodForRecipeScreen() {
     }
   }, []);
 
-  // Add a focus listener to refresh the list when the screen becomes active
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      console.log('SearchFoodForRecipeScreen focused - refreshing foods list');
-      fetchFoods(searchQuery);
-    });
-
-    return unsubscribe;
-  }, [navigation, fetchFoods, searchQuery]);
-
-  // Initial load
-  useEffect(() => {
-    fetchFoods();
-  }, [fetchFoods]);
-
-  // Create a memoized debounced search function
+  // Create a memoized debounced search function with proper check for minimum length
   const debouncedSearch = useMemo(
     () => debounce((query: string) => {
-      fetchFoods(query);
+      if (query.length >= 2) {
+        console.log(`Debounced search triggered for: ${query}`);
+        fetchFoods(query);
+      }
     }, 1000),
     [fetchFoods]
   );
@@ -186,7 +174,14 @@ export function SearchFoodForRecipeScreen() {
   // Handle search query change
   const handleSearchQueryChange = (query: string) => {
     setSearchQuery(query);
-    debouncedSearch(query);
+
+    // Only trigger search if query is long enough
+    if (query.length >= 2) {
+      debouncedSearch(query);
+    } else if (query.length === 0) {
+      // If query is cleared, show custom foods immediately
+      fetchFoods('');
+    }
   };
 
   // Handle selecting a food item
@@ -394,6 +389,25 @@ export function SearchFoodForRecipeScreen() {
       </TouchableOpacity>
     );
   };
+
+  // Add a focus listener to refresh the list when the screen becomes active
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('SearchFoodForRecipeScreen focused');
+      // Only refresh if we have a stable query (empty or at least 3 chars)
+      if (!searchQuery || searchQuery.length >= 3) {
+        console.log('Refreshing foods list on focus');
+        fetchFoods(searchQuery);
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, fetchFoods]); // Remove searchQuery dependency
+
+  // Initial load
+  useEffect(() => {
+    fetchFoods();
+  }, [fetchFoods]);
 
   return (
     <View style={styles.container}>

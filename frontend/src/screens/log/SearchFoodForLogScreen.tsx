@@ -162,15 +162,23 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
   // Refresh data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      console.log('SearchFoodForLog screen focused, refreshing food list');
-      fetchFoods(searchQuery);
-    }, [fetchFoods, searchQuery])
+      console.log('SearchFoodForLog screen focused');
+      // Only refresh the list on focus, not when search changes
+      // And only refresh if we have a stable query (empty or at least 3 chars)
+      if (!searchQuery || searchQuery.length >= 3) {
+        console.log('Refreshing foods list on focus');
+        fetchFoods(searchQuery);
+      }
+    }, [fetchFoods]) // Remove searchQuery dependency
   );
 
-  // Create a memoized debounced search function
+  // Create a memoized debounced search function with proper check for minimum length
   const debouncedSearch = useMemo(
     () => debounce((query: string) => {
-      fetchFoods(query);
+      if (query.length >= 2) {
+        console.log(`Debounced search triggered for: ${query}`);
+        fetchFoods(query);
+      }
     }, 1000),
     [fetchFoods]
   );
@@ -178,7 +186,14 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
   // Handle search query change
   const handleSearchQueryChange = (query: string) => {
     setSearchQuery(query);
-    debouncedSearch(query);
+
+    // Only trigger search if query is long enough
+    if (query.length >= 2) {
+      debouncedSearch(query);
+    } else if (query.length === 0) {
+      // If query is cleared, show custom foods immediately
+      fetchFoods('');
+    }
   };
 
   // Handle refresh

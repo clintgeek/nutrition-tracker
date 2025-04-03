@@ -1,6 +1,7 @@
 const axios = require('axios');
 const logger = require('./logger');
 const nutritionixService = require('./nutritionixService');
+const spoonacularService = require('./spoonacularService');
 
 // Keep only USDA API URL and remove OpenFoodFacts URLs
 const USDA_API_URL = 'https://api.nal.usda.gov/fdc/v1';
@@ -9,8 +10,13 @@ const USDA_API_URL = 'https://api.nal.usda.gov/fdc/v1';
 console.log('Environment variables:', {
   USDA_API_KEY: process.env.USDA_API_KEY ? 'Present' : 'Missing',
   NUTRITIONIX_APP_ID: process.env.NUTRITIONIX_APP_ID ? 'Present' : 'Missing',
-  NUTRITIONIX_API_KEY: process.env.NUTRITIONIX_API_KEY ? 'Present' : 'Missing'
+  NUTRITIONIX_API_KEY: process.env.NUTRITIONIX_API_KEY ? 'Present' : 'Missing',
+  SPOONACULAR_API_KEY: process.env.SPOONACULAR_API_KEY ? 'Present' : 'Missing'
 });
+
+// Additional debug logging for Spoonacular API key
+console.log('Spoonacular API Key first 10 chars:', process.env.SPOONACULAR_API_KEY ?
+  process.env.SPOONACULAR_API_KEY.substring(0, 10) + '...' : 'Missing');
 
 const API_TIMEOUT = 10000; // 10 seconds
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
@@ -206,7 +212,7 @@ class FoodApiService {
     let score = 0;
 
     // Source quality score (base points)
-    const sourceScores = { nutritionix: 20, usda: 20 };
+    const sourceScores = { nutritionix: 20, usda: 20, spoonacular: 20 };
     score += sourceScores[food.source] || 0;
 
     // Name matching score
@@ -317,20 +323,28 @@ class FoodApiService {
         return [];
       });
 
+      const spoonacularPromise = spoonacularService.searchByName(query).catch(error => {
+        logger.error('Spoonacular search error:', error.message);
+        return [];
+      });
+
       // Wait for all searches to complete
       const nutritionixResults = await nutritionixPromise;
       const usdaResults = await usdaPromise;
+      const spoonacularResults = await spoonacularPromise;
 
       // Combine all results
       const allResults = [
         ...nutritionixResults,
-        ...usdaResults
+        ...usdaResults,
+        ...spoonacularResults
       ];
 
       // Log results from each source
       logger.info('Search results from each source:', {
         nutritionix: nutritionixResults.length,
         usda: usdaResults.length,
+        spoonacular: spoonacularResults.length,
         total: allResults.length
       });
 
@@ -376,6 +390,22 @@ class FoodApiService {
         // Ensure the barcode is included in the result
         const resultWithBarcode = {
           ...nutritionixResult,
+          barcode: barcode
+        };
+
+        // Cache the result
+        setCacheData(cacheKey, resultWithBarcode);
+        return resultWithBarcode;
+      }
+
+      // Try Spoonacular if Nutritionix fails
+      const spoonacularResult = await spoonacularService.searchByUPC(barcode);
+      if (spoonacularResult) {
+        logger.info('Food found in Spoonacular');
+
+        // Ensure the barcode is included in the result
+        const resultWithBarcode = {
+          ...spoonacularResult,
           barcode: barcode
         };
 

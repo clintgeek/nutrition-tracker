@@ -2,6 +2,7 @@ const { validationResult } = require('express-validator');
 const FoodItem = require('../models/FoodItem');
 const FoodApiService = require('../utils/foodApiService');
 const nutritionixService = require('../utils/nutritionixService');
+const spoonacularService = require('../utils/spoonacularService');
 const logger = require('../config/logger');
 const { asyncHandler } = require('../middleware/errorHandler');
 const db = require('../config/db');
@@ -46,11 +47,15 @@ const debugSearch = asyncHandler(async (req, res) => {
       FoodApiService.searchUSDAByName(query, true).catch(error => {
         logger.error(`USDA search error: ${error.message}`);
         return [];
+      }),
+      spoonacularService.searchByName(query).catch(error => {
+        logger.error(`Spoonacular search error: ${error.message}`);
+        return [];
       })
     ];
 
     // Wait for all searches to complete
-    const [nutritionixResults, usdaResults] = await Promise.all(searches);
+    const [nutritionixResults, usdaResults, spoonacularResults] = await Promise.all(searches);
 
     res.json({
       nutritionix: {
@@ -60,6 +65,10 @@ const debugSearch = asyncHandler(async (req, res) => {
       usda: {
         count: usdaResults.length,
         results: usdaResults.slice(0, 3)
+      },
+      spoonacular: {
+        count: spoonacularResults.length,
+        results: spoonacularResults.slice(0, 3)
       }
     });
   } catch (error) {
