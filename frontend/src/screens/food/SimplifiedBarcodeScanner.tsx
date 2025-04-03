@@ -185,9 +185,39 @@ export default function SimplifiedBarcodeScanner() {
       setIsLoading(true);
       const food = await foodService.getFoodByBarcode(code);
 
+      // Get route params from the navigation
+      const navigationState = navigation.getState();
+      const routes = navigationState.routes;
+      const currentRoute = routes[routes.length - 1];
+      const { mealType, date, fromLog } = currentRoute.params || {};
+
       // Navigate back to food screen with the scanned food
       stopScanner();
-      navigation.navigate('Food', { screen: 'FoodList', params: { scannedFood: food } });
+
+      // Navigate differently based on where we came from
+      if (fromLog) {
+        // If coming from the log screen, preserve that context
+        console.log(`Navigation from log - params: mealType=${mealType}, date=${date}, fromLog=${fromLog}`);
+
+        navigation.navigate('Food', {
+          screen: 'FoodScreen',
+          params: {
+            scannedFood: food,
+            mealType,
+            date,
+            fromLog: true
+          }
+        });
+      } else {
+        // Regular navigation to Food screen
+        console.log(`Regular navigation to Food screen with scanned food`);
+        navigation.navigate('Food', {
+          screen: 'FoodScreen',
+          params: {
+            scannedFood: food
+          }
+        });
+      }
     } catch (error) {
       console.error('Error processing barcode:', error);
       setScanned(false);
@@ -229,9 +259,39 @@ export default function SimplifiedBarcodeScanner() {
       // Look up the food by barcode
       const food = await foodService.getFoodByBarcode(manualBarcode);
 
+      // Get route params from the navigation
+      const navigationState = navigation.getState();
+      const routes = navigationState.routes;
+      const currentRoute = routes[routes.length - 1];
+      const { mealType, date, fromLog } = currentRoute.params || {};
+
       // Navigate back to food screen with the scanned food
       stopScanner();
-      navigation.navigate('Food', { screen: 'FoodList', params: { scannedFood: food } });
+
+      // Navigate differently based on where we came from
+      if (fromLog) {
+        // If coming from the log screen, preserve that context
+        console.log(`Manual barcode - Navigation from log - params: mealType=${mealType}, date=${date}, fromLog=${fromLog}`);
+
+        navigation.navigate('Food', {
+          screen: 'FoodScreen',
+          params: {
+            scannedFood: food,
+            mealType,
+            date,
+            fromLog: true
+          }
+        });
+      } else {
+        // Regular navigation to Food screen
+        console.log(`Manual barcode - Regular navigation to Food screen with scanned food`);
+        navigation.navigate('Food', {
+          screen: 'FoodScreen',
+          params: {
+            scannedFood: food
+          }
+        });
+      }
     } catch (error) {
       console.error('Error looking up barcode:', error);
       let errorMessage = 'Could not find food with this barcode. Please try again or add the food manually.';
@@ -286,6 +346,22 @@ export default function SimplifiedBarcodeScanner() {
       </View>
     );
   };
+
+  useEffect(() => {
+    // Log navigation state for debugging
+    const navigationState = navigation.getState();
+    const routes = navigationState.routes;
+    const currentRoute = routes[routes.length - 1];
+
+    console.log("SimplifiedBarcodeScanner - Navigation State:",
+      JSON.stringify({
+        currentScreen: currentRoute.name,
+        params: currentRoute.params || {},
+        routesCount: routes.length,
+        parentNavigator: navigation.getParent()?.getId() || 'none'
+      }, null, 2)
+    );
+  }, []);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

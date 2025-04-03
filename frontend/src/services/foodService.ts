@@ -201,11 +201,20 @@ function transformFood(data: any): Food {
   const nutrition = mapNutritionData(data);
   const brand = extractBrand(data);
 
+  // Extract barcode and ensure it's properly formatted
+  const rawBarcode = data.barcode || data.code || data.upc;
+  // Convert to string and trim if not null/undefined, otherwise undefined
+  const barcode = rawBarcode !== null && rawBarcode !== undefined
+    ? rawBarcode.toString().trim()
+    : undefined;
+
+  console.log(`transformFood: Processing barcode data: ${barcode}`);
+
   return {
     id: typeof data.id === 'string' ? parseInt(data.id, 10) : data.id,
     name: data.name || data.product_name || data.food_name || '',
-    barcode: data.barcode || data.code || data.upc || null,
-    brand,
+    barcode,
+    brand: brand || undefined,
     calories: nutrition.calories,
     protein: nutrition.protein,
     carbs: nutrition.carbs,
@@ -214,10 +223,7 @@ function transformFood(data: any): Food {
     serving_unit: nutrition.serving_unit,
     source: data.source === 'usda' || data.source === 'recipe' ? data.source : 'custom',
     source_id: data.sourceId || data.source_id || data.code || `api-${data.id}`,
-    is_custom: data.source !== 'usda' && data.source !== 'recipe',
-    created_at: data.created_at,
-    updated_at: data.updated_at,
-    is_deleted: data.is_deleted || false
+    user_created: data.user_created || false,
   };
 }
 
@@ -225,6 +231,68 @@ function transformFood(data: any): Food {
 export const foodService = {
   // Search for foods
   async searchFood(query: string, page = 1, limit = 20): Promise<SearchResponse> {
+    console.log(`searchFood: Running query: ${query}`);
+
+    // Special handling for barcode searches
+    if (query.startsWith('barcode:')) {
+      const barcode = query.replace('barcode:', '').trim();
+      console.log(`searchFood: Detected barcode search for: ${barcode}`);
+
+      try {
+        // First try direct barcode endpoint
+        console.log(`searchFood: Trying direct barcode API endpoint for: ${barcode}`);
+        try {
+          const barcodeResponse = await apiService.get<{ food: any, source: string }>(`/foods/barcode/${barcode}`);
+          if (barcodeResponse && barcodeResponse.food) {
+            console.log(`searchFood: Found exact barcode match via API: ${barcodeResponse.food.name}`);
+            const food = transformFood(barcodeResponse.food);
+            return {
+              foods: [food],
+              total: 1,
+              page: 1,
+              limit: limit
+            };
+          }
+        } catch (err) {
+          console.warn('Direct barcode API lookup failed:', err);
+          // Continue to next method
+        }
+
+        // If direct lookup fails, try to get custom foods and filter by barcode
+        console.log(`searchFood: Trying to find barcode in custom foods`);
+        const customFoods = await this.getCustomFoods(true); // Include all users' foods
+        console.log(`searchFood: Got ${customFoods.length} custom foods to filter by barcode`);
+
+        // Check for exact barcode matches
+        const exactMatches = customFoods.filter(f => {
+          if (!f.barcode || !barcode) return false;
+
+          const foodBarcode = f.barcode.toString().trim();
+          const searchBarcode = barcode.toString().trim();
+
+          console.log(`searchFood: Comparing barcodes: "${foodBarcode}" vs "${searchBarcode}"`);
+          return foodBarcode === searchBarcode;
+        });
+
+        if (exactMatches.length > 0) {
+          console.log(`searchFood: Found ${exactMatches.length} exact barcode matches in custom foods`);
+          return {
+            foods: exactMatches,
+            total: exactMatches.length,
+            page: 1,
+            limit: limit
+          };
+        } else {
+          console.log(`searchFood: No exact barcode matches found in custom foods`);
+        }
+      } catch (err) {
+        console.error('Error in barcode search process:', err);
+        // Continue with regular search
+      }
+    }
+
+    // Regular search via API
+    console.log(`searchFood: Performing regular API search for: ${query}`);
     const response = await apiService.get<SearchResponse>('/foods/search', {
       params: {
         query,
@@ -237,26 +305,7 @@ export const foodService = {
 
     if (response.foods) {
       // Map API response to ensure correct data structure
-      const mappedFoods = response.foods.map((food: any) => {
-        const nutrition = mapNutritionData(food);
-        const brand = extractBrand(food);
-
-        return {
-          id: typeof food.id === 'string' ? parseInt(food.id, 10) : food.id,
-          name: food.name || food.product_name || food.food_name || '',
-          barcode: food.barcode || food.code || food.upc || null,
-          brand,
-          calories: nutrition.calories,
-          protein: nutrition.protein,
-          carbs: nutrition.carbs,
-          fat: nutrition.fat,
-          serving_size: nutrition.serving_size,
-          serving_unit: nutrition.serving_unit,
-          source: food.source === 'usda' || food.source === 'recipe' ? food.source : 'custom',
-          source_id: food.sourceId || food.source_id || food.code || `api-${food.id}`,
-          is_custom: food.source !== 'usda' && food.source !== 'recipe',
-        };
-      });
+      const mappedFoods = response.foods.map((food: any) => transformFood(food));
 
       return {
         ...response,
@@ -364,8 +413,12 @@ export const foodService = {
   },
 
   // Get custom foods
-  async getCustomFoods(): Promise<Food[]> {
-    const response = await apiService.get<CustomFoodsResponse>('/foods/custom');
+  async getCustomFoods(includeAllUsers: boolean = false): Promise<Food[]> {
+    const response = await apiService.get<CustomFoodsResponse>('/foods/custom', {
+      params: {
+        all: includeAllUsers ? 'true' : 'false'
+      }
+    });
     return response.foods.map(food => this.mapFoodItemToFood(food));
   },
 
@@ -424,25 +477,65 @@ export const foodService = {
     }
   },
 
-  // Map food item from database to frontend format
-  mapFoodItemToFood(item: FoodItem): Food {
+  // Helper to map food item to consistent Food type
+  mapFoodItemToFood(item: any): Food {
     return {
-      id: typeof item.id === 'string' ? parseInt(item.id, 10) : item.id,
+      id: item.id,
       name: item.name,
       brand: item.brand || undefined,
       barcode: item.barcode || undefined,
-      calories: item.calories || item.calories_per_serving || 0,
-      protein: item.protein || item.protein_grams || 0,
-      carbs: item.carbs || item.carbs_grams || 0,
-      fat: item.fat || item.fat_grams || 0,
+      calories: item.calories || 0,
+      protein: item.protein || 0,
+      carbs: item.carbs || 0,
+      fat: item.fat || 0,
       serving_size: item.serving_size || 100,
-      serving_unit: item.serving_unit || '',
-      source: item.source === 'usda' || item.source === 'recipe' ? item.source : 'custom',
-      source_id: item.source_id,
-      is_custom: item.source !== 'usda' && item.source !== 'recipe',
-      is_deleted: item.is_deleted || false,
-      created_at: item.created_at,
-      updated_at: item.updated_at
+      serving_unit: item.serving_unit || 'g',
+      source: item.source || 'custom',
+      source_id: item.source_id || '',
+      user_created: item.user_created || item.is_custom || false,
     };
+  },
+
+  // Check if a food exists by barcode or name
+  async checkFoodExists(params: { barcode?: string, name?: string }): Promise<{
+    exists: boolean,
+    food?: Food,
+    similarFoods?: Food[]
+  }> {
+    try {
+      console.log(`Checking if food exists with params:`, params);
+
+      const response = await apiService.get<{
+        exists: boolean;
+        food?: any;
+        similarFoods?: any[];
+      }>('/foods/exists', {
+        params
+      });
+
+      console.log(`Food exists check response:`, response);
+
+      // If a food was found, transform it to the proper format
+      if (response.exists && response.food) {
+        return {
+          exists: true,
+          food: transformFood(response.food)
+        };
+      }
+
+      // If similar foods were found, transform them
+      if (response.similarFoods && Array.isArray(response.similarFoods)) {
+        return {
+          exists: false,
+          similarFoods: response.similarFoods.map(food => transformFood(food))
+        };
+      }
+
+      // No matches
+      return { exists: false };
+    } catch (error: any) {
+      console.error('Error checking if food exists:', error);
+      return { exists: false };
+    }
   },
 };

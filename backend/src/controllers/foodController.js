@@ -179,19 +179,116 @@ const createCustomFood = asyncHandler(async (req, res) => {
     brand
   } = req.body;
 
+  // Check for existing food with same name or barcode
+  let existingFood = null;
+
+  // First check by barcode if provided
+  if (barcode) {
+    logger.debug(`Checking for existing food with barcode: ${barcode}`);
+    try {
+      existingFood = await FoodItem.findByBarcode(barcode);
+      if (existingFood) {
+        logger.info(`Found existing food with barcode ${barcode}: ${existingFood.name} (ID: ${existingFood.id})`);
+      }
+    } catch (error) {
+      logger.error(`Error checking food by barcode: ${error.message}`);
+      // Continue with the creation process even if barcode check fails
+    }
+  }
+
+  // If no existing food found by barcode, check by name similarity
+  if (!existingFood && name) {
+    logger.debug(`Checking for existing food with similar name: ${name}`);
+    try {
+      // Find foods with similar name (case insensitive)
+      const similarNameFoods = await FoodItem.findByPartialName(name);
+
+      if (similarNameFoods && similarNameFoods.length > 0) {
+        // Find exact name match first (case insensitive)
+        existingFood = similarNameFoods.find(food =>
+          food.name.toLowerCase() === name.toLowerCase() &&
+          food.user_id === req.user.id
+        );
+
+        if (existingFood) {
+          logger.info(`Found existing food with exact name match: ${existingFood.name} (ID: ${existingFood.id})`);
+        } else {
+          // Log similar foods for debugging
+          logger.debug(`Found ${similarNameFoods.length} foods with similar names but no exact match`);
+        }
+      }
+    } catch (error) {
+      logger.error(`Error checking food by name: ${error.message}`);
+      // Continue with the creation process even if name check fails
+    }
+  }
+
+  // If we found an existing food, return it instead of creating a new one
+  if (existingFood) {
+    logger.info(`Returning existing food instead of creating duplicate: ${existingFood.id}`);
+
+    // Update the existing food with any new information
+    const updatedData = {
+      calories_per_serving: calories !== undefined ? calories : existingFood.calories_per_serving,
+      protein_grams: protein !== undefined ? protein : existingFood.protein_grams,
+      carbs_grams: carbs !== undefined ? carbs : existingFood.carbs_grams,
+      fat_grams: fat !== undefined ? fat : existingFood.fat_grams,
+      serving_size: serving_size || existingFood.serving_size,
+      serving_unit: serving_unit || existingFood.serving_unit,
+      barcode: barcode || existingFood.barcode,
+      brand: brand || existingFood.brand
+    };
+
+    try {
+      // Only update if this is the user's own food
+      let updatedFood;
+      if (existingFood.user_id === req.user.id) {
+        updatedFood = await FoodItem.update(existingFood.id, updatedData, req.user.id);
+      } else if (existingFood.source === 'custom') {
+        // Use the new method for updating any custom food
+        updatedFood = await FoodItem.updateAnyCustomFood(existingFood.id, updatedData, req.user.id);
+      }
+
+      if (updatedFood) {
+        // Invalidate caches after updating food
+        await invalidateFoodCaches();
+
+        return res.status(200).json({
+          message: 'Using existing food item with updated information',
+          food: updatedFood,
+          existing: true
+        });
+      }
+    } catch (updateError) {
+      logger.error(`Error updating existing food: ${updateError.message}`);
+      // If update fails, we'll still return the existing food without changes
+    }
+
+    return res.status(200).json({
+      message: 'Using existing food item',
+      food: existingFood,
+      existing: true
+    });
+  }
+
+  // Generate a truly unique source_id
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 10);
+  const uniqueSourceId = `custom-${req.user.id}-${timestamp}-${randomStr}`;
+
   // Create food item
   const foodItem = await FoodItem.create({
     name,
     barcode,
     brand,
-    calories,
-    protein,
-    carbs,
-    fat,
+    calories_per_serving: calories,
+    protein_grams: protein,
+    carbs_grams: carbs,
+    fat_grams: fat,
     serving_size,
     serving_unit,
     source: 'custom',
-    source_id: `custom-${req.user.id}-${Date.now()}`,
+    source_id: uniqueSourceId,
     user_id: req.user.id,
   });
 
@@ -231,12 +328,22 @@ const updateCustomFood = asyncHandler(async (req, res) => {
         return res.status(404).json({ message: 'Food item not found' });
       }
 
-      if (food.user_id !== userId) {
-        return res.status(403).json({ message: 'Not authorized to update this food item' });
-      }
-
+      // If the user owns the food item or the item is not custom, use the regular update
+      // Otherwise, use the new method to update any custom food
       try {
-        const updatedFood = await FoodItem.update(id, { is_deleted: isDeleted }, userId);
+        let updatedFood;
+
+        if (food.user_id === userId) {
+          // User owns this food item, use regular update
+          updatedFood = await FoodItem.update(id, { is_deleted: isDeleted }, userId);
+        } else if (food.source === 'custom') {
+          // User doesn't own this food, but it's a custom food so allow update
+          updatedFood = await FoodItem.updateAnyCustomFood(id, { is_deleted: isDeleted }, userId);
+        } else {
+          // Not a custom food and user doesn't own it
+          return res.status(403).json({ message: 'Not authorized to update this food item' });
+        }
+
         if (!updatedFood) {
           return res.status(404).json({ message: 'Food item not found or update failed' });
         }
@@ -260,11 +367,21 @@ const updateCustomFood = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: 'Food item not found' });
     }
 
-    if (food.user_id !== userId) {
+    // Changed: Allow any user to update any custom food
+    let updatedFood;
+
+    if (food.user_id === userId) {
+      // User owns this food item, use regular update
+      updatedFood = await FoodItem.update(id, req.body, userId);
+    } else if (food.source === 'custom') {
+      // User doesn't own this food, but it's a custom food so allow update
+      logger.info(`User ${userId} is updating custom food ${id} owned by user ${food.user_id}`);
+      updatedFood = await FoodItem.updateAnyCustomFood(id, req.body, userId);
+    } else {
+      // Not a custom food and user doesn't own it
       return res.status(403).json({ message: 'Not authorized to update this food item' });
     }
 
-    const updatedFood = await FoodItem.update(id, req.body, userId);
     if (!updatedFood) {
       return res.status(404).json({ message: 'Food item not found or update failed' });
     }
@@ -317,11 +434,8 @@ const deleteCustomFood = asyncHandler(async (req, res) => {
       return res.status(403).json({ message: 'Only custom food items can be deleted' });
     }
 
-    // Check if the food item belongs to the user
-    if (foodItem.user_id !== userId) {
-      logger.debug(`User ${userId} not authorized to delete food item ${id} (owner: ${foodItem.user_id})`);
-      return res.status(403).json({ message: 'Not authorized to delete this food item' });
-    }
+    // Changed: Allow any user to delete any custom food
+    // No longer checking if the food item belongs to the user
 
     // Check if the food item has any associated logs
     const hasLogs = await FoodItem.hasAssociatedLogs(id);
@@ -336,7 +450,16 @@ const deleteCustomFood = asyncHandler(async (req, res) => {
 
     // Delete food item
     logger.debug(`Attempting to delete food item ${id}`);
-    const success = await FoodItem.delete(id, userId);
+    let success;
+
+    if (foodItem.user_id === userId) {
+      // User owns this food item, use regular delete
+      success = await FoodItem.delete(id, userId);
+    } else {
+      // User doesn't own this food, but allow deletion of custom foods
+      logger.info(`User ${userId} is deleting custom food ${id} owned by user ${foodItem.user_id}`);
+      success = await FoodItem.deleteAnyCustomFood(id, userId);
+    }
 
     if (!success) {
       logger.debug(`Failed to delete food item ${id}`);
@@ -375,13 +498,25 @@ const getCustomFoods = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 20;
   const offset = (page - 1) * limit;
+  const includeAllUsers = req.query.all === 'true';
 
-  const customFoods = await FoodItem.getCustomFoods(req.user.id, limit, offset);
+  let customFoods;
+
+  if (includeAllUsers) {
+    // Get custom foods from all users
+    logger.debug(`Getting all users' custom foods - Page: ${page}, Limit: ${limit}`);
+    customFoods = await FoodItem.getAllCustomFoods(limit, offset);
+  } else {
+    // Get only the current user's custom foods
+    logger.debug(`Getting user ${req.user.id}'s custom foods - Page: ${page}, Limit: ${limit}`);
+    customFoods = await FoodItem.getCustomFoods(req.user.id, limit, offset);
+  }
 
   res.json({
     foods: customFoods,
     page,
     limit,
+    all_users: includeAllUsers
   });
 });
 

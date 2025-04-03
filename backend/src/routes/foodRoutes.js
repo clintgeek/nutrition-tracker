@@ -14,6 +14,7 @@ const {
 } = require('../controllers/foodController');
 const { authenticate } = require('../middleware/auth');
 const cacheMiddleware = require('../middleware/cacheMiddleware');
+const FoodItem = require('../models/FoodItem');
 
 const router = express.Router();
 
@@ -137,5 +138,63 @@ router.get('/custom', getCustomFoods);
  * @access Private
  */
 router.get('/recipes', getRecipeFoods);
+
+/**
+ * @route GET /api/foods/exists
+ * @desc Check if a food exists by barcode or name
+ * @access Private
+ */
+router.get('/exists', authenticate, async (req, res) => {
+  try {
+    const { barcode, name } = req.query;
+
+    logger.info(`Checking if food exists - barcode: ${barcode}, name: ${name}`);
+
+    if (!barcode && !name) {
+      return res.status(400).json({ message: 'Either barcode or name must be provided' });
+    }
+
+    let existingFood = null;
+
+    // First check by barcode if provided
+    if (barcode) {
+      existingFood = await FoodItem.findByBarcode(barcode);
+      if (existingFood) {
+        logger.info(`Found existing food by barcode: ${existingFood.id}`);
+        return res.json({ exists: true, food: existingFood });
+      }
+    }
+
+    // Then check by name if provided
+    if (name && !existingFood) {
+      const similarFoods = await FoodItem.findByPartialName(name);
+      const exactMatch = similarFoods.find(food =>
+        food.name.toLowerCase().trim() === name.toLowerCase().trim()
+      );
+
+      if (exactMatch) {
+        logger.info(`Found existing food by exact name: ${exactMatch.id}`);
+        existingFood = exactMatch;
+        return res.json({ exists: true, food: existingFood });
+      }
+
+      // Return similar foods for reference
+      if (similarFoods.length > 0) {
+        logger.info(`Found ${similarFoods.length} similar foods by name`);
+        return res.json({
+          exists: false,
+          similarFoods: similarFoods.slice(0, 5) // Return up to 5 similar foods
+        });
+      }
+    }
+
+    // No matching food found
+    logger.info('No matching food found');
+    return res.json({ exists: false });
+  } catch (error) {
+    logger.error('Error checking if food exists:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
 
 module.exports = router;

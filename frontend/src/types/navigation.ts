@@ -38,6 +38,13 @@ export type FoodStackParamList = {
     mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack';
     servings?: number;
   };
+  FoodScreen: {
+    scannedFood?: Food;
+    addToLog?: boolean;
+    logDate?: string;
+    mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+    servings?: number;
+  };
   FoodDetails: { foodId: string };
   AddFood: undefined;
   FoodSearch: {

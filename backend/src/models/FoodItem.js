@@ -136,19 +136,32 @@ class FoodItem {
 
   /**
    * Find food item by barcode
-   * @param {string} barcode - Barcode
-   * @returns {Promise<Object|null>} Food item or null
+   * @param {string} barcode - Food item barcode
+   * @returns {Promise<Object|null>} Found food item or null
    */
   static async findByBarcode(barcode) {
     try {
+      if (!barcode) return null;
+
+      const normalizedBarcode = barcode.toString().trim();
+      logger.debug(`Searching for food with barcode: ${normalizedBarcode}`);
+
       const result = await db.query(
-        'SELECT * FROM food_items WHERE barcode = $1 AND is_deleted = FALSE',
-        [barcode]
+        `SELECT * FROM food_items
+         WHERE barcode = $1 AND is_deleted = FALSE
+         ORDER BY user_created DESC LIMIT 1`,
+        [normalizedBarcode]
       );
 
+      if (result.rows.length === 0) {
+        logger.debug(`No food found with barcode: ${normalizedBarcode}`);
+        return null;
+      }
+
+      logger.debug(`Found food with barcode ${normalizedBarcode}: ${result.rows[0].name}`);
       return this.transformToFrontend(result.rows[0]);
     } catch (error) {
-      logger.error(`Error finding food item by barcode: ${error.message}`);
+      logger.error(`Error finding food by barcode: ${error.message}`);
       throw error;
     }
   }
@@ -277,6 +290,81 @@ class FoodItem {
   }
 
   /**
+   * Update any custom food item regardless of owner
+   * @param {number} id - Food item ID
+   * @param {Object} foodData - Food item data
+   * @param {number} userId - User ID making the update (for audit purposes)
+   * @returns {Promise<Object|null>} Updated food item or null
+   */
+  static async updateAnyCustomFood(id, foodData, userId) {
+    try {
+      // Check if this is a soft delete request
+      if (foodData.hasOwnProperty('is_deleted') && Object.keys(foodData).length === 1) {
+        // Ensure is_deleted is a boolean
+        const isDeleted = foodData.is_deleted === true || foodData.is_deleted === 'true';
+        logger.debug(`Soft delete request for any custom food - ID: ${id}, RequestUserID: ${userId}, Value: ${isDeleted}`);
+
+        const result = await db.query(
+          'UPDATE food_items SET is_deleted = $1, updated_at = NOW() WHERE id = $2 AND source = \'custom\' RETURNING *',
+          [isDeleted, id]
+        );
+
+        if (!result.rows[0]) {
+          logger.debug(`No rows updated for ID: ${id}`);
+          return null;
+        }
+
+        logger.debug(`Successfully updated food item: ${JSON.stringify(result.rows[0])}`);
+        return this.transformToFrontend(result.rows[0]);
+      }
+
+      // Regular update - transform the data first
+      const dbData = this.transformToDatabase(foodData);
+
+      // Log the transformed data for debugging
+      logger.debug('Update data after transformation:', dbData);
+
+      const setClause = Object.keys(dbData)
+        .filter(key => dbData[key] !== undefined)
+        .map((key, i) => `${key} = $${i + 1}`)
+        .join(', ');
+
+      if (!setClause) {
+        throw new Error('No valid fields to update');
+      }
+
+      const values = Object.keys(dbData)
+        .filter(key => dbData[key] !== undefined)
+        .map(key => dbData[key]);
+
+      values.push(id);
+
+      logger.debug(`Update any custom food query values: ${JSON.stringify(values)}`);
+
+      // Notice this query does not have the user_id check but does include the source = 'custom' check
+      const result = await db.query(
+        `UPDATE food_items
+         SET ${setClause}, updated_at = NOW()
+         WHERE id = $${values.length} AND source = 'custom'
+         RETURNING *`,
+        values
+      );
+
+      if (!result.rows[0]) {
+        logger.debug(`No rows updated for regular update - ID: ${id}`);
+        return null;
+      }
+
+      logger.debug(`Successfully updated any custom food item: ${JSON.stringify(result.rows[0])}`);
+      return this.transformToFrontend(result.rows[0]);
+    } catch (error) {
+      logger.error(`Error updating any custom food item (ID: ${id}):`, error);
+      logger.error('Stack trace:', error.stack);
+      throw error;
+    }
+  }
+
+  /**
    * Check if food item has any associated logs
    * @param {number} id - Food item ID
    * @returns {Promise<boolean>} True if food logs exist
@@ -327,6 +415,38 @@ class FoodItem {
   }
 
   /**
+   * Soft delete any custom food item regardless of owner
+   * @param {number} id - Food item ID
+   * @param {number} userId - User ID making the delete (for audit purposes)
+   * @returns {Promise<boolean>} Success status
+   */
+  static async deleteAnyCustomFood(id, userId) {
+    try {
+      logger.debug(`Attempting to soft delete any custom food item - ID: ${id}, RequestUserID: ${userId}`);
+
+      const result = await db.query(
+        `UPDATE food_items
+         SET is_deleted = TRUE, updated_at = NOW()
+         WHERE id = $1 AND source = 'custom'
+         RETURNING *`,
+        [id]
+      );
+
+      if (!result.rows[0]) {
+        logger.debug(`No rows updated for soft delete - ID: ${id}`);
+        return false;
+      }
+
+      logger.debug(`Successfully soft deleted any custom food item ${id}`);
+      return true;
+    } catch (error) {
+      logger.error(`Error soft deleting any custom food item (ID: ${id}):`, error);
+      logger.error('Stack trace:', error.stack);
+      throw error;
+    }
+  }
+
+  /**
    * Get custom food items created by a user
    * @param {number} userId - User ID
    * @param {number} limit - Result limit
@@ -354,6 +474,36 @@ class FoodItem {
       return result.rows.map(row => this.transformToFrontend(row));
     } catch (error) {
       logger.error(`Error getting custom foods: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all custom food items from all users
+   * @param {number} limit - Result limit
+   * @param {number} offset - Result offset
+   * @returns {Promise<Array>} Food items
+   */
+  static async getAllCustomFoods(limit = 20, offset = 0) {
+    try {
+      const result = await db.query(
+        `SELECT f.*,
+                COALESCE(f.calories_per_serving, r.total_calories / r.servings) as calories_per_serving,
+                COALESCE(f.protein_grams, r.total_protein_grams / r.servings) as protein_grams,
+                COALESCE(f.carbs_grams, r.total_carbs_grams / r.servings) as carbs_grams,
+                COALESCE(f.fat_grams, r.total_fat_grams / r.servings) as fat_grams
+         FROM food_items f
+         LEFT JOIN recipes r ON f.recipe_id = r.id
+         WHERE (f.source = 'custom' OR f.source = 'recipe')
+         AND f.is_deleted = FALSE
+         ORDER BY f.name ASC
+         LIMIT $1 OFFSET $2`,
+        [limit, offset]
+      );
+
+      return result.rows.map(row => this.transformToFrontend(row));
+    } catch (error) {
+      logger.error(`Error getting all custom foods: ${error.message}`);
       throw error;
     }
   }
@@ -399,6 +549,36 @@ class FoodItem {
       return result.rows.map(row => this.transformToFrontend(row));
     } catch (error) {
       logger.error('Error in findAll:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Find food items by partial name match
+   * @param {string} name - Food item name to search for
+   * @returns {Promise<Array>} Food items with similar names
+   */
+  static async findByPartialName(name) {
+    try {
+      if (!name) return [];
+
+      const normalizedName = name.toLowerCase().trim();
+      logger.debug(`Searching for foods with similar name: ${normalizedName}`);
+
+      // Use ILIKE for case-insensitive search
+      const result = await db.query(
+        `SELECT * FROM food_items
+         WHERE lower(name) ILIKE $1
+         AND source = 'custom'
+         AND is_deleted = FALSE
+         ORDER BY user_id, name`,
+        [`%${normalizedName}%`]
+      );
+
+      logger.debug(`Found ${result.rows.length} foods with name similar to: ${normalizedName}`);
+      return result.rows.map(row => this.transformToFrontend(row));
+    } catch (error) {
+      logger.error(`Error finding foods by partial name: ${error.message}`);
       throw error;
     }
   }

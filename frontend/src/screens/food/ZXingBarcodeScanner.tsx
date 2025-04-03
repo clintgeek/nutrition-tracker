@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Platform, Dimensions, Vibration, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/core';
 import { ActivityIndicator, Text, useTheme, Button, Portal, Dialog } from 'react-native-paper';
 import { foodService } from '../../services/foodService';
 import { loggingService } from '../../services/loggingService';
@@ -27,6 +28,7 @@ export default function ZXingBarcodeScanner() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const codeReaderRef = useRef<any>(null);
   const navigation = useNavigation();
+  const route = useRoute();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -188,7 +190,6 @@ export default function ZXingBarcodeScanner() {
 
       setScanned(true);
       setLastScannedCode(code);
-      loggingService.info('Barcode detected', { code });
 
       // Provide haptic feedback if possible
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -203,13 +204,53 @@ export default function ZXingBarcodeScanner() {
         throw new Error(`Invalid barcode: ${validation.error}`);
       }
 
+      console.log(`Barcode detected: ${code}. Searching for food...`);
+
+      // Dump navigation state for debugging
+      console.log(`Current navigation state:`, JSON.stringify(navigation.getState(), null, 2));
+
+      // Route params debug - use useRoute hook that's already imported
+      // If route is undefined, we can't access route.params
+      const routeParams = route?.params || {};
+      console.log(`Route params:`, JSON.stringify(routeParams, null, 2));
+
       // Lookup the food
       setIsLoading(true);
       const food = await foodService.getFoodByBarcode(code);
 
+      // Get route params from the navigation
+      const navigationState = navigation.getState();
+      const routes = navigationState.routes;
+      const currentRoute = routes[routes.length - 1];
+      const { mealType, date, fromLog } = currentRoute.params || {};
+
       // Navigate back to food screen with the scanned food
       stopScanner();
-      navigation.navigate('Food', { screen: 'FoodList', params: { scannedFood: food } });
+
+      // Navigate differently based on where we came from
+      if (fromLog) {
+        // If coming from the log screen, preserve that context
+        console.log(`Navigation from log - params: mealType=${mealType}, date=${date}, fromLog=${fromLog}`);
+
+        navigation.navigate('Food', {
+          screen: 'FoodScreen',
+          params: {
+            scannedFood: food,
+            mealType,
+            date,
+            fromLog: true
+          }
+        });
+      } else {
+        // Regular navigation to Food screen
+        console.log(`Regular navigation to Food screen with scanned food`);
+        navigation.navigate('Food', {
+          screen: 'FoodScreen',
+          params: {
+            scannedFood: food
+          }
+        });
+      }
     } catch (error) {
       console.error('Error processing barcode:', error);
       setScanned(false);
@@ -251,9 +292,39 @@ export default function ZXingBarcodeScanner() {
       // Look up the food by barcode
       const food = await foodService.getFoodByBarcode(manualBarcode);
 
+      // Get route params from the navigation
+      const navigationState = navigation.getState();
+      const routes = navigationState.routes;
+      const currentRoute = routes[routes.length - 1];
+      const { mealType, date, fromLog } = currentRoute.params || {};
+
       // Navigate back to food screen with the scanned food
       stopScanner();
-      navigation.navigate('Food', { screen: 'FoodList', params: { scannedFood: food } });
+
+      // Navigate differently based on where we came from
+      if (fromLog) {
+        // If coming from the log screen, preserve that context
+        console.log(`Manual barcode - Navigation from log - params: mealType=${mealType}, date=${date}, fromLog=${fromLog}`);
+
+        navigation.navigate('Food', {
+          screen: 'FoodScreen',
+          params: {
+            scannedFood: food,
+            mealType,
+            date,
+            fromLog: true
+          }
+        });
+      } else {
+        // Regular navigation to Food screen
+        console.log(`Manual barcode - Regular navigation to Food screen with scanned food`);
+        navigation.navigate('Food', {
+          screen: 'FoodScreen',
+          params: {
+            scannedFood: food
+          }
+        });
+      }
     } catch (error) {
       console.error('Error looking up barcode:', error);
       let errorMessage = 'Could not find food with this barcode. Please try again or add the food manually.';
@@ -340,6 +411,22 @@ export default function ZXingBarcodeScanner() {
       </View>
     );
   };
+
+  useEffect(() => {
+    // Log navigation state for debugging
+    const navigationState = navigation.getState();
+    const routes = navigationState.routes;
+    const currentRoute = routes[routes.length - 1];
+
+    console.log("ZXingBarcodeScanner - Navigation State:",
+      JSON.stringify({
+        currentScreen: currentRoute.name,
+        params: currentRoute.params || {},
+        routesCount: routes.length,
+        parentNavigator: navigation.getParent()?.getId() || 'none'
+      }, null, 2)
+    );
+  }, []);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

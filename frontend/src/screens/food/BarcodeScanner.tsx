@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Platform, Dimensions, Vibration, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/core';
 import { ActivityIndicator, Text, useTheme, Button, Portal, Dialog } from 'react-native-paper';
 import { foodService } from '../../services/foodService';
 import { loggingService } from '../../services/loggingService';
@@ -8,6 +9,12 @@ import { validateBarcode } from '../../utils/validation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SCAN_AREA_SIZE = Math.min(Dimensions.get('window').width * 0.8, 300);
+
+type RouteParams = {
+  mealType?: string;
+  date?: string;
+  fromLog?: boolean;
+};
 
 // Unified barcode scanner using ZXing library for better PWA compatibility
 export default function BarcodeScanner() {
@@ -26,8 +33,13 @@ export default function BarcodeScanner() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const codeReaderRef = useRef<any>(null);
   const navigation = useNavigation();
+  const route = useRoute();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+
+  // Extract route params with better type safety
+  const params = route.params as RouteParams || {};
+  const { mealType, date, fromLog } = params;
 
   // Load ZXing script dynamically
   useEffect(() => {
@@ -181,13 +193,70 @@ export default function BarcodeScanner() {
         throw new Error(`Invalid barcode: ${validation.error}`);
       }
 
+      console.log(`Barcode detected: ${code}. Searching for food...`);
+
       // Lookup the food
       setIsLoading(true);
-      const food = await foodService.getFoodByBarcode(code);
+      let food;
+      try {
+        food = await foodService.getFoodByBarcode(code);
+        console.log(`Found food with barcode ${code} in database: ${JSON.stringify(food)}`);
+      } catch (error) {
+        console.log(`Could not find food with barcode ${code}, creating empty food with barcode`);
+        // Create a placeholder food with the barcode
+        food = {
+          id: Date.now(),
+          name: "New Food",
+          barcode: code, // Ensure barcode is added here
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          serving_size: 100,
+          serving_unit: 'g',
+          source: 'custom'
+        };
+      }
 
-      // Navigate back to food screen with the scanned food
+      // IMPORTANT: Ensure the barcode is present in the food object
+      if (!food.barcode) {
+        console.log(`Food object missing barcode, adding it now: ${code}`);
+        food.barcode = code;
+      }
+
+      // Get route params directly from the route object
+      const { mealType, date, fromLog } = route.params as RouteParams || {};
+
+      console.log(`Navigating with scanned food: ${JSON.stringify(food)}`);
+      console.log(`Route params: ${JSON.stringify({ mealType, date, fromLog })}`);
+
+      // Stop the scanner before navigation
       stopScanner();
-      navigation.navigate('Food', { screen: 'FoodList', params: { scannedFood: food } });
+
+      // Navigate differently based on where we came from
+      if (fromLog) {
+        // If coming from the log screen, navigate back to the log stack with the food
+        console.log(`Navigation from log - params: mealType=${mealType}, date=${date}, fromLog=${fromLog}`);
+
+        // Navigate directly to the AddFoodToLogModal in the Log stack
+        navigation.navigate('Log', {
+          screen: 'AddFoodToLogModal',
+          params: {
+            food,
+            mealType,
+            date
+          }
+        });
+      } else {
+        // Regular navigation to Food screen
+        console.log(`Regular navigation to Food screen with scanned food (barcode: ${food.barcode})`);
+        navigation.navigate('Food', {
+          screen: 'FoodScreen',
+          params: {
+            scannedFood: food
+          }
+        });
+      }
     } catch (error) {
       console.error('Error processing barcode:', error);
       setScanned(false);
@@ -226,12 +295,69 @@ export default function BarcodeScanner() {
         throw new Error(`Invalid barcode: ${validation.error}`);
       }
 
-      // Look up the food by barcode
-      const food = await foodService.getFoodByBarcode(manualBarcode);
+      console.log(`Manual barcode entered: ${manualBarcode}. Searching for food...`);
 
-      // Navigate back to food screen with the scanned food
+      // Look up the food by barcode
+      let food;
+      try {
+        food = await foodService.getFoodByBarcode(manualBarcode);
+        console.log(`Found food with barcode ${manualBarcode} in database: ${JSON.stringify(food)}`);
+      } catch (error) {
+        console.log(`Could not find food with barcode ${manualBarcode}, creating empty food with barcode`);
+        // Create a placeholder food with the barcode
+        food = {
+          id: Date.now(),
+          name: "New Food",
+          barcode: manualBarcode, // Ensure barcode is added here
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          serving_size: 100,
+          serving_unit: 'g',
+          source: 'custom'
+        };
+      }
+
+      // IMPORTANT: Ensure the barcode is present in the food object
+      if (!food.barcode) {
+        console.log(`Food object missing barcode, adding it now: ${manualBarcode}`);
+        food.barcode = manualBarcode;
+      }
+
+      // Get route params directly from the route object
+      const { mealType, date, fromLog } = route.params as RouteParams || {};
+
+      console.log(`Navigating with scanned food: ${JSON.stringify(food)}`);
+      console.log(`Route params: ${JSON.stringify({ mealType, date, fromLog })}`);
+
+      // Stop the scanner before navigation
       stopScanner();
-      navigation.navigate('Food', { screen: 'FoodList', params: { scannedFood: food } });
+
+      // Navigate differently based on where we came from
+      if (fromLog) {
+        // If coming from the log screen, navigate back to the log stack with the food
+        console.log(`Navigation from log - params: mealType=${mealType}, date=${date}, fromLog=${fromLog}`);
+
+        // Navigate directly to the AddFoodToLogModal in the Log stack
+        navigation.navigate('Log', {
+          screen: 'AddFoodToLogModal',
+          params: {
+            food,
+            mealType,
+            date
+          }
+        });
+      } else {
+        // Regular navigation to Food screen
+        console.log(`Regular navigation to Food screen with scanned food (barcode: ${food.barcode})`);
+        navigation.navigate('Food', {
+          screen: 'FoodScreen',
+          params: {
+            scannedFood: food
+          }
+        });
+      }
     } catch (error) {
       console.error('Error looking up barcode:', error);
       let errorMessage = 'Could not find food with this barcode. Please try again or add the food manually.';
@@ -248,7 +374,6 @@ export default function BarcodeScanner() {
       setShowErrorDialog(true);
     } finally {
       setIsLoading(false);
-      setManualBarcode('');
     }
   };
 

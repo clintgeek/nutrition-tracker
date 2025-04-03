@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Alert, ScrollView, RefreshControl, TextInput } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Alert, ScrollView, RefreshControl, TextInput, Switch } from 'react-native';
 import {
   Searchbar,
   FAB,
@@ -23,6 +23,7 @@ import axios from 'axios';
 import debounce from 'lodash/debounce';
 
 import { foodService, FoodItem } from '../../services/foodService';
+import { foodLogService } from '../../services/foodLogService';
 import { Food, CreateFoodDTO } from '../../types/Food';
 import EmptyState from '../../components/common/EmptyState';
 import EditableTextInput from '../../components/common/EditableTextInput';
@@ -61,7 +62,11 @@ const FoodScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const isFocused = useIsFocused();
-  const { fromLog } = (route.params as RouteParams) || {};
+
+  // Extract route params with better type safety
+  const params = route.params as RouteParams || {};
+  const { fromLog, mealType: routeMealType, date: routeDate } = params;
+
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -72,6 +77,12 @@ const FoodScreen: React.FC = () => {
   const [foodToDelete, setFoodToDelete] = useState<Food | null>(null);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [isDeleting, setIsDeleting] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [selectedMealType, setSelectedMealType] = useState<string | undefined>(routeMealType);
+  const [selectedDate, setSelectedDate] = useState<string | undefined>(routeDate);
+  const [quantity, setQuantity] = useState(1);
+  const [isEditing, setIsEditing] = useState(false);
+  const [showAllUsersFoods, setShowAllUsersFoods] = useState(true);
 
   // Fetch foods function
   const fetchFoods = useCallback(async (query: string = '', forceRefresh: boolean = false) => {
@@ -83,7 +94,8 @@ const FoodScreen: React.FC = () => {
       if (query.trim()) {
         results = await foodService.searchFood(query);
       } else {
-        const customFoods = await foodService.getCustomFoods();
+        // Get custom foods, including all users' foods if toggle is on
+        const customFoods = await foodService.getCustomFoods(showAllUsersFoods);
         const sortedFoods = customFoods
           .map(item => mapFoodItemToFood(item))
           .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
@@ -106,22 +118,39 @@ const FoodScreen: React.FC = () => {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [showAllUsersFoods]);
 
   // Handle scanned food and refresh params
   useEffect(() => {
-    const params = route.params as { scannedFood?: Food; refresh?: boolean } | undefined;
+    const params = route.params || {};
+    console.log('FoodScreen mounted with route params:', JSON.stringify(params, null, 2));
 
-    if (params?.scannedFood) {
-      setSelectedFood(params.scannedFood);
-      setIsFoodDetailsVisible(true);
-      navigation.setParams({ scannedFood: undefined });
+    // Debug the fromLog parameter specifically
+    const { scannedFood, fromLog, mealType: paramMealType, date: paramDate } = params;
+    console.log(`Important route params: fromLog=${fromLog}, mealType=${paramMealType}, date=${paramDate}`);
+
+    if (scannedFood) {
+      // Update the selected food state
+      setSelectedFood(scannedFood);
+
+      if (fromLog === true) {
+        console.log(`Scanned food with fromLog=true. Will show Add button for log context.`);
+      }
     }
-    if (params?.refresh) {
+
+    if (paramMealType && !selectedMealType) {
+      setSelectedMealType(paramMealType);
+    }
+
+    if (paramDate && !selectedDate) {
+      setSelectedDate(paramDate);
+    }
+
+    if (params.refresh) {
       fetchFoods(searchQuery, true);
-      navigation.setParams({ refresh: undefined });
+      navigation.setParams({ ...params, refresh: undefined });
     }
-  }, [route.params, navigation, fetchFoods, searchQuery]);
+  }, [route.params, fetchFoods, navigation, searchQuery, selectedMealType, selectedDate]);
 
   // Initial load
   useEffect(() => {
@@ -156,62 +185,309 @@ const FoodScreen: React.FC = () => {
 
   // Handle adding food to log
   const handleAddToLog = (food: Food) => {
-    const { mealType, date } = route.params as { mealType?: string; date?: string };
-    navigation.navigate('LogStack', {
-      screen: 'AddFoodToLogModal',
-      params: {
-        food,
-        mealType: mealType || 'snack',
-        date: date || new Date().toISOString().split('T')[0]
-      }
-    });
+    console.log(`Adding food to ${selectedMealType} log`);
+
+    // Navigate to the AddFoodToLogModal in the proper way
+    if (navigation.canGoBack()) {
+      // If we can go back, we should - this means we came from the log screen
+      navigation.goBack();
+      // And pass the food parameter to the log screen
+      navigation.navigate('Log', {
+        screen: 'AddFoodToLogModal',
+        params: {
+          food,
+          mealType: selectedMealType || 'snack',
+          date: selectedDate || new Date().toISOString().split('T')[0]
+        }
+      });
+    } else {
+      // Otherwise use a direct path from the main navigator
+      navigation.navigate('Log', {
+        screen: 'AddFoodToLogModal',
+        params: {
+          food,
+          mealType: selectedMealType || 'snack',
+          date: selectedDate || new Date().toISOString().split('T')[0]
+        }
+      });
+    }
   };
 
   const handleSaveFood = async () => {
     if (!selectedFood) return;
 
+    // Close the modal immediately to prevent multiple interactions
+    setIsFoodDetailsVisible(false);
+
+    // Then start saving process
+    setIsSaving(true);
+
     try {
-      const foodData: CreateFoodDTO = {
-        name: selectedFood.name.trim().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' '),
-        calories: Math.round(selectedFood.calories || 0),
-        protein: Math.round(selectedFood.protein || 0),
-        carbs: Math.round(selectedFood.carbs || 0),
-        fat: Math.round(selectedFood.fat || 0),
-        serving_size: Math.round(Number(selectedFood.serving_size) || 100),
-        serving_unit: selectedFood.serving_unit || '',
-        barcode: selectedFood.barcode,
-        brand: selectedFood.brand,
-        source: 'custom',
-        source_id: selectedFood.source_id,
-      };
+      console.log('Starting food save process...');
+      console.log(`Selected food: ${JSON.stringify(selectedFood)}`);
 
-      let savedFoodId: number;
+      // First, check for duplicate foods using multiple strategies
+      let existingFood = null;
 
-      if (selectedFood.id && selectedFood.source === 'custom') {
-        // Update existing custom food
-        const id = parseInt(selectedFood.id.toString());
-        if (isNaN(id)) {
-          throw new Error('Invalid food ID');
+      // Strategy 1: Check by ID
+      if (selectedFood.id) {
+        console.log(`Checking for food with ID ${selectedFood.id}`);
+        const allFoods = foods || []; // Use current foods list
+        const idMatch = allFoods.find(f => f.id === selectedFood.id);
+        if (idMatch) {
+          console.log(`Found exact match by ID: ${idMatch.id}`);
+          existingFood = idMatch;
         }
-        await foodService.updateCustomFood(id, foodData);
-        savedFoodId = id;
-      } else {
-        // Create new custom food
-        const result = await foodService.createCustomFood(foodData);
-        if (!result || typeof result.id !== 'number') {
-          throw new Error('Invalid response from createCustomFood');
-        }
-        savedFoodId = result.id;
       }
 
-      // Just saving the food, stay on food screen
-      setIsFoodDetailsVisible(false);
-      setSelectedFood(null);
-      fetchFoods(searchQuery, true);
-      Alert.alert('Success', 'Food saved successfully!');
+      // Strategy 2: Check by barcode if provided
+      if (!existingFood && selectedFood.barcode) {
+        console.log(`Checking for food with barcode ${selectedFood.barcode}`);
+        try {
+          // Normalize barcode
+          const normalizedBarcode = selectedFood.barcode.toString().trim();
+
+          // First check local state
+          const allFoods = foods || []; // Use current foods list
+          const barcodeMatch = allFoods.find(f => {
+            if (!f.barcode) return false;
+            return f.barcode.toString().trim() === normalizedBarcode;
+          });
+
+          if (barcodeMatch) {
+            console.log(`Found existing food with barcode in current list: ${barcodeMatch.id}`);
+            existingFood = barcodeMatch;
+          } else {
+            // If not found in current list, fetch all custom foods including from other users
+            const customFoods = await foodService.getCustomFoods(true);
+            console.log(`Fetched ${customFoods.length} custom foods to check for barcode`);
+
+            const exactMatch = customFoods.find(f => {
+              if (!f.barcode) return false;
+              return f.barcode.toString().trim() === normalizedBarcode;
+            });
+
+            if (exactMatch) {
+              console.log(`Found exact barcode match from database: ${exactMatch.id}`);
+              existingFood = foodService.mapFoodItemToFood(exactMatch);
+            } else {
+              // Do a direct API barcode search as last resort
+              console.log(`No match found in database, trying direct barcode lookup`);
+              try {
+                const searchQuery = `barcode:${normalizedBarcode}`;
+                const searchResults = await foodService.searchFood(searchQuery);
+
+                if (searchResults.foods && searchResults.foods.length > 0) {
+                  const firstResult = searchResults.foods[0];
+                  console.log(`Found food via barcode search: ${firstResult.id}`);
+                  existingFood = firstResult;
+                }
+              } catch (err) {
+                console.warn('Direct barcode search failed:', err);
+                // Continue with creating new food
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Error checking for food by barcode:', err);
+          // Continue with creating new food
+        }
+      }
+
+      // Strategy 3: Check by exact name
+      if (!existingFood && selectedFood.name) {
+        console.log(`Checking for food with exact name: "${selectedFood.name}"`);
+        const allFoods = foods || []; // Use current foods list
+        const nameMatch = allFoods.find(f =>
+          f.name.toLowerCase().trim() === selectedFood.name.toLowerCase().trim()
+        );
+
+        if (nameMatch) {
+          console.log(`Found existing food with exact name: ${nameMatch.id}`);
+          existingFood = nameMatch;
+        }
+      }
+
+      // If we found an existing food, use it
+      if (existingFood) {
+        console.log(`Using existing food: ${JSON.stringify(existingFood)}`);
+
+        // If we came from the log screen, add to log
+        if (fromLog && selectedMealType) {
+          try {
+            console.log(`Adding existing food to ${selectedMealType} log`);
+
+            // Ensure meal_type is valid
+            const validMealType = (selectedMealType === 'breakfast' ||
+                                  selectedMealType === 'lunch' ||
+                                  selectedMealType === 'dinner' ||
+                                  selectedMealType === 'snack')
+                                  ? selectedMealType
+                                  : 'snack';
+
+            const foodLogEntry = {
+              food_id: existingFood.id,
+              meal_type: validMealType as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+              quantity: quantity,
+              log_date: selectedDate || new Date().toISOString().split('T')[0],
+              food_item_id: existingFood.id,
+              servings: quantity,
+              user_id: 1 // Required field
+            };
+
+            await foodLogService.createLog(foodLogEntry);
+            console.log('Food log created successfully for existing food');
+
+            // Navigate back to log screen
+            navigateBackToLog();
+          } catch (err) {
+            console.error('Error adding existing food to log:', err);
+            Alert.alert('Error', 'Failed to add food to log. Please try again.');
+          } finally {
+            setIsSaving(false);
+          }
+          return;
+        } else {
+          // Just show message that food already exists
+          Alert.alert('Food Already Exists', 'This food is already in your database.');
+          setSelectedFood(null);
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      // Create a truly unique source_id for this food
+      const timestamp = Date.now();
+      const randomStr = Math.random().toString(36).substring(2, 10);
+      const uniqueSourceId = `custom-${timestamp}-${randomStr}`;
+
+      // Prepare the food data with proper barcode handling
+      const foodToSave = {
+        name: selectedFood.name || '',
+        calories: Number(selectedFood.calories || 0),
+        protein: Number(selectedFood.protein || 0),
+        carbs: Number(selectedFood.carbs || 0),
+        fat: Number(selectedFood.fat || 0),
+        serving_size: Number(selectedFood.serving_size || 100),
+        serving_unit: selectedFood.serving_unit || 'g',
+        source: 'custom' as const,
+        source_id: uniqueSourceId,
+        barcode: selectedFood.barcode || undefined,
+        brand: selectedFood.brand || undefined,
+      };
+
+      console.log('Creating new food with data:', JSON.stringify(foodToSave));
+
+      // Create a new food
+      const newFood = await foodService.createCustomFood(foodToSave);
+      console.log('Food created successfully with ID:', newFood.id);
+
+      // Add the new food to our state immediately
+      const updatedFoods = [...foods, newFood];
+      setFoods(updatedFoods);
+      setFilteredFoods(updatedFoods);
+
+      // Check if we came from the log screen and have a meal type
+      if (fromLog && selectedMealType) {
+        console.log(`Adding new food to ${selectedMealType} log`);
+
+        // Ensure meal_type is valid
+        const validMealType = (selectedMealType === 'breakfast' ||
+                              selectedMealType === 'lunch' ||
+                              selectedMealType === 'dinner' ||
+                              selectedMealType === 'snack')
+                              ? selectedMealType
+                              : 'snack';
+
+        // Create a food log entry
+        const foodLogEntry = {
+          food_id: newFood.id,
+          meal_type: validMealType as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+          quantity: quantity,
+          log_date: selectedDate || new Date().toISOString().split('T')[0],
+          food_item_id: newFood.id,
+          servings: quantity,
+          user_id: 1 // Required field
+        };
+
+        await foodLogService.createLog(foodLogEntry);
+        console.log('Food log created successfully');
+
+        // Navigate back to the log screen
+        Alert.alert(
+          'Success',
+          `Food added to ${validMealType}!`,
+          [{ text: 'OK', onPress: () => navigateBackToLog() }]
+        );
+      } else {
+        // Just show success message
+        Alert.alert(
+          'Success',
+          'Food saved successfully!',
+          [{ text: 'OK' }]
+        );
+      }
     } catch (error) {
       console.error('Error saving food:', error);
-      alert('Failed to save food. Please try again.');
+      Alert.alert('Error', 'Failed to save food. Please try again.');
+    } finally {
+      setIsSaving(false);
+      setSelectedFood(null);
+    }
+  };
+
+  // Helper function to navigate back to log screen with proper error handling
+  const navigateBackToLog = () => {
+    console.log('Attempting to navigate back to log screen...');
+
+    const params = route.params || {};
+    const { fromLog, mealType, date } = params;
+    console.log(`Route params for back navigation: fromLog=${fromLog}, mealType=${mealType}, date=${date}`);
+
+    if (fromLog !== true) {
+      console.log('Not from log screen, staying on food screen');
+      return;
+    }
+
+    // Use direct navigation to Log stack with proper screen name
+    try {
+      console.log('Navigating to Log -> SearchFoodForLogScreen with params:', { mealType, date });
+
+      // First try with the new screen name
+      navigation.navigate('Log', {
+        screen: 'SearchFoodForLogScreen',
+        params: {
+          mealType,
+          date,
+          refresh: Date.now() // Force refresh
+        }
+      });
+    } catch (error) {
+      console.error('Primary navigation failed:', error);
+
+      // Fall back to old screen name if that fails
+      try {
+        console.log('Trying fallback with SearchFoodForLog screen name');
+        navigation.navigate('Log', {
+          screen: 'SearchFoodForLog',
+          params: {
+            mealType,
+            date,
+            refresh: Date.now()
+          }
+        });
+      } catch (secondError) {
+        console.error('Secondary navigation failed:', secondError);
+
+        // Last resort - just go to Log tab
+        try {
+          console.log('Last resort: navigating to Log tab');
+          navigation.navigate('Log');
+        } catch (finalError) {
+          console.error('All navigation attempts failed:', finalError);
+          Alert.alert('Navigation Error', 'Unable to return to log screen. Please use the bottom tab to navigate manually.');
+        }
+      }
     }
   };
 
@@ -225,7 +501,11 @@ const FoodScreen: React.FC = () => {
   };
 
   const navigateToScanBarcode = () => {
-    navigation.navigate('BarcodeScanner');
+    navigation.navigate('BarcodeScanner', {
+      mealType: selectedMealType,
+      date: selectedDate,
+      fromLog
+    });
   };
 
   const handleDeleteFood = async (food: Food) => {
@@ -673,6 +953,8 @@ const FoodScreen: React.FC = () => {
           onDismiss={() => {
             setIsFoodDetailsVisible(false);
             setSelectedFood(null);
+            // Reset any other state that might be causing issues
+            setQuantity(1);
           }}
           style={styles.detailsDialog}
         >

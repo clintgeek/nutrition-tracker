@@ -33,7 +33,7 @@ export interface Food {
   fat: number;
   created_at?: string;
   updated_at?: string;
-  is_custom?: boolean;
+  user_created?: boolean;
   user_id?: string;
   sync_status?: 'synced' | 'pending' | 'failed';
   source: 'custom' | 'usda' | 'recipe';

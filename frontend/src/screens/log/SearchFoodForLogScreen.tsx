@@ -9,7 +9,8 @@ import {
   ActivityIndicator,
   Avatar,
   useTheme,
-  Chip
+  Chip,
+  Switch
 } from 'react-native-paper';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LogStackParamList, RootStackScreenProps } from '../../types/navigation';
@@ -77,6 +78,10 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [foods, setFoods] = useState<Food[]>([]);
   const [filteredFoods, setFilteredFoods] = useState<Food[]>([]);
+  const [selectedFood, setSelectedFood] = useState<Food | null>(null);
+  const [servings, setServings] = useState(1);
+  // Always show all users' foods by default
+  const [showAllUsersFoods, setShowAllUsersFoods] = useState(true);
 
   const { mealType, date } = route.params;
 
@@ -97,7 +102,7 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
       } else {
         // Get both custom foods and food logs
         const [customFoods, recentLogs] = await Promise.all([
-          foodService.getCustomFoods(),
+          foodService.getCustomFoods(showAllUsersFoods),
           foodLogService.getLogs(new Date().toISOString().split('T')[0])
         ]);
 
@@ -147,12 +152,12 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [showAllUsersFoods]);
 
-  // Initial load
+  // Effect for initial load and when the showAllUsersFoods toggle changes
   useEffect(() => {
     fetchFoods();
-  }, [fetchFoods]);
+  }, [fetchFoods, showAllUsersFoods]);
 
   // Create a memoized debounced search function
   const debouncedSearch = useMemo(
@@ -253,8 +258,6 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
       backgroundColor: theme.colors.background,
     },
     searchContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
       padding: 16,
       backgroundColor: theme.colors.surface,
       elevation: 4,
@@ -263,6 +266,11 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
       shadowOpacity: 0.1,
       shadowRadius: 4,
       zIndex: 1,
+    },
+    searchBarWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      width: '100%',
     },
     searchBar: {
       flex: 1,
@@ -357,24 +365,45 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
     },
   });
 
+  useEffect(() => {
+    // Log navigation state for debugging
+    const navigationState = navigation.getState();
+    const routes = navigationState.routes;
+    const currentRoute = routes[routes.length - 1];
+
+    console.log("SearchFoodForLogScreen - Navigation State:",
+      JSON.stringify({
+        currentScreen: currentRoute.name,
+        params: route.params,
+        routesCount: routes.length,
+        parentNavigator: navigation.getParent()?.getId() || 'none'
+      }, null, 2)
+    );
+  }, []);
+
   return (
     <View style={styles.container}>
       <View style={styles.searchContainer}>
-        <Searchbar
-          placeholder="Search foods..."
-          onChangeText={handleSearchQueryChange}
-          value={searchQuery}
-          style={styles.searchBar}
-          icon="magnify"
-          clearIcon="close"
-        />
-
-        <TouchableOpacity
-          style={styles.scanButton}
-          onPress={() => navigation.navigate('BarcodeScanner')}
-        >
-          <Ionicons name="barcode-outline" size={24} color={theme.colors.primary} />
-        </TouchableOpacity>
+        <View style={styles.searchBarWrapper}>
+          <Searchbar
+            placeholder="Search foods..."
+            onChangeText={handleSearchQueryChange}
+            value={searchQuery}
+            style={styles.searchBar}
+            icon="magnify"
+            clearIcon="close"
+          />
+          <TouchableOpacity
+            style={styles.scanButton}
+            onPress={() => navigation.navigate('BarcodeScanner', {
+              mealType,
+              date,
+              fromLog: true
+            })}
+          >
+            <Ionicons name="barcode-outline" size={24} color={theme.colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {isLoading ? (
