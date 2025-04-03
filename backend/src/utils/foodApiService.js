@@ -1,6 +1,7 @@
 const axios = require('axios');
 const logger = require('./logger');
 const nutritionixService = require('./nutritionixService');
+const openFoodFactsService = require('./openFoodFactsService');
 const spoonacularService = require('./spoonacularService');
 
 // Keep only USDA API URL and remove OpenFoodFacts URLs
@@ -312,9 +313,18 @@ class FoodApiService {
         return cachedData;
       }
 
-      // Run API searches in parallel
+      // Run API searches in parallel with priority order:
+      // 1. Nutritionix
+      // 2. OpenFoodFacts
+      // 3. USDA
+      // 4. Spoonacular
       const nutritionixPromise = nutritionixService.searchByName(query).catch(error => {
         logger.error('Nutritionix search error:', error.message);
+        return [];
+      });
+
+      const openFoodFactsPromise = openFoodFactsService.searchByName(query).catch(error => {
+        logger.error('OpenFoodFacts search error:', error.message);
         return [];
       });
 
@@ -330,19 +340,22 @@ class FoodApiService {
 
       // Wait for all searches to complete
       const nutritionixResults = await nutritionixPromise;
+      const openFoodFactsResults = await openFoodFactsPromise;
       const usdaResults = await usdaPromise;
       const spoonacularResults = await spoonacularPromise;
 
       // Combine all results
       const allResults = [
-        ...nutritionixResults,
-        ...usdaResults,
-        ...spoonacularResults
+        ...nutritionixResults,      // Priority 1
+        ...openFoodFactsResults,    // Priority 2
+        ...usdaResults,             // Priority 3
+        ...spoonacularResults       // Priority 4
       ];
 
       // Log results from each source
       logger.info('Search results from each source:', {
         nutritionix: nutritionixResults.length,
+        openfoodfacts: openFoodFactsResults.length,
         usda: usdaResults.length,
         spoonacular: spoonacularResults.length,
         total: allResults.length
@@ -382,7 +395,8 @@ class FoodApiService {
 
       logger.info(`Fetching food data for barcode: ${barcode}`);
 
-      // Try Nutritionix
+      // Priority order for barcode lookup:
+      // 1. Nutritionix (best for branded foods)
       const nutritionixResult = await nutritionixService.searchByUPC(barcode);
       if (nutritionixResult) {
         logger.info('Food found in Nutritionix');
@@ -398,7 +412,23 @@ class FoodApiService {
         return resultWithBarcode;
       }
 
-      // Try Spoonacular if Nutritionix fails
+      // 2. OpenFoodFacts (good for international products)
+      const openFoodFactsResult = await openFoodFactsService.searchByUPC(barcode);
+      if (openFoodFactsResult) {
+        logger.info('Food found in OpenFoodFacts');
+
+        // Ensure the barcode is included in the result
+        const resultWithBarcode = {
+          ...openFoodFactsResult,
+          barcode: barcode
+        };
+
+        // Cache the result
+        setCacheData(cacheKey, resultWithBarcode);
+        return resultWithBarcode;
+      }
+
+      // 3. Spoonacular (fallback option)
       const spoonacularResult = await spoonacularService.searchByUPC(barcode);
       if (spoonacularResult) {
         logger.info('Food found in Spoonacular');

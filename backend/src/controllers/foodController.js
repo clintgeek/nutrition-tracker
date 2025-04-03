@@ -7,6 +7,7 @@ const logger = require('../config/logger');
 const { asyncHandler } = require('../middleware/errorHandler');
 const db = require('../config/db');
 const redisService = require('../services/redisService');
+const openFoodFactsService = require('../utils/openFoodFactsService');
 
 // Helper function to invalidate food-related caches
 const invalidateFoodCaches = async () => {
@@ -38,42 +39,65 @@ const debugSearch = asyncHandler(async (req, res) => {
   try {
     logger.info(`Debug search for: ${query}`);
 
-    // Run API searches in parallel
-    const searches = [
-      nutritionixService.searchByName(query).catch(error => {
-        logger.error(`Nutritionix search error: ${error.message}`);
+    // Run searches from each API source in parallel
+    const [nutritionixResults, openFoodFactsResults, usdaResults, spoonacularResults] = await Promise.all([
+      nutritionixService.searchByName(query).catch(e => {
+        logger.error('Nutritionix error:', e.message);
         return [];
       }),
-      FoodApiService.searchUSDAByName(query, true).catch(error => {
-        logger.error(`USDA search error: ${error.message}`);
+      openFoodFactsService.searchByName(query).catch(e => {
+        logger.error('OpenFoodFacts error:', e.message);
         return [];
       }),
-      spoonacularService.searchByName(query).catch(error => {
-        logger.error(`Spoonacular search error: ${error.message}`);
+      FoodApiService.searchUSDAByName(query, true).catch(e => {
+        logger.error('USDA error:', e.message);
+        return [];
+      }),
+      spoonacularService.searchByName(query).catch(e => {
+        logger.error('Spoonacular error:', e.message);
         return [];
       })
+    ]);
+
+    // Calculate total results before deduplication
+    const totalBeforeDedup = nutritionixResults.length + openFoodFactsResults.length + usdaResults.length + spoonacularResults.length;
+
+    // Combine all results in priority order
+    const combinedResults = [
+      ...nutritionixResults,
+      ...openFoodFactsResults,
+      ...usdaResults,
+      ...spoonacularResults
     ];
 
-    // Wait for all searches to complete
-    const [nutritionixResults, usdaResults, spoonacularResults] = await Promise.all(searches);
+    // Get deduplicated results with the same logic used in the regular search
+    const dedupResults = FoodApiService.deduplicateResults(combinedResults, query);
 
     res.json({
-      nutritionix: {
-        count: nutritionixResults.length,
-        results: nutritionixResults.slice(0, 3)
+      stats: {
+        query: query,
+        nutritionix: nutritionixResults.length,
+        openFoodFacts: openFoodFactsResults.length,
+        usda: usdaResults.length,
+        spoonacular: spoonacularResults.length,
+        total_before_dedup: totalBeforeDedup,
+        total_after_dedup: dedupResults.length,
+        duplicates_removed: totalBeforeDedup - dedupResults.length
       },
-      usda: {
-        count: usdaResults.length,
-        results: usdaResults.slice(0, 3)
-      },
-      spoonacular: {
-        count: spoonacularResults.length,
-        results: spoonacularResults.slice(0, 3)
+      results: {
+        nutritionix: nutritionixResults.slice(0, 5),
+        openFoodFacts: openFoodFactsResults.slice(0, 5),
+        usda: usdaResults.slice(0, 5),
+        spoonacular: spoonacularResults.slice(0, 5),
+        combined: dedupResults.slice(0, 10)
       }
     });
   } catch (error) {
     logger.error('Debug search error:', error);
-    res.status(500).json({ message: 'Error in debug search', error: error.message });
+    res.status(500).json({
+      error: `Search failed: ${error.message}`,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
