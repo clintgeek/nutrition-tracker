@@ -85,6 +85,11 @@ export interface SyncStatus {
   nextRun: string;
 }
 
+export interface DevModeStatus {
+  enabled: boolean;
+  mode: string;
+}
+
 // Function to detect if error is a rate limit error (429)
 const isRateLimitError = (error: any): boolean => {
   return error?.response?.status === 429 ||
@@ -454,6 +459,38 @@ class FitnessService {
         success: false,
         error: error.response?.data?.error || 'Failed to sync with Garmin'
       };
+    }
+  }
+
+  /**
+   * Get the development mode status for Garmin API access
+   * @returns Development mode status
+   */
+  async getDevModeStatus(): Promise<DevModeStatus> {
+    try {
+      const response = await api.get('/fitness/garmin/dev-mode-status');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting dev mode status:', error);
+      return {
+        enabled: false,
+        mode: 'unknown'
+      };
+    }
+  }
+
+  /**
+   * Toggle Garmin API access in development mode
+   * @param enabled Whether to enable or disable API access
+   * @returns Toggle result
+   */
+  async toggleDevModeApiAccess(enabled: boolean): Promise<any> {
+    try {
+      const response = await api.post('/fitness/garmin/toggle-dev-mode', { enabled });
+      return response.data;
+    } catch (error) {
+      console.error('Error toggling dev mode API access:', error);
+      throw error;
     }
   }
 }

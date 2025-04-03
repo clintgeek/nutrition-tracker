@@ -9,6 +9,9 @@ const { authenticate } = require('../middleware/auth');
 const { validateDate, validateDateRange } = require('../utils/validators');
 const logger = require('../utils/logger');
 const cronService = require('../services/cronService');
+const fs = require('fs');
+const path = require('path');
+const dotenv = require('dotenv');
 
 // Admin middleware
 const isAdmin = async (req, res, next) => {
@@ -624,6 +627,95 @@ router.post('/garmin/sync/now', authenticate, isAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to trigger manual sync',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route GET /api/fitness/garmin/dev-mode-status
+ * @desc Check if Garmin API calls are enabled in development mode
+ * @access Private
+ */
+router.get('/garmin/dev-mode-status', authenticate, async (req, res) => {
+  try {
+    // Only allow this route in development mode
+    if (process.env.NODE_ENV !== 'development') {
+      return res.json({ enabled: true, mode: 'production' });
+    }
+
+    // Check the current setting
+    const enabled = process.env.ENABLE_GARMIN_API_IN_DEV === 'true';
+
+    res.json({
+      enabled,
+      mode: 'development'
+    });
+  } catch (error) {
+    logger.error(`Error checking dev mode status: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check development mode status',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route POST /api/fitness/garmin/toggle-dev-mode
+ * @desc Toggle Garmin API access in development mode
+ * @access Private
+ */
+router.post('/garmin/toggle-dev-mode', authenticate, async (req, res) => {
+  try {
+    // Only allow this route in development mode
+    if (process.env.NODE_ENV !== 'development') {
+      return res.status(403).json({
+        success: false,
+        message: 'This feature is only available in development mode'
+      });
+    }
+
+    const { enabled } = req.body;
+
+    // Read the current .env.local file
+    const envPath = path.resolve(process.cwd(), '.env.local');
+    let envConfig = {};
+
+    try {
+      if (fs.existsSync(envPath)) {
+        envConfig = dotenv.parse(fs.readFileSync(envPath));
+      }
+    } catch (err) {
+      logger.error(`Error reading .env.local: ${err.message}`);
+    }
+
+    // Update the setting
+    envConfig.ENABLE_GARMIN_API_IN_DEV = enabled ? 'true' : 'false';
+
+    // Write it back to the file
+    const envContent = Object.entries(envConfig)
+      .map(([key, value]) => `${key}=${value}`)
+      .join('\n');
+
+    fs.writeFileSync(envPath, envContent);
+
+    // Update the environment variable in the current process
+    process.env.ENABLE_GARMIN_API_IN_DEV = enabled ? 'true' : 'false';
+
+    // Log the change
+    logger.info(`Garmin API in dev mode set to: ${enabled ? 'enabled' : 'disabled'}`);
+
+    res.json({
+      success: true,
+      enabled,
+      message: `Garmin API calls in development mode are now ${enabled ? 'enabled' : 'disabled'}`
+    });
+  } catch (error) {
+    logger.error(`Error updating dev mode setting: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update development mode setting',
       error: error.message
     });
   }

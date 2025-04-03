@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, TouchableOpacity, TextInput as RNTextInput } from 'react-native';
-import { Button, Card, Title, Paragraph, useTheme, Portal, Dialog, Switch, Divider, List } from 'react-native-paper';
-import { RadioButton } from 'react-native-paper';
+import { Button, Card, Title, Paragraph, useTheme, Portal, Dialog, Switch, Divider, List, RadioButton } from 'react-native-paper';
 import { format } from 'date-fns';
 import { useNavigation } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
+import Constants from 'expo-constants';
 
-import { fitnessService, GarminConnectionStatus, SyncResult, GarminCredentials, SyncStatus } from '../services/fitnessService';
+import { fitnessService, GarminConnectionStatus, SyncResult, GarminCredentials, SyncStatus, DevModeStatus } from '../services/fitnessService';
 import { useAuth } from '../contexts/AuthContext';
 
 /**
@@ -31,6 +31,8 @@ const GarminSettingsScreen: React.FC = () => {
   const [showSyncSettings, setShowSyncSettings] = useState(false);
   const [selectedInterval, setSelectedInterval] = useState<number>(15);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isApiEnabledInDev, setIsApiEnabledInDev] = useState(false);
+  const [isDevMode, setIsDevMode] = useState(false);
 
   // Check if user is admin (has permissions to configure sync)
   useEffect(() => {
@@ -77,6 +79,17 @@ const GarminSettingsScreen: React.FC = () => {
   useEffect(() => {
     fetchConnectionStatus();
     fetchSyncStatus();
+  }, []);
+
+  // Check environment mode
+  useEffect(() => {
+    const env = Constants.expoConfig?.extra?.env || 'development';
+    setIsDevMode(env === 'development');
+
+    // If in dev mode, check the current API setting
+    if (env === 'development') {
+      checkApiEnabledStatus();
+    }
   }, []);
 
   // Fetch Garmin connection status
@@ -333,6 +346,41 @@ const GarminSettingsScreen: React.FC = () => {
     }
   };
 
+  // Check if Garmin API is enabled in dev mode
+  const checkApiEnabledStatus = async () => {
+    try {
+      const status = await fitnessService.getDevModeStatus();
+      setIsApiEnabledInDev(status.enabled || false);
+    } catch (error) {
+      console.error('Error checking API enabled status:', error);
+      setIsApiEnabledInDev(false);
+    }
+  };
+
+  // Toggle Garmin API in dev mode
+  const toggleApiInDevMode = async () => {
+    try {
+      setIsSyncLoading(true);
+      const newState = !isApiEnabledInDev;
+      const response = await fitnessService.toggleDevModeApiAccess(newState);
+
+      if (response.success) {
+        setIsApiEnabledInDev(newState);
+        Alert.alert(
+          'Development Mode Setting',
+          `Garmin API calls are now ${newState ? 'enabled' : 'disabled'} in development mode. ${newState ? 'Live API will be used.' : 'Mock data will be used.'}`
+        );
+      } else {
+        Alert.alert('Error', 'Failed to update development mode setting');
+      }
+    } catch (error) {
+      console.error('Error toggling API in dev mode:', error);
+      Alert.alert('Error', 'Failed to update development mode setting');
+    } finally {
+      setIsSyncLoading(false);
+    }
+  };
+
   // Render credentials modal
   const renderCredentialsModal = () => {
     return (
@@ -528,6 +576,30 @@ const GarminSettingsScreen: React.FC = () => {
             <Paragraph style={{ color: garminColors.text }}>Token Value: {authToken ? `${authToken.substring(0, 10)}...` : 'None'}</Paragraph>
           </Card.Content>
         </Card>
+
+        {/* Development mode section */}
+        {isDevMode && (
+          <Card style={styles(theme, garminColors).card}>
+            <Card.Content>
+              <Title style={styles(theme, garminColors).cardTitle}>Development Mode Settings</Title>
+              <Divider style={styles(theme).divider} />
+
+              <View style={styles(theme).settingRow}>
+                <Text style={styles(theme).settingText}>Enable Garmin API Calls</Text>
+                <Switch
+                  value={isApiEnabledInDev}
+                  onValueChange={toggleApiInDevMode}
+                  disabled={isSyncLoading}
+                  color={garminColors.primary}
+                />
+              </View>
+              <Paragraph style={styles(theme).helpText}>
+                When disabled, mock data will be returned instead of making real API calls.
+                This helps prevent hitting rate limits during development.
+              </Paragraph>
+            </Card.Content>
+          </Card>
+        )}
 
         {connectionStatus && connectionStatus.connected ? (
           <>
@@ -750,6 +822,20 @@ const styles = (theme: any, colors?: any) => StyleSheet.create({
   },
   radioItem: {
     paddingVertical: 4,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: colors?.text || theme.colors.text,
+  },
+  settingText: {
+    fontSize: 16,
+    color: colors?.text || theme.colors.text,
+  },
+  helpText: {
+    marginTop: 8,
+    color: colors?.placeholder || '#666',
   },
 });
 

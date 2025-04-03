@@ -8,6 +8,11 @@ const path = require('path');
 const fs = require('fs');
 const logger = require('../config/logger');
 
+// Check environment and API access settings
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const ENABLE_GARMIN_API_IN_DEV = process.env.ENABLE_GARMIN_API_IN_DEV === 'true';
+const isDevMode = NODE_ENV === 'development';
+
 // Define the path to the Python virtual environment and script
 const PYTHON_SCRIPT_PATH = path.join(__dirname, '../python/garmin/garmin_service.py');
 const PYTHON_VENV_PATH = path.join(__dirname, '../../venv/bin/python3');
@@ -198,9 +203,48 @@ function cacheResponse(username, command, args, data) {
  * @param {Object} args - The arguments for the command
  * @param {Object} credentials - The Garmin credentials { username, password }
  * @param {Object} options - Additional options { forceRefresh }
- * @returns {Promise<Object>} - The parsed JSON result
+ * @returns {Promise<Object>} - The command results
  */
 async function executeGarminCommand(command, args = {}, credentials = {}, options = {}) {
+  // Check if in development mode and API calls are disabled
+  if (isDevMode && !ENABLE_GARMIN_API_IN_DEV) {
+    logger.warn(`Garmin API call blocked in dev mode: ${command}. Set ENABLE_GARMIN_API_IN_DEV=true to enable.`);
+
+    // Return mock data based on command type
+    switch (command) {
+      case 'authenticate':
+        return { success: true, message: 'Dev mode mock authentication' };
+      case 'profile':
+        return {
+          success: true,
+          data: {
+            displayName: 'Dev User',
+            userProfileId: 12345678,
+            location: 'Development',
+            gender: 'N/A',
+            weight: 70,
+            height: 175,
+            age: 30
+          }
+        };
+      case 'activities':
+        return { success: true, data: [], message: 'Dev mode - no activities returned' };
+      case 'activity_details':
+        return { success: true, data: {}, message: 'Dev mode - no activity details returned' };
+      case 'daily_summary':
+      case 'daily_summaries':
+        return {
+          success: true,
+          data: [],
+          message: 'Dev mode - no daily summaries returned'
+        };
+      default:
+        return { success: false, error: `Unknown command: ${command}` };
+    }
+  }
+
+  const username = credentials.username;
+
   // Check if Python script exists
   if (!fs.existsSync(PYTHON_SCRIPT_PATH)) {
     logger.error(`Python script not found at ${PYTHON_SCRIPT_PATH}`);
@@ -223,13 +267,13 @@ async function executeGarminCommand(command, args = {}, credentials = {}, option
   }
 
   // Check for rate limiting
-  if (isRateLimited(credentials.username, command)) {
+  if (isRateLimited(username, command)) {
     throw new Error(`Rate limit exceeded for Garmin API command: ${command}`);
   }
 
   // Check cache for non-authenticate commands
   if (command !== 'authenticate') {
-    const cachedResponse = getCachedResponse(credentials.username, command, args, options.forceRefresh);
+    const cachedResponse = getCachedResponse(username, command, args, options.forceRefresh);
     if (cachedResponse) {
       return cachedResponse;
     }
@@ -260,7 +304,7 @@ async function executeGarminCommand(command, args = {}, credentials = {}, option
   logger.debug(`Executing Garmin command: ${command}`);
 
   // Track this API call
-  trackApiCall(credentials.username, command);
+  trackApiCall(username, command);
 
   return new Promise((resolve, reject) => {
     const pythonProcess = spawn(pythonExecutable, cmdArgs);
@@ -284,7 +328,7 @@ async function executeGarminCommand(command, args = {}, credentials = {}, option
       if (code !== 0) {
         logger.error(`Garmin Python process exited with code ${code}`);
         const errorMsg = `Process exited with code ${code}: ${errorString}`;
-        trackApiError(credentials.username, command, errorMsg);
+        trackApiError(username, command, errorMsg);
         reject(new Error(errorMsg));
         return;
       }
@@ -302,7 +346,7 @@ async function executeGarminCommand(command, args = {}, credentials = {}, option
 
           // Cache successful response for non-authenticate commands
           if (command !== 'authenticate' && result && !result.error) {
-            cacheResponse(credentials.username, command, args, result);
+            cacheResponse(username, command, args, result);
           }
 
           resolve(result);
@@ -348,7 +392,7 @@ async function executeGarminCommand(command, args = {}, credentials = {}, option
 
             // Cache successful response for non-authenticate commands
             if (command !== 'authenticate' && result && !result.error) {
-              cacheResponse(credentials.username, command, args, result);
+              cacheResponse(username, command, args, result);
             }
 
             resolve(result);
@@ -372,7 +416,7 @@ async function executeGarminCommand(command, args = {}, credentials = {}, option
       } catch (error) {
         logger.error(`Failed to process Python result: ${error.message}`);
         logger.error(`Raw output: ${dataString}`);
-        trackApiError(credentials.username, command, error.message);
+        trackApiError(username, command, error.message);
         reject(new Error(`Failed to process Python result: ${error.message}`));
       }
     });
@@ -380,7 +424,7 @@ async function executeGarminCommand(command, args = {}, credentials = {}, option
     // Handle process errors
     pythonProcess.on('error', (error) => {
       logger.error(`Failed to start Garmin Python process: ${error.message}`);
-      trackApiError(credentials.username, command, error.message);
+      trackApiError(username, command, error.message);
       reject(error);
     });
 
@@ -388,7 +432,7 @@ async function executeGarminCommand(command, args = {}, credentials = {}, option
     const timeout = setTimeout(() => {
       pythonProcess.kill();
       logger.error('Garmin Python process timed out');
-      trackApiError(credentials.username, command, 'Process timed out');
+      trackApiError(username, command, 'Process timed out');
       reject(new Error('Process timed out'));
     }, 30000); // 30 second timeout
 
