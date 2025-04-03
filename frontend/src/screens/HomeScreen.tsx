@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Text, Card, Title, Button, useTheme, Divider, FAB } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RootStackScreenProps } from '../types/navigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format } from 'date-fns';
+import { useFocusEffect } from '@react-navigation/native';
 
 // Import components
 import TodaySummary from '../components/home/TodaySummary';
@@ -153,6 +154,14 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   useEffect(() => {
     loadData();
   }, [token]);
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('HomeScreen focused, refreshing data');
+      loadData();
+    }, [])
+  );
 
   // Calculate logging streak (simplified implementation)
   const calculateStreak = (logs: any[]) => {

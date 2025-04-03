@@ -159,6 +159,14 @@ const SearchFoodForLogScreen: React.FC<Props> = ({ route }) => {
     fetchFoods();
   }, [fetchFoods, showAllUsersFoods]);
 
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('SearchFoodForLog screen focused, refreshing food list');
+      fetchFoods(searchQuery);
+    }, [fetchFoods, searchQuery])
+  );
+
   // Create a memoized debounced search function
   const debouncedSearch = useMemo(
     () => debounce((query: string) => {

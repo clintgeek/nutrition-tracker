@@ -9,6 +9,7 @@ import * as Clipboard from 'expo-clipboard';
 import { DatePickerModal } from 'react-native-paper-dates';
 import { mealPlanService, MealPlan } from '../../services/mealPlanService';
 import { format } from 'date-fns';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface Meal {
   id: string;
@@ -247,6 +248,14 @@ export const MealPlannerScreen: React.FC = () => {
   useEffect(() => {
     loadMeals();
   }, [selectedDate, currentMonth]);
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('MealPlannerScreen focused, refreshing meals');
+      loadMeals();
+    }, [])
+  );
 
   const loadMeals = async () => {
     try {

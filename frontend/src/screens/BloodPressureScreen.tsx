@@ -20,6 +20,7 @@ import bloodPressureService, { BloodPressureLog } from '../services/bloodPressur
 import BloodPressureForm from '../components/BloodPressureForm';
 import { BloodPressureImportButton } from '../components/BloodPressureImportButton';
 import NivoBloodPressureChart from '../components/blood-pressure/NivoBloodPressureChart';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface BloodPressureFormData {
   systolic: number;
@@ -92,6 +93,14 @@ const BloodPressureScreen: React.FC = () => {
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('BloodPressureScreen focused, refreshing logs');
+      fetchLogs();
+    }, [fetchLogs])
+  );
 
   useEffect(() => {
     const checkPdfTooltipStatus = async () => {
