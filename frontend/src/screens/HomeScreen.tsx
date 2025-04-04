@@ -21,7 +21,8 @@ import { SkeletonLoader } from '../components/common';
 import { useAuth } from '../contexts/AuthContext';
 import { setAuthToken } from '../services/apiService';
 import { userPreferencesService } from '../services/userPreferencesService';
-import { fitnessService, GarminDailySummary } from '../services/fitnessService';
+import { fitnessService, GarminDailySummary, GarminConnectionStatus, RefreshedSummaryResult } from '../services/fitnessService';
+import { getTodayDate } from '../utils/dateUtils';
 
 // Remove the storage key for weight display preference
 // const SHOW_WEIGHT_VALUES_KEY = 'showWeightValuesOnDashboard';
@@ -68,7 +69,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   // Load user preference and data
   // Define loadData outside useEffect so we can call it from the reset button
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
 
@@ -111,23 +112,29 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         });
       }
 
-      // Load fitness data
+      // Load fitness data using the new service method
       try {
-        // Check connection status first
-        const status = await fitnessService.checkGarminConnectionStatus();
-        setConnectionStatus(status);
+        const status: GarminConnectionStatus = await fitnessService.checkGarminConnectionStatus();
+        setConnectionStatus({ connected: status.connected }); // Keep simplified status for Home screen
 
         if (status.connected) {
-          // Get today's date in YYYY-MM-DD format
-          const today = new Date();
-          const todayStr = format(today, 'yyyy-MM-dd');
+          const todayStr = getTodayDate(); // Returns YYYY-MM-DD string
+          console.log(`[HomeScreen] Fetching summary for ${todayStr} using getRefreshedGarminSummary`);
+          const result: RefreshedSummaryResult = await fitnessService.getRefreshedGarminSummary(todayStr);
 
-          // Attempt to get today's summary
-          const summary = await fitnessService.getGarminDailySummary(todayStr);
-          setDailySummary(summary);
+          console.log('[HomeScreen] Summary Result:', result);
+          setDailySummary(result.summary);
+
+          // Log any errors encountered during fetch
+          if (result.error) {
+            console.warn(`[HomeScreen] Error/Info fetching Garmin summary (Source: ${result.source}):`, result.error);
+          }
+        } else {
+          setDailySummary(null); // Clear summary if not connected
         }
       } catch (error) {
-        console.error('Error fetching fitness data:', error);
+        console.error('[HomeScreen] Error fetching fitness data:', error);
+        setDailySummary(null); // Clear summary on error
       }
 
       // Load recent food logs
@@ -145,22 +152,29 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       setTipOfTheDay(getTipOfTheDay());
 
     } catch (error) {
-      // Minimal error logging
+      console.error('[HomeScreen] Error in loadData:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
-    loadData();
-  }, [token]);
+    if (token) {
+        loadData();
+    }
+  }, [token, loadData]);
 
   // Refresh data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       console.log('HomeScreen focused, refreshing data');
-      loadData();
-    }, [])
+      // Call loadData directly if token exists
+      if (token) {
+        loadData();
+      }
+      // No cleanup needed
+      return () => {};
+    }, [token, loadData]) // Depend on token and loadData
   );
 
   // Calculate logging streak (simplified implementation)

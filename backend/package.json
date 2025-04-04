@@ -4,9 +4,10 @@
   "description": "Backend API for nutrition tracking application",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "NODE_ENV=development node -r dotenv/config src/server.js dotenv_config_path=../.env.local",
-    "test": "jest"
+    "start": "node scripts/check-garmin-dependencies.js && node src/server.js",
+    "dev": "nodemon -r dotenv/config src/server.js",
+    "test": "jest",
+    "check-garmin": "node scripts/check-garmin-dependencies.js"
   },
   "dependencies": {
     "@prisma/client": "^4.16.2",

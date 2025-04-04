@@ -1,36 +1,33 @@
-FROM node:16-alpine
+FROM node:18-alpine
 
+# Install Python 3 and required dependencies
+RUN apk add --no-cache python3 py3-pip bash
+
+# Set working directory
 WORKDIR /app
-
-# Install build dependencies and postgresql-client
-RUN apk add --no-cache --virtual .gyp python3 make g++ postgresql-client
-
-# Add npmrc with more aggressive settings
-RUN echo "registry=http://registry.npmjs.org/" > ~/.npmrc && \
-    echo "strict-ssl=false" >> ~/.npmrc && \
-    echo "loglevel=verbose" >> ~/.npmrc && \
-    echo "fetch-retries=5" >> ~/.npmrc
 
 # Copy package files
 COPY package*.json ./
 
-# Configure npm and clean cache
-RUN npm config set registry=http://registry.npmjs.org/ && \
-    npm config set strict-ssl=false && \
-    npm cache clean --force
+# Install Node.js dependencies
+RUN npm ci
 
-# Install dependencies
-RUN npm install --no-audit --no-fund --network-timeout=100000
-RUN npm install bcrypt --no-audit --no-fund
-
-# Remove build dependencies
-RUN apk del .gyp
-
-# Copy the rest of the application code
+# Copy application code
 COPY . .
 
-# Expose the port
-EXPOSE 3000
+# Setup Python virtual environment
+RUN python3 -m venv venv && \
+    . venv/bin/activate && \
+    pip install --no-cache-dir -r requirements-garmin.txt
 
-# Start the server
+# Set permissions on Python scripts
+RUN chmod +x src/python/garmin/*.py
+
+# Set Python path in environment
+ENV PYTHON_PATH=/app/venv/bin/python3
+
+# Expose port
+EXPOSE 4081
+
+# Start the application
 CMD ["npm", "start"]

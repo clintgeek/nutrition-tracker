@@ -24,8 +24,8 @@ app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 
-  // Start the background Garmin sync job
-  const syncIntervalMinutes = parseInt(process.env.GARMIN_SYNC_INTERVAL_MINUTES || '15', 10);
-  logger.info(`Starting Garmin background sync job with ${syncIntervalMinutes} minute interval`);
-  cronService.startGarminSyncJob(syncIntervalMinutes);
+  // // Start the background Garmin sync job -- DISABLED based on new strategy
+  // const syncIntervalMinutes = parseInt(process.env.GARMIN_SYNC_INTERVAL_MINUTES || '15', 10);
+  // logger.info(`Starting Garmin background sync job with ${syncIntervalMinutes} minute interval`);
+  // cronService.startGarminSyncJob(syncIntervalMinutes);
 });

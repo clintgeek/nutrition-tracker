@@ -8,14 +8,43 @@ const path = require('path');
 const fs = require('fs');
 const logger = require('../config/logger');
 
-// Check environment and API access settings
+// Get environment variables for configuration
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const ENABLE_GARMIN_API_IN_DEV = process.env.ENABLE_GARMIN_API_IN_DEV === 'true';
+const ENABLE_GARMIN_API = process.env.ENABLE_GARMIN_API !== 'false'; // Default to enabled
 const isDevMode = NODE_ENV === 'development';
 
-// Define the path to the Python virtual environment and script
+// Define the path to the Python script
 const PYTHON_SCRIPT_PATH = path.join(__dirname, '../python/garmin/garmin_service.py');
-const PYTHON_VENV_PATH = path.join(__dirname, '../../venv/bin/python3');
+
+// Get Python executable from environment or use default paths based on environment
+const PYTHON_VENV_PATH = process.env.PYTHON_PATH ||
+                        (isDevMode
+                          ? path.join(__dirname, '../../venv/bin/python3')
+                          : '/usr/bin/python3');
+
+// Log Python configuration for debugging
+logger.info(`Garmin Python Configuration:
+  - Environment: ${NODE_ENV}
+  - Python Path: ${PYTHON_VENV_PATH}
+  - Script Path: ${PYTHON_SCRIPT_PATH}
+  - API Enabled in Dev: ${ENABLE_GARMIN_API_IN_DEV}
+  - API Enabled: ${ENABLE_GARMIN_API}
+`);
+
+// Check if Python path exists
+if (fs.existsSync(PYTHON_VENV_PATH)) {
+  logger.info(`Python executable found at: ${PYTHON_VENV_PATH}`);
+} else {
+  logger.error(`Python executable NOT found at: ${PYTHON_VENV_PATH}`);
+}
+
+// Check if Python script exists
+if (fs.existsSync(PYTHON_SCRIPT_PATH)) {
+  logger.info(`Python script found at: ${PYTHON_SCRIPT_PATH}`);
+} else {
+  logger.error(`Python script NOT found at: ${PYTHON_SCRIPT_PATH}`);
+}
 
 // Track API call counts and implement rate limiting
 const API_RATE_LIMITS = {
@@ -197,6 +226,17 @@ function cacheResponse(username, command, args, data) {
   logger.debug(`Cached response for ${username}/${command}`);
 }
 
+// Remove activity-related commands
+const validCommands = [
+  'authenticate',
+  'profile',
+  'daily_summary',
+  // 'daily_summaries', // Keep this? Or rely on service to loop?
+  // 'activities',
+  // 'activity_details',
+  'test_connection'
+];
+
 /**
  * Execute a Python command and return the results
  * @param {string} command - The command to execute
@@ -206,41 +246,16 @@ function cacheResponse(username, command, args, data) {
  * @returns {Promise<Object>} - The command results
  */
 async function executeGarminCommand(command, args = {}, credentials = {}, options = {}) {
+  // Check if Garmin API is disabled entirely
+  if (!ENABLE_GARMIN_API) {
+    logger.warn(`Garmin API calls are disabled globally: ${command}. Set ENABLE_GARMIN_API=true to enable.`);
+    return getMockDataForCommand(command);
+  }
+
   // Check if in development mode and API calls are disabled
   if (isDevMode && !ENABLE_GARMIN_API_IN_DEV) {
     logger.warn(`Garmin API call blocked in dev mode: ${command}. Set ENABLE_GARMIN_API_IN_DEV=true to enable.`);
-
-    // Return mock data based on command type
-    switch (command) {
-      case 'authenticate':
-        return { success: true, message: 'Dev mode mock authentication' };
-      case 'profile':
-        return {
-          success: true,
-          data: {
-            displayName: 'Dev User',
-            userProfileId: 12345678,
-            location: 'Development',
-            gender: 'N/A',
-            weight: 70,
-            height: 175,
-            age: 30
-          }
-        };
-      case 'activities':
-        return { success: true, data: [], message: 'Dev mode - no activities returned' };
-      case 'activity_details':
-        return { success: true, data: {}, message: 'Dev mode - no activity details returned' };
-      case 'daily_summary':
-      case 'daily_summaries':
-        return {
-          success: true,
-          data: [],
-          message: 'Dev mode - no daily summaries returned'
-        };
-      default:
-        return { success: false, error: `Unknown command: ${command}` };
-    }
+    return getMockDataForCommand(command);
   }
 
   const username = credentials.username;
@@ -248,26 +263,11 @@ async function executeGarminCommand(command, args = {}, credentials = {}, option
   // Check if Python script exists
   if (!fs.existsSync(PYTHON_SCRIPT_PATH)) {
     logger.error(`Python script not found at ${PYTHON_SCRIPT_PATH}`);
-    throw new Error('Garmin service Python script not found');
-  }
-
-  // Check if Python venv exists, fall back to system python3 if not
-  let pythonExecutable = 'python3';
-  if (fs.existsSync(PYTHON_VENV_PATH)) {
-    pythonExecutable = PYTHON_VENV_PATH;
-    logger.debug(`Using virtual environment Python: ${PYTHON_VENV_PATH}`);
-  } else {
-    logger.warn(`Python virtual environment not found at ${PYTHON_VENV_PATH}, falling back to system python3`);
-  }
-
-  // Ensure required credentials are available
-  if (!credentials.username || !credentials.password) {
-    logger.error('Garmin credentials are not provided');
-    throw new Error('Garmin credentials missing');
+    throw new Error(`Python script not found at ${PYTHON_SCRIPT_PATH}`);
   }
 
   // Check for rate limiting
-  if (isRateLimited(username, command)) {
+  if (username && isRateLimited(username, command)) {
     throw new Error(`Rate limit exceeded for Garmin API command: ${command}`);
   }
 
@@ -284,6 +284,11 @@ async function executeGarminCommand(command, args = {}, credentials = {}, option
     logger.info(`Force refreshing data from Garmin API for command: ${command}`);
   } else {
     logger.info(`Cache miss or expired, fetching fresh data from Garmin API for command: ${command}`);
+  }
+
+  if (!validCommands.includes(command)) {
+    logger.error(`Invalid Garmin command requested: ${command}`);
+    throw new Error(`Invalid Garmin command: ${command}`);
   }
 
   // Build the command arguments
@@ -307,7 +312,7 @@ async function executeGarminCommand(command, args = {}, credentials = {}, option
   trackApiCall(username, command);
 
   return new Promise((resolve, reject) => {
-    const pythonProcess = spawn(pythonExecutable, cmdArgs);
+    const pythonProcess = spawn(PYTHON_VENV_PATH, cmdArgs);
 
     let dataString = '';
     let errorString = '';
@@ -444,6 +449,45 @@ async function executeGarminCommand(command, args = {}, credentials = {}, option
 }
 
 /**
+ * Get mock data for a command when API is disabled
+ * @param {string} command - The command being called
+ * @returns {Object} - Mock data appropriate for the command
+ */
+function getMockDataForCommand(command) {
+  // Return mock data based on command type
+  switch (command) {
+    case 'authenticate':
+      return { success: true, message: 'Mock authentication' };
+    case 'profile':
+      return {
+        success: true,
+        data: {
+          displayName: 'Mock User',
+          userProfileId: 12345678,
+          location: 'Mock Location',
+          gender: 'N/A',
+          weight: 70,
+          height: 175,
+          age: 30
+        }
+      };
+    case 'activities':
+      return { success: true, data: [], message: 'Mock - no activities returned' };
+    case 'activity_details':
+      return { success: true, data: {}, message: 'Mock - no activity details returned' };
+    case 'daily_summary':
+    case 'daily_summaries':
+      return {
+        success: true,
+        data: [],
+        message: 'Mock - no daily summaries returned'
+      };
+    default:
+      return { success: false, error: `Unknown command: ${command}` };
+  }
+}
+
+/**
  * Authenticate with Garmin Connect
  * @param {Object} credentials - The Garmin credentials { username, password }
  * @returns {Promise<Object>} - Authentication result
@@ -467,37 +511,6 @@ async function getUserProfile(credentials) {
     return await executeGarminCommand('profile', {}, credentials);
   } catch (error) {
     logger.error(`Failed to get user profile: ${error.message}`);
-    throw error;
-  }
-}
-
-/**
- * Get activities from Garmin Connect
- * @param {string} startDate - Start date (YYYY-MM-DD)
- * @param {string} endDate - End date (YYYY-MM-DD) (optional)
- * @param {Object} credentials - The Garmin credentials { username, password }
- * @returns {Promise<Array>} - List of activities
- */
-async function getActivities(startDate, endDate, credentials) {
-  try {
-    return await executeGarminCommand('activities', { startDate, endDate }, credentials);
-  } catch (error) {
-    logger.error(`Failed to get activities: ${error.message}`);
-    throw error;
-  }
-}
-
-/**
- * Get activity details from Garmin Connect
- * @param {string} activityId - Activity ID
- * @param {Object} credentials - The Garmin credentials { username, password }
- * @returns {Promise<Object>} - Activity details
- */
-async function getActivityDetails(activityId, credentials) {
-  try {
-    return await executeGarminCommand('activity_details', { activityId }, credentials);
-  } catch (error) {
-    logger.error(`Failed to get activity details: ${error.message}`);
     throw error;
   }
 }
@@ -535,6 +548,10 @@ async function getDailySummaries(startDate, endDate, credentials, forceRefresh =
   }
 }
 
+async function testConnection(credentials) {
+  return executeGarminCommand('test_connection', {}, credentials);
+}
+
 // Export the paths
 module.exports = {
   executeGarminCommand,
@@ -542,8 +559,8 @@ module.exports = {
   PYTHON_VENV_PATH,
   authenticate,
   getUserProfile,
-  getActivities,
-  getActivityDetails,
   getDailySummary,
-  getDailySummaries
+  getDailySummaries,
+  testConnection,
+  // Removed getActivities, getActivityDetails
 };

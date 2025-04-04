@@ -1,25 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert } from 'react-native';
-import { Text, Card, Title, Paragraph, ActivityIndicator, useTheme, Divider, Button, FAB } from 'react-native-paper';
-import { format, parseISO, subDays, isToday, isYesterday } from 'date-fns';
+import { Text, Card, Title, Paragraph, ActivityIndicator, useTheme, Divider, Button } from 'react-native-paper';
+import { format, parseISO, isToday, isYesterday, differenceInSeconds, addHours } from 'date-fns';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
-import { fitnessService, GarminActivity, GarminDailySummary, GarminConnectionStatus } from '../services/fitnessService';
+import { fitnessService, GarminDailySummary, GarminConnectionStatus, RefreshedSummaryResult } from '../services/fitnessService';
 import { api } from '../services/api';
+import { getTodayDate } from '../utils/dateUtils';
 
 /**
  * Fitness Screen
  * Shows Garmin Connect integration data
  */
 const FitnessScreen: React.FC = () => {
-  const [activities, setActivities] = useState<GarminActivity[]>([]);
   const [dailySummary, setDailySummary] = useState<GarminDailySummary | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<GarminConnectionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [forceRefreshing, setForceRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<any | null>(null);
   const theme = useTheme();
   const navigation = useNavigation();
 
@@ -41,10 +41,61 @@ const FitnessScreen: React.FC = () => {
     sedentary: '#E0E0E0',      // Light gray
   };
 
-  // Load data when component mounts
-  useEffect(() => {
-    loadData();
-  }, []);
+  // Refactored Load data function (called by focus and pull-to-refresh)
+  const loadData = useCallback(async (isPullRefresh = false) => {
+    console.log('[FitnessScreen] loadData triggered', { isPullRefresh });
+    if (!isPullRefresh) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
+    setFetchError(null); // Clear previous errors
+
+    try {
+      const status = await fitnessService.checkGarminConnectionStatus();
+      setConnectionStatus(status);
+
+      if (status.connected) {
+        const todayStr = getTodayDate();
+        console.log(`[FitnessScreen] Fetching summary for ${todayStr} using getRefreshedGarminSummary`);
+        const result: RefreshedSummaryResult = await fitnessService.getRefreshedGarminSummary(todayStr);
+
+        console.log('[FitnessScreen] Summary Result:', result);
+        setDailySummary(result.summary);
+        setFetchError(result.error);
+
+        // We no longer need specific rate limit state, just use the error
+        if (result.error) {
+            console.warn('[FitnessScreen] Error received from getRefreshedGarminSummary:', result.error);
+        }
+
+      } else {
+        // Not connected, clear summary and error
+        setDailySummary(null);
+        setFetchError(null);
+      }
+    } catch (error) {
+      console.error('[FitnessScreen] Unexpected error in loadData:', error);
+      setFetchError({ message: 'An unexpected error occurred while loading data.' }); // Set a generic error
+      setDailySummary(null);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []); // Empty dependency array for useCallback, relies on component scope
+
+  // Load data on initial mount and focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('FitnessScreen focused, calling loadData...');
+      loadData(); // Call loadData on focus
+
+      // No cleanup needed for timers anymore
+      return () => {
+        console.log('FitnessScreen unfocused');
+      };
+    }, [loadData]) // Depend on loadData callback
+  );
 
   // Debug Garmin integration
   const debugGarminIntegration = async () => {
@@ -84,113 +135,67 @@ const FitnessScreen: React.FC = () => {
     }
   };
 
-  // Fetch activities and daily summary from the API
-  const loadData = async (forceRefresh = false) => {
-    try {
-      if (forceRefresh) {
-        setForceRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+  // Updated function for manual force refresh button
+  const handleManualForceRefresh = async () => {
+      console.log('[FitnessScreen] Manual force refresh triggered');
+      setForceRefreshing(true);
+      setFetchError(null); // Clear previous errors
 
-      // Load connection status
-      const status = await fitnessService.checkGarminConnectionStatus();
-      setConnectionStatus(status);
+      try {
+        const status = await fitnessService.checkGarminConnectionStatus();
+        setConnectionStatus(status);
 
-      if (status.connected) {
-        try {
-          // Format date as yyyy-MM-dd
-          const today = new Date();
-          const todayStr = today.toISOString().split('T')[0];
+        if (status.connected) {
+           const todayStr = getTodayDate();
+           console.log(`[FitnessScreen] Force refreshing summary for ${todayStr} using forceRefreshGarminSummary`);
+           // Call the NEW public service method
+           const result = await fitnessService.forceRefreshGarminSummary(todayStr);
 
-          // Calculate date 3 days ago (reduced from 7 to minimize API load during testing)
-          const threeDaysAgo = new Date();
-          threeDaysAgo.setDate(today.getDate() - 3);
-          const threeDaysAgoStr = threeDaysAgo.toISOString().split('T')[0];
+           console.log('[FitnessScreen] Manual Force Refresh Result:', result);
 
-          // If doing a force refresh, use the sync function with forceRefresh option
-          if (forceRefresh) {
-            console.log('Force refreshing data from Garmin API...');
-            setSyncing(true);
+           // Update state based on the result object
+           setDailySummary(result.summary);
+           setFetchError(result.error);
 
-            // Sync today's data only to minimize API load
-            const syncResult = await fitnessService.syncGarminData(todayStr, todayStr, true);
-            console.log('Force refresh result:', syncResult);
-
-            if (syncResult.success) {
-              console.log(`Successfully force refreshed data: ${syncResult.imported} of ${syncResult.total} summaries imported`);
-            } else {
-              console.error('Failed to force refresh data:', syncResult.error);
-              if (syncResult.error === 'RATE_LIMIT') {
-                Alert.alert(
-                  'Garmin API Rate Limit',
-                  'You have reached the Garmin API rate limit. Please try again later.',
-                  [{ text: 'OK' }]
-                );
-              }
-            }
-
-            setSyncing(false);
-          } else {
-            // Regular sync for non-force refresh
-            console.log('Syncing with Garmin...');
-            setSyncing(true);
-
-            // Sync past 3 days of summaries
-            const syncResult = await fitnessService.syncGarminData(threeDaysAgoStr, todayStr);
-            if (syncResult.error === 'RATE_LIMIT') {
-              Alert.alert(
-                'Garmin API Rate Limit',
-                'You have reached the Garmin API rate limit. Please try again later.',
-                [{ text: 'OK' }]
-              );
-            }
-
-            // Import activities for today only to minimize API load
-            const importResult = await fitnessService.importGarminActivities(todayStr);
-            console.log('Sync result:', syncResult);
-            console.log('Import result:', importResult);
-
-            setSyncing(false);
-          }
-
-          // Load activities after sync
-          const fetchedActivities = await fitnessService.getGarminActivities(3);
-          console.log('Fetched activities count:', fetchedActivities.length);
-          setActivities(fetchedActivities);
-
-          // Load today's summary - use force refresh option if requested
-          console.log(`Loading daily summary from database${forceRefresh ? ' with force refresh' : ''}...`);
-          const summary = await fitnessService.getGarminDailySummary(todayStr, forceRefresh);
-          console.log('Fetched daily summary:', summary ? 'Found' : 'Not found');
-          setDailySummary(summary);
-        } catch (loadError) {
-          console.error('Error loading database data:', loadError);
+           if (result.error) {
+               console.warn('[FitnessScreen] Error during manual force refresh:', result.error);
+           } else {
+                // Successfully refreshed
+                console.log('[FitnessScreen] Manual force refresh successful.');
+           }
+        } else {
+             setDailySummary(null);
+             setFetchError({ message: 'Cannot refresh, Garmin not connected.' });
         }
+      } catch (error) {
+          console.error('[FitnessScreen] Unexpected error during manual force refresh:', error);
+          setFetchError({ message: 'An unexpected error occurred during force refresh.' });
+          setDailySummary(null);
+      } finally {
+          setForceRefreshing(false);
       }
-    } catch (error) {
-      console.error('Error loading fitness data:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setForceRefreshing(false);
-    }
   };
 
-  // Handle refresh
+  // Handle pull-to-refresh
   const onRefresh = () => {
-    setRefreshing(true);
-    loadData();
+    // Pass true to indicate it's a pull-to-refresh action
+    loadData(true);
   };
 
-  // Handle force refresh
-  const onForceRefresh = () => {
+  // Handle force refresh button press
+  const onForceRefreshPress = () => {
     Alert.alert(
       'Force Refresh from Garmin',
-      'This will bypass all caches and get fresh data directly from Garmin API. This counts against the API rate limits. Continue?',
+      'This will bypass local cache check and get fresh data directly from Garmin API. This counts against the API rate limits. Continue?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Refresh', onPress: () => loadData(true) }
+        {
+          text: 'Refresh',
+          onPress: () => {
+            console.log('[FitnessScreen] Alert "Refresh" button pressed. Attempting to call handleManualForceRefresh...');
+            handleManualForceRefresh();
+          }
+        }
       ]
     );
   };
@@ -239,13 +244,6 @@ const FitnessScreen: React.FC = () => {
     navigation.navigate('GarminSettings' as never);
   };
 
-  // Navigate to see all activities
-  const viewAllActivities = () => {
-    navigation.navigate('Settings', {
-      screen: 'GarminActivities'
-    });
-  };
-
   // Navigate to see all daily summaries
   const viewAllSummaries = () => {
     navigation.navigate('Settings', {
@@ -253,48 +251,29 @@ const FitnessScreen: React.FC = () => {
     });
   };
 
-  // Get icon for activity type
-  const getActivityIcon = (type: string) => {
-    const iconMap: Record<string, string> = {
-      'running': 'run',
-      'cycling': 'bike',
-      'swimming': 'swim',
-      'walking': 'walk',
-      'hiking': 'hiking',
-      'strength_training': 'weight-lifter',
-      'yoga': 'yoga',
-      'indoor_cycling': 'bike',
-      'elliptical': 'ellipse',
-      'treadmill_running': 'run',
-      'cardio': 'heart-pulse',
-    };
-
-    return iconMap[type.toLowerCase()] || 'run-fast';
-  };
-
-  // Render connection status section
+  // Render connection status section (updated)
   const renderConnectionStatus = () => {
     if (loading && !refreshing && !forceRefreshing) {
       return (
-        <Card style={styles(theme).loadingCard}>
+        <Card style={styles(theme, fitnessColors).loadingCard}>
           <ActivityIndicator animating={true} color={theme.colors.primary} />
-          <Text style={styles(theme).loadingText}>Loading Garmin data...</Text>
+          <Text style={styles(theme, fitnessColors).loadingText}>Loading Garmin data...</Text>
         </Card>
       );
     }
 
     if (!connectionStatus?.connected) {
       return (
-        <Card style={styles(theme).notConnectedCard}>
+        <Card style={styles(theme, fitnessColors).notConnectedCard}>
           <Card.Content>
-            <Title style={styles(theme).cardTitle}>Connect Garmin</Title>
-            <Paragraph style={styles(theme).cardText}>
+            <Title style={styles(theme, fitnessColors).cardTitle}>Connect Garmin</Title>
+            <Paragraph style={styles(theme, fitnessColors).cardText}>
               Connect your Garmin account to see your activity and health data.
             </Paragraph>
             <Button
               mode="contained"
               onPress={navigateToSettings}
-              style={styles(theme).buttonMargin}
+              style={styles(theme, fitnessColors).buttonMargin}
             >
               Connect Account
             </Button>
@@ -305,16 +284,16 @@ const FitnessScreen: React.FC = () => {
 
     if (!connectionStatus.isActive) {
       return (
-        <Card style={styles(theme).notConnectedCard}>
+        <Card style={styles(theme, fitnessColors).notConnectedCard}>
           <Card.Content>
-            <Title style={styles(theme).cardTitle}>Reconnect Garmin</Title>
-            <Paragraph style={styles(theme).cardText}>
+            <Title style={styles(theme, fitnessColors).cardTitle}>Reconnect Garmin</Title>
+            <Paragraph style={styles(theme, fitnessColors).cardText}>
               Your Garmin account is not active. Please reconnect to see your data.
             </Paragraph>
             <Button
               mode="contained"
               onPress={navigateToSettings}
-              style={styles(theme).buttonMargin}
+              style={styles(theme, fitnessColors).buttonMargin}
             >
               Reconnect Account
             </Button>
@@ -323,46 +302,50 @@ const FitnessScreen: React.FC = () => {
       );
     }
 
+    // Determine error message based on fetchError state
+    let errorMessage = null;
+    if (fetchError) {
+        if (fetchError.error === 'RATE_LIMIT') {
+            errorMessage = fetchError.message || 'Garmin API rate limit reached. Please try again later.';
+        } else if (fetchError.message) {
+            errorMessage = `Error: ${fetchError.message}`;
+        } else {
+            errorMessage = 'An error occurred fetching Garmin data.';
+        }
+    }
+
     return (
-      <Card style={styles(theme).statusCard}>
+      <Card style={styles(theme, fitnessColors).card}>
         <Card.Content>
-          <View style={styles(theme).statusHeader}>
-            <View>
-              <Title style={styles(theme).cardTitle}>Garmin Connected</Title>
-              <Paragraph style={styles(theme).lastSyncText}>
-                Last sync: {connectionStatus.lastSyncTime
-                  ? format(new Date(connectionStatus.lastSyncTime), 'MMM d, h:mm a')
-                  : 'Never'}
-              </Paragraph>
-            </View>
-
-            <View style={styles(theme).syncButtonContainer}>
-              <Button
-                mode="contained"
-                icon="sync"
-                loading={syncing}
-                onPress={() => loadData(true)}
-                style={styles(theme).syncNowButton}
-              >
-                Sync Now
-              </Button>
-            </View>
+          <View style={styles(theme, fitnessColors).statusHeader}>
+            <MaterialCommunityIcons name="check-circle" size={24} color="#4CAF50" />
+            <Title style={styles(theme, fitnessColors).statusTitle}>Garmin Connected</Title>
           </View>
-
-          <View style={styles(theme).buttonsRow}>
+          <Paragraph style={styles(theme, fitnessColors).statusText}>
+            Last sync attempt: {connectionStatus?.lastSyncTime ? format(parseISO(connectionStatus.lastSyncTime), 'MMM d, yyyy h:mm a') : 'Never'}
+          </Paragraph>
+          {/* Display error message if fetchError exists */}
+          {errorMessage && (
+             <Paragraph style={styles(theme, fitnessColors).errorTextSmall}>
+               {errorMessage}
+             </Paragraph>
+          )}
+          <View style={styles(theme, fitnessColors).buttonRow}>
             <Button
               mode="outlined"
-              onPress={viewAllActivities}
-              style={[styles(theme).smallButton, styles(theme).buttonMargin]}
+              onPress={debugGarminIntegration}
+              style={styles(theme, fitnessColors).debugButton}
             >
-              All Activities
+              Debug
             </Button>
             <Button
               mode="outlined"
-              onPress={viewAllSummaries}
-              style={styles(theme).smallButton}
+              onPress={onForceRefreshPress}
+              loading={forceRefreshing}
+              disabled={refreshing || loading}
+              style={styles(theme, fitnessColors).syncButton}
             >
-              All Summaries
+              Force Refresh
             </Button>
           </View>
         </Card.Content>
@@ -370,46 +353,57 @@ const FitnessScreen: React.FC = () => {
     );
   };
 
-  // Render daily summary card
+  // Render daily summary card (updated error handling)
   const renderDailySummary = () => {
-    if (!connectionStatus?.connected) {
-      return null;
-    }
+    // Show loading indicator within card area if loading and not pull-refreshing
+    if (loading && !refreshing) return null; // Main loading indicator handles this
 
-    if (!dailySummary && !loading) {
-      return (
-        <Card style={styles(theme, fitnessColors).summaryCard}>
-          <Card.Content>
-            <Title style={styles(theme, fitnessColors).sectionTitle}>Today's Activity</Title>
-            <View style={styles(theme, fitnessColors).emptyDataContainer}>
-              <MaterialCommunityIcons name="calendar" size={48} color="#ccc" />
-              <Text style={styles(theme, fitnessColors).emptyDataText}>No data for today</Text>
-              <Paragraph style={{ textAlign: 'center', marginTop: 8, color: fitnessColors.placeholder }}>
-                If you just connected, try using the Sync button above to fetch your Garmin data.
-              </Paragraph>
-              <Paragraph style={{ textAlign: 'center', marginTop: 4, color: fitnessColors.placeholder }}>
-                Note: Garmin API has rate limits (approximately 15 requests per hour).
-              </Paragraph>
-            </View>
+    // Don't render summary if not connected
+    if (!connectionStatus?.connected) return null;
+
+    // Show specific error card if fetchError exists (e.g., rate limit)
+    // We can refine this to show different cards based on error type if needed
+    if (fetchError && !dailySummary) {
+       let errorTitle = 'Error Fetching Summary';
+       let errorMsg = fetchError.message || 'Could not load Garmin data.';
+       let errorIcon = "alert-circle-outline";
+
+       if (fetchError.error === 'RATE_LIMIT') {
+           errorTitle = 'Garmin API Rate Limited';
+           errorIcon = "timer-sand-paused";
+       }
+
+       return (
+        <Card style={[styles(theme, fitnessColors).card, styles(theme, fitnessColors).errorCard]}>
+          <Card.Content style={styles(theme, fitnessColors).centerContent}>
+            <MaterialCommunityIcons name={errorIcon} size={32} color={'#FFFFFF'} />
+            <Title style={[styles(theme, fitnessColors).cardTitle, styles(theme, fitnessColors).errorText]}>{errorTitle}</Title>
+            <Paragraph style={styles(theme, fitnessColors).errorText}>
+              {errorMsg}
+            </Paragraph>
+            {/* Optionally add a retry button here? */}
           </Card.Content>
         </Card>
       );
     }
 
-    if (loading) {
+    // Show card indicating no data if summary is null and no error
+    if (!dailySummary && !fetchError) {
       return (
-        <Card style={styles(theme, fitnessColors).summaryCard}>
+        <Card style={styles(theme, fitnessColors).card}>
           <Card.Content>
-            <Title style={styles(theme, fitnessColors).sectionTitle}>Today's Activity</Title>
-            <View style={styles(theme, fitnessColors).loadingContainer}>
-              <ActivityIndicator size="large" color={fitnessColors.primary} />
-              <Text style={styles(theme, fitnessColors).loadingText}>Loading...</Text>
-            </View>
+            <Title style={styles(theme, fitnessColors).cardTitle}>Today's Summary</Title>
+            <Paragraph>No summary data available for today.</Paragraph>
+            {/* Optional: Button to try force refresh */}
+            <Button onPress={handleManualForceRefresh} loading={forceRefreshing} disabled={refreshing || loading} style={{marginTop: 10}}>
+                Try Refreshing Now
+            </Button>
           </Card.Content>
         </Card>
       );
     }
 
+    // If we have summary data, render it (even if there was a fallback error)
     if (dailySummary) {
       // Log daily summary data to debug
       console.log('===== DAILY SUMMARY DATA =====');
@@ -424,7 +418,7 @@ const FitnessScreen: React.FC = () => {
       console.log('===== END SUMMARY DATA =====');
 
       return (
-        <Card style={styles(theme, fitnessColors).summaryCard}>
+        <Card style={styles(theme, fitnessColors).card}>
           <Card.Content>
             <Title style={styles(theme, fitnessColors).sectionTitle}>Today's Activity</Title>
 
@@ -573,99 +567,35 @@ const FitnessScreen: React.FC = () => {
       );
     }
 
+    // Fallback if none of the above conditions met (shouldn't happen)
     return null;
-  };
-
-  // Render activities section
-  const renderActivities = () => {
-    if (!connectionStatus?.connected) {
-      return null;
-    }
-
-    if (loading && !refreshing) {
-      return (
-        <Card style={styles(theme, fitnessColors).activitiesCard}>
-          <Card.Content>
-            <Title style={styles(theme, fitnessColors).sectionTitle}>Recent Activities</Title>
-            <View style={styles(theme, fitnessColors).loadingContainer}>
-              <ActivityIndicator size="large" color={fitnessColors.primary} />
-            </View>
-          </Card.Content>
-        </Card>
-      );
-    }
-
-    if (activities.length === 0) {
-      return (
-        <Card style={styles(theme, fitnessColors).activitiesCard}>
-          <Card.Content>
-            <Title style={styles(theme, fitnessColors).sectionTitle}>Recent Activities</Title>
-            <View style={styles(theme, fitnessColors).emptyDataContainer}>
-              <MaterialCommunityIcons name="run" size={48} color="#ccc" />
-              <Text style={styles(theme, fitnessColors).emptyDataText}>No recent activities</Text>
-            </View>
-          </Card.Content>
-        </Card>
-      );
-    }
-
-    return (
-      <Card style={styles(theme, fitnessColors).activitiesCard}>
-        <Card.Content>
-          <View style={styles(theme, fitnessColors).sectionHeader}>
-            <Title style={styles(theme, fitnessColors).sectionTitle}>Recent Activities</Title>
-            <TouchableOpacity onPress={viewAllActivities}>
-              <Text style={styles(theme, fitnessColors).viewAllLink}>View All</Text>
-            </TouchableOpacity>
-          </View>
-
-          {activities.slice(0, 3).map((activity, index) => (
-            <React.Fragment key={activity.garmin_activity_id}>
-              <View style={styles(theme, fitnessColors).activityItem}>
-                <View style={styles(theme, fitnessColors).activityIconContainer}>
-                  <MaterialCommunityIcons
-                    name={getActivityIcon(activity.activity_type)}
-                    size={24}
-                    color={fitnessColors.primary}
-                  />
-                </View>
-                <View style={styles(theme, fitnessColors).activityInfo}>
-                  <Text style={styles(theme, fitnessColors).activityName}>{activity.activity_name}</Text>
-                  <Text style={styles(theme, fitnessColors).activityDate}>{formatDate(activity.start_time)}</Text>
-                </View>
-                <View style={styles(theme, fitnessColors).activityStats}>
-                  <Text style={styles(theme, fitnessColors).activityDuration}>{formatDuration(activity.duration_seconds)}</Text>
-                  <Text style={styles(theme, fitnessColors).activityDistance}>{formatDistance(activity.distance_meters)}</Text>
-                </View>
-              </View>
-              {index < activities.length - 1 && <Divider style={styles(theme, fitnessColors).divider} />}
-            </React.Fragment>
-          ))}
-        </Card.Content>
-      </Card>
-    );
   };
 
   return (
     <View style={styles(theme, fitnessColors).container}>
-      {loading && !refreshing ? (
-        <View style={styles(theme, fitnessColors).loadingContainer}>
-          <ActivityIndicator size="large" color={fitnessColors.primary} />
-          <Text style={{ marginTop: 16, color: fitnessColors.text }}>Loading fitness data...</Text>
-        </View>
-      ) : (
-        <ScrollView
-          style={styles(theme, fitnessColors).scrollContainer}
-          contentContainerStyle={{ paddingBottom: 80 }}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[fitnessColors.primary]} />
-          }
-        >
-          {renderDailySummary()}
-          {renderActivities()}
-          {renderConnectionStatus()}
-        </ScrollView>
-      )}
+      <ScrollView
+        contentContainerStyle={styles(theme, fitnessColors).scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        {/* Show main loading indicator only on initial load */}
+        {loading && !refreshing && (
+          <View style={styles(theme, fitnessColors).loadingContainer}>
+            <ActivityIndicator size="large" color={fitnessColors.primary} />
+            <Text style={styles(theme, fitnessColors).loadingText}>Loading fitness data...</Text>
+          </View>
+        )}
+
+        {/* Render content when not initial loading */}
+        {!loading && (
+          <>
+            {/* Render Summary Card FIRST (handles its own error/empty states) */}
+            {connectionStatus?.connected && renderDailySummary()}
+
+            {/* Render Connection Status Card SECOND (handles its own error state) */}
+            {renderConnectionStatus()}
+          </>
+        )}
+      </ScrollView>
     </View>
   );
 };
@@ -675,83 +605,123 @@ const styles = (theme: any, colors?: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors?.background || (theme.dark ? theme.colors.background : '#f5f5f5'),
   },
-  scrollContainer: {
+  scrollContent: {
     padding: 16,
+  },
+  card: {
+    marginBottom: 16,
+    backgroundColor: colors?.surface || theme.colors.surface,
+    borderRadius: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: colors?.borderColor || 'transparent',
+  },
+  errorCard: {
+    backgroundColor: colors?.error || theme.colors.error,
+    borderColor: 'darkred',
+    borderWidth: 1,
+  },
+  errorText: {
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  errorTextSmall: {
+    color: colors?.error || theme.colors.error,
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+  centerContent: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: colors?.text || theme.colors.text,
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 50,
   },
-  sectionHeader: {
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: colors?.placeholder || theme.colors.disabled,
+  },
+  button: {
+    marginTop: 15,
+    backgroundColor: colors?.primary || theme.colors.primary,
+  },
+  divider: {
+    marginVertical: 10,
+  },
+  statusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  statusTitle: {
+    marginLeft: 10,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors?.text || theme.colors.text,
+  },
+  statusText: {
+    fontSize: 14,
+    color: colors?.placeholder || theme.colors.disabled,
+    marginBottom: 15,
+  },
+  buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  debugButton: {
+    borderColor: colors?.placeholder || theme.colors.disabled,
+    flex: 1,
+    marginRight: 5,
+  },
+  syncButton: {
+    borderColor: colors?.primary || theme.colors.primary,
+    flex: 1,
+    marginLeft: 5,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+  },
+  summaryItem: {
+    width: '30%',
     alignItems: 'center',
-    marginBottom: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 5,
+    color: colors?.text || theme.colors.text,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: colors?.placeholder || theme.colors.disabled,
+    marginTop: 2,
+    textAlign: 'center',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: colors?.text || theme.colors.text,
-  },
-  viewAllLink: {
-    color: colors?.primary || theme.colors.primary,
-    fontSize: 14,
-  },
-  connectionCard: {
-    marginBottom: 16,
-    backgroundColor: colors?.surface || theme.colors.surface,
-    borderRadius: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    borderWidth: 1,
-    borderColor: colors?.borderColor || 'transparent',
-  },
-  connectionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  connectionTextContainer: {
-    marginLeft: 16,
-    flex: 1,
-  },
-  connectionIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  connectionText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors?.text || theme.colors.text,
-  },
-  lastSyncText: {
-    fontSize: 12,
-    color: colors?.placeholder || theme.colors.placeholder,
-    marginTop: 2,
-  },
-  connectButton: {
-    marginTop: 16,
-    backgroundColor: colors?.primary || theme.colors.primary,
-  },
-  summaryCard: {
-    marginBottom: 16,
-    backgroundColor: colors?.surface || theme.colors.surface,
-    borderRadius: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    borderWidth: 1,
-    borderColor: colors?.borderColor || 'transparent',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -772,89 +742,6 @@ const styles = (theme: any, colors?: any) => StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 4,
     color: colors?.text || theme.colors.text,
-  },
-  heartRateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    padding: 8,
-    backgroundColor: 'rgba(255, 82, 82, 0.1)',
-    borderRadius: 4,
-  },
-  heartRateText: {
-    fontSize: 14,
-    marginLeft: 8,
-    color: colors?.text || theme.colors.text,
-  },
-  activitiesCard: {
-    marginBottom: 16,
-    backgroundColor: colors?.surface || theme.colors.surface,
-    borderRadius: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    borderWidth: 1,
-    borderColor: colors?.borderColor || 'transparent',
-  },
-  activityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  activityIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors?.accent || 'rgba(33, 150, 243, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors?.primary || theme.colors.primary,
-    marginRight: 12,
-  },
-  activityInfo: {
-    flex: 1,
-  },
-  activityName: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: colors?.text || theme.colors.text,
-  },
-  activityDate: {
-    fontSize: 12,
-    color: colors?.placeholder || theme.colors.placeholder,
-  },
-  activityStats: {
-    alignItems: 'flex-end',
-  },
-  activityDuration: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: colors?.text || theme.colors.text,
-  },
-  activityDistance: {
-    fontSize: 12,
-    color: colors?.placeholder || theme.colors.placeholder,
-  },
-  divider: {
-    marginVertical: 4,
-    backgroundColor: colors?.borderColor || theme.colors.disabled,
-  },
-  emptyDataContainer: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  emptyDataText: {
-    fontSize: 16,
-    color: colors?.placeholder || theme.colors.placeholder,
-    marginTop: 8,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: colors?.text || theme.colors.text,
-    marginTop: 16,
   },
   calorieBreakdown: {
     marginTop: 12,
@@ -910,50 +797,6 @@ const styles = (theme: any, colors?: any) => StyleSheet.create({
     fontSize: 12,
     color: colors?.text || theme.colors.text,
   },
-  statusCard: {
-    marginBottom: 16,
-    backgroundColor: colors?.surface || theme.colors.surface,
-    borderRadius: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    borderWidth: 1,
-    borderColor: colors?.borderColor || 'transparent',
-  },
-  statusHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  syncButtonContainer: {
-    alignItems: 'flex-end',
-  },
-  syncNowButton: {
-    backgroundColor: theme.colors.primary,
-  },
-  buttonsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-  },
-  smallButton: {
-    flex: 1,
-  },
-  buttonMargin: {
-    marginHorizontal: 4,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors?.text || theme.colors.text,
-  },
-  cardText: {
-    fontSize: 14,
-    color: colors?.placeholder || theme.colors.placeholder,
-  },
   loadingCard: {
     marginBottom: 16,
     backgroundColor: colors?.surface || theme.colors.surface,
@@ -977,6 +820,13 @@ const styles = (theme: any, colors?: any) => StyleSheet.create({
     shadowRadius: 4,
     borderWidth: 1,
     borderColor: colors?.borderColor || 'transparent',
+  },
+  buttonMargin: {
+    marginHorizontal: 4,
+  },
+  cardText: {
+    fontSize: 14,
+    color: colors?.placeholder || theme.colors.placeholder,
   },
 });
 

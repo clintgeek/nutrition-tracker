@@ -98,165 +98,6 @@ router.post('/garmin/disconnect', authenticate, async (req, res) => {
 });
 
 /**
- * @route POST /api/fitness/garmin/import
- * @desc Import activities from Garmin
- * @access Private
- */
-router.post('/garmin/import', authenticate, validateDateRange, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { startDate, endDate } = req.body;
-
-    logger.info(`Importing activities for user ${userId} from ${startDate} to ${endDate || startDate}`);
-    const importResult = await garminService.importActivities(userId, startDate, endDate);
-
-    if (!importResult.success) {
-      // Check if this is a rate limit error
-      if (importResult.error &&
-          (importResult.error.includes('rate limit') ||
-           importResult.error.includes('Too Many Requests'))) {
-        logger.warn(`Rate limit reached during import for user ${userId}`);
-        return res.status(429).json({
-          success: false,
-          error: 'RATE_LIMIT',
-          message: 'Garmin API rate limit reached. Please try again later.'
-        });
-      }
-
-      logger.warn(`Import failed for user ${userId}: ${importResult.error}`);
-      return res.status(400).json({ success: false, error: importResult.error });
-    }
-
-    logger.info(`Successfully imported ${importResult.imported} of ${importResult.totalActivities} activities for user ${userId}`);
-    res.json({
-      success: true,
-      message: `Imported ${importResult.imported} of ${importResult.totalActivities} activities`,
-      imported: importResult.imported,
-      total: importResult.totalActivities
-    });
-  } catch (error) {
-    logger.error(`Error importing Garmin activities: ${error.message}`);
-    res.status(500).json({ error: 'Failed to import activities' });
-  }
-});
-
-/**
- * @route POST /api/fitness/garmin/sync
- * @desc Sync daily summaries from Garmin
- * @access Private
- */
-router.post('/garmin/sync', authenticate, validateDateRange, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { startDate, endDate, forceRefresh } = req.body;
-    const shouldForceRefresh = forceRefresh === true;
-
-    logger.info(`Syncing daily summaries for user ${userId} from ${startDate} to ${endDate || startDate}${shouldForceRefresh ? ' (force refresh)' : ''}`);
-
-    // Add more detailed logging
-    logger.info(`Detailed sync request - User: ${userId}, Start: ${startDate}, End: ${endDate}, Force: ${shouldForceRefresh}`);
-
-    const syncResult = await garminService.syncDailySummaries(userId, startDate, endDate, shouldForceRefresh);
-
-    // Log the sync result
-    logger.info(`Sync result: ${JSON.stringify(syncResult, null, 2)}`);
-
-    if (!syncResult.success) {
-      // Check if this is a rate limit error
-      if (syncResult.error &&
-          (syncResult.error.includes('rate limit') ||
-           syncResult.error.includes('Too Many Requests'))) {
-        logger.warn(`Rate limit reached during sync for user ${userId}`);
-        return res.status(429).json({
-          success: false,
-          error: 'RATE_LIMIT',
-          message: 'Garmin API rate limit reached. Please try again later.'
-        });
-      }
-
-      logger.warn(`Sync failed for user ${userId}: ${syncResult.error}`);
-      return res.status(400).json({ success: false, error: syncResult.error });
-    }
-
-    logger.info(`Successfully synced ${syncResult.imported} of ${syncResult.total} daily summaries for user ${userId}`);
-
-    // After sync, check the data that was stored
-    try {
-      const summaries = await garminService.getDailySummaries(userId, { startDate, endDate });
-      if (summaries && summaries.length > 0) {
-        logger.info(`Sample of synced data for ${summaries[0].date}: ${JSON.stringify({
-          steps: summaries[0].total_steps,
-          minutes_highly_active: summaries[0].minutes_highly_active,
-          minutes_moderately_active: summaries[0].minutes_moderately_active,
-          minutes_lightly_active: summaries[0].minutes_lightly_active,
-          minutes_sedentary: summaries[0].minutes_sedentary
-        })}`);
-      }
-    } catch (checkError) {
-      logger.warn(`Error checking synced data: ${checkError.message}`);
-    }
-
-    res.json({
-      success: true,
-      message: `Synced ${syncResult.imported} of ${syncResult.total} daily summaries`,
-      imported: syncResult.imported,
-      total: syncResult.total
-    });
-  } catch (error) {
-    logger.error(`Error syncing Garmin daily summaries: ${error.message}`);
-    res.status(500).json({ error: 'Failed to sync daily summaries' });
-  }
-});
-
-/**
- * @route GET /api/fitness/garmin/activities
- * @desc Get list of activities
- * @access Private
- */
-router.get('/garmin/activities', authenticate, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { limit = 20, offset = 0, startDate, endDate } = req.query;
-
-    const activities = await garminService.getActivities(
-      userId,
-      parseInt(limit),
-      parseInt(offset),
-      startDate,
-      endDate
-    );
-
-    res.json(activities);
-  } catch (error) {
-    logger.error(`Error getting Garmin activities: ${error.message}`);
-    res.status(500).json({ error: 'Failed to get activities' });
-  }
-});
-
-/**
- * @route GET /api/fitness/garmin/activities/:activityId
- * @desc Get activity details
- * @access Private
- */
-router.get('/garmin/activities/:activityId', authenticate, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { activityId } = req.params;
-
-    const activity = await garminService.getActivityDetails(userId, activityId);
-
-    if (activity.error) {
-      return res.status(404).json({ error: activity.error });
-    }
-
-    res.json(activity);
-  } catch (error) {
-    logger.error(`Error getting Garmin activity details: ${error.message}`);
-    res.status(500).json({ error: 'Failed to get activity details' });
-  }
-});
-
-/**
  * @route GET /api/fitness/garmin/daily/:date
  * @desc Get daily summary for a specific date - returns raw data without processing
  */
@@ -278,7 +119,16 @@ router.get('/garmin/daily/:date', authenticate, async (req, res) => {
 
     if (summary.error) {
       logger.warn(`Error getting daily summary: ${summary.error}`);
-      return res.status(404).json({ error: summary.error });
+      // Check if it's a rate limit error
+      if (summary.error.includes('429') || summary.error.includes('Too Many Requests')) {
+        return res.status(429).json({
+          success: false,
+          error: 'RATE_LIMIT',
+          message: 'Garmin API rate limit reached. Please try again later.'
+        });
+      }
+      // For other errors, return 404 or appropriate status
+      return res.status(404).json({ success: false, error: summary.error });
     }
 
     // Log the activity minutes fields for debugging
@@ -297,6 +147,14 @@ router.get('/garmin/daily/:date', authenticate, async (req, res) => {
     res.json(summary);
   } catch (error) {
     logger.error(`Error getting daily summary: ${error.message}`);
+    // Handle potential rate limit exceptions thrown by the service/wrapper
+    if (error.message.includes('Rate limit exceeded')) {
+       return res.status(429).json({
+         success: false,
+         error: 'RATE_LIMIT',
+         message: 'Garmin API rate limit reached. Please try again later.'
+       });
+    }
     res.status(500).json({ error: 'Failed to get daily summary' });
   }
 });

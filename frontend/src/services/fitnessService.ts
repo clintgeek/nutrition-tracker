@@ -1,5 +1,7 @@
 import { api } from './api';
 import axios, { AxiosError } from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { differenceInMinutes } from 'date-fns';
 
 /**
  * Interface for connection status response
@@ -17,27 +19,6 @@ export interface GarminConnectionStatus {
 export interface GarminCredentials {
   username: string;
   password: string;
-}
-
-/**
- * Interface for Garmin activity
- */
-export interface GarminActivity {
-  id: number;
-  garmin_activity_id: string;
-  activity_name: string;
-  activity_type: string;
-  start_time: string;
-  duration_seconds: number;
-  distance_meters: number;
-  calories: number;
-  avg_heart_rate: number;
-  max_heart_rate: number;
-  steps: number;
-  elevation_gain: number;
-  created_at: string;
-  updated_at: string;
-  details?: any;
 }
 
 /**
@@ -90,6 +71,17 @@ export interface DevModeStatus {
   mode: string;
 }
 
+// Interface for the result of the new function
+export interface RefreshedSummaryResult {
+  summary: GarminDailySummary | null;
+  error: any | null; // Can hold the error object
+  source: 'live' | 'cache' | 'cache-fallback';
+}
+
+// AsyncStorage key
+const LAST_LIVE_FETCH_KEY = '@garmin_last_live_fetch_timestamp';
+const CACHE_DURATION_MINUTES = 15;
+
 // Function to detect if error is a rate limit error (429)
 const isRateLimitError = (error: any): boolean => {
   return error?.response?.status === 429 ||
@@ -120,8 +112,8 @@ class FitnessService {
   }
 
   /**
-   * Connect Garmin account
-   * @param credentials Garmin Connect credentials
+   * Connect to Garmin account
+   * @param credentials Garmin credentials
    * @returns Connection result
    */
   async connectGarminAccount(credentials: GarminCredentials): Promise<SyncResult> {
@@ -130,6 +122,16 @@ class FitnessService {
       return response.data;
     } catch (error: any) {
       console.error('Error connecting Garmin account:', error);
+
+      // Check if this is a rate limit error
+      if (isRateLimitError(error)) {
+        return {
+          success: false,
+          error: 'RATE_LIMIT',
+          message: 'Garmin API rate limit reached. Please try again later.'
+        };
+      }
+
       return {
         success: false,
         error: error.response?.data?.error || 'Failed to connect Garmin account'
@@ -138,28 +140,15 @@ class FitnessService {
   }
 
   /**
-   * Disconnect Garmin account
+   * Disconnect from Garmin account
    * @returns Disconnection result
    */
   async disconnectGarminAccount(): Promise<SyncResult> {
     try {
-      console.log('Calling disconnect Garmin API endpoint');
       const response = await api.post('/fitness/garmin/disconnect');
-      console.log('Disconnect API response:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error disconnecting Garmin account:', error);
-
-      // More detailed error logging
-      if (error.response) {
-        console.error('Response data:', error.response.data);
-        console.error('Response status:', error.response.status);
-      } else if (error.request) {
-        console.error('No response received:', error.request);
-      } else {
-        console.error('Error setting up request:', error.message);
-      }
-
       return {
         success: false,
         error: error.response?.data?.error || 'Failed to disconnect Garmin account'
@@ -168,120 +157,153 @@ class FitnessService {
   }
 
   /**
-   * Import activities from Garmin
-   * @param startDate Start date (YYYY-MM-DD)
-   * @param endDate End date (YYYY-MM-DD) (optional)
-   * @returns Import result
-   */
-  async importGarminActivities(startDate: string, endDate?: string): Promise<SyncResult> {
-    try {
-      console.log('Importing Garmin activities for date range:', startDate, 'to', endDate);
-      const response = await api.post('/fitness/garmin/import', { startDate, endDate });
-      console.log('Import response:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('Error importing Garmin activities:', error);
-
-      if (isRateLimitError(error)) {
-        console.warn('Garmin API rate limit reached');
-        return {
-          success: false,
-          error: 'RATE_LIMIT',
-          message: 'Garmin API rate limit reached. Please try again later.'
-        };
-      }
-
-      return {
-        success: false,
-        error: error?.response?.data?.error || error.message || 'Unknown error'
-      };
-    }
-  }
-
-  /**
-   * Sync daily summaries from Garmin
-   * @param startDate Start date (YYYY-MM-DD)
-   * @param endDate End date (YYYY-MM-DD) (optional)
-   * @returns Sync result
-   */
-  async syncGarminDailySummaries(startDate: string, endDate?: string): Promise<SyncResult> {
-    try {
-      console.log('Syncing Garmin daily summaries for date range:', startDate, 'to', endDate);
-      const response = await api.post('/fitness/garmin/sync', { startDate, endDate });
-      console.log('Sync response:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('Error syncing Garmin daily summaries:', error);
-
-      if (isRateLimitError(error)) {
-        console.warn('Garmin API rate limit reached');
-        return {
-          success: false,
-          error: 'RATE_LIMIT',
-          message: 'Garmin API rate limit reached. Please try again later.'
-        };
-      }
-
-      return {
-        success: false,
-        error: error?.response?.data?.error || error.message || 'Unknown error'
-      };
-    }
-  }
-
-  /**
-   * Get Garmin activities
-   * @param limit Maximum number of activities to return
-   * @param offset Offset for pagination
-   * @param startDate Start date filter (YYYY-MM-DD) (optional)
-   * @param endDate End date filter (YYYY-MM-DD) (optional)
-   * @returns List of activities
-   */
-  async getGarminActivities(
-    limit = 20,
-    offset = 0,
-    startDate?: string,
-    endDate?: string
-  ): Promise<GarminActivity[]> {
-    try {
-      const params = { limit, offset, startDate, endDate };
-      const response = await api.get('/fitness/garmin/activities', { params });
-      return response.data;
-    } catch (error) {
-      console.error('Error getting Garmin activities:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get activity details
-   * @param activityId Garmin activity ID
-   * @returns Activity details
-   */
-  async getGarminActivityDetails(activityId: string): Promise<GarminActivity | null> {
-    try {
-      const response = await api.get(`/fitness/garmin/activities/${activityId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error getting Garmin activity details:', error);
-      return null;
-    }
-  }
-
-  /**
    * Get daily summary for a specific date
+   * Internal function called by getRefreshedGarminSummary
    * @param date Date (YYYY-MM-DD)
    * @param forceRefresh Whether to force refresh data from Garmin API
-   * @returns Daily summary
+   * @returns Daily summary or error object
    */
-  async getGarminDailySummary(date: string, forceRefresh?: boolean): Promise<GarminDailySummary | null> {
+  private async _getGarminDailySummaryInternal(date: string, forceRefresh?: boolean): Promise<GarminDailySummary | null | { error: string; message: string }> {
     try {
       const params = forceRefresh ? { forceRefresh: 'true' } : {};
-      const response = await api.get(`/fitness/garmin/daily/${date}`, { params });
-      return response.data;
-    } catch (error) {
-      console.error('Error getting Garmin daily summary:', error);
-      return null;
+      const url = `/fitness/garmin/daily/${date}`;
+      // Add timestamp cache buster only if forcing refresh
+      const cacheBuster = forceRefresh ? `?_=${new Date().getTime()}` : '';
+      console.log(`[FitnessService] Calling API endpoint: ${api.defaults.baseURL}${url}${cacheBuster} with forceRefresh=${forceRefresh}`);
+      const response = await api.get(`${url}${cacheBuster}`, { params });
+      console.log(`[FitnessService] API response for ${date} (forceRefresh=${forceRefresh}):`, response.data);
+      // Ensure empty data is returned as null for consistency
+      if (response.data && Object.keys(response.data).length === 0) {
+        console.log(`[FitnessService] Empty object received for ${date}, treating as null.`);
+        return null;
+      }
+      return response.data as GarminDailySummary;
+    } catch (error: any) {
+      console.error(`[FitnessService] Error getting Garmin daily summary for ${date} (forceRefresh=${forceRefresh}):`, error);
+      if (error.response?.status === 429 || error.response?.data?.error === 'RATE_LIMIT') {
+        console.warn(`[FitnessService] Rate limit hit for ${date} (forceRefresh=${forceRefresh})`);
+        return {
+          error: 'RATE_LIMIT',
+          message: error.response?.data?.message || 'Garmin API rate limit reached. Please try again later.'
+        };
+      }
+      // Return the full error object for better handling upstream
+      return { error: 'FETCH_FAILED', message: error.message || 'Failed to fetch summary' };
+    }
+  }
+
+  /**
+   * Gets the Garmin daily summary, checking client-side cache timestamp first.
+   * Fetches live data if cache is older than 15 minutes, otherwise uses backend cache.
+   * Includes fallback to backend cache if live fetch fails.
+   * @param date Date (YYYY-MM-DD)
+   * @returns RefreshedSummaryResult object
+   */
+  async getRefreshedGarminSummary(date: string): Promise<RefreshedSummaryResult> {
+    let lastFetchTimestampStr: string | null = null;
+    let minutesSinceLastFetch: number | null = null;
+    const now = new Date();
+
+    try {
+      lastFetchTimestampStr = await AsyncStorage.getItem(LAST_LIVE_FETCH_KEY);
+      if (lastFetchTimestampStr) {
+        const lastFetchTime = new Date(parseInt(lastFetchTimestampStr, 10));
+        minutesSinceLastFetch = differenceInMinutes(now, lastFetchTime);
+        console.log(`[FitnessService] Last live fetch for Garmin was ${minutesSinceLastFetch} minutes ago.`);
+      } else {
+        console.log('[FitnessService] No previous Garmin live fetch timestamp found.');
+      }
+    } catch (e) {
+      console.error('[FitnessService] Error reading Garmin timestamp from AsyncStorage:', e);
+      // Proceed as if no timestamp exists
+    }
+
+    const shouldForceRefresh = minutesSinceLastFetch === null || minutesSinceLastFetch >= CACHE_DURATION_MINUTES;
+
+    if (shouldForceRefresh) {
+      console.log('[FitnessService] Attempting LIVE fetch (cache expired or missing).');
+      const liveResult = await this._getGarminDailySummaryInternal(date, true);
+
+      // Check if the result is an error object
+      if (liveResult && typeof liveResult === 'object' && 'error' in liveResult) {
+        console.warn('[FitnessService] Live fetch failed. Attempting CACHE fallback.', liveResult);
+        const fallbackResult = await this._getGarminDailySummaryInternal(date, false);
+
+        if (fallbackResult && typeof fallbackResult === 'object' && 'error' in fallbackResult) {
+          // Both live and cache failed
+          return { summary: null, error: liveResult, source: 'cache-fallback' }; // Return original live error
+        }
+        // Cache fallback succeeded
+        return { summary: fallbackResult as GarminDailySummary | null, error: liveResult, source: 'cache-fallback' }; // Return original live error
+
+      } else if (liveResult) {
+        // Live fetch succeeded
+        try {
+          await AsyncStorage.setItem(LAST_LIVE_FETCH_KEY, now.getTime().toString());
+          console.log('[FitnessService] Successfully updated live fetch timestamp.');
+        } catch (e) {
+          console.error('[FitnessService] Error saving Garmin timestamp to AsyncStorage:', e);
+        }
+        return { summary: liveResult as GarminDailySummary, error: null, source: 'live' };
+      } else {
+        // Live fetch returned null (e.g., no data for the day yet)
+        console.log('[FitnessService] Live fetch returned null/no data.');
+         try {
+          await AsyncStorage.setItem(LAST_LIVE_FETCH_KEY, now.getTime().toString());
+           console.log('[FitnessService] Successfully updated live fetch timestamp even though data was null.');
+         } catch (e) {
+           console.error('[FitnessService] Error saving Garmin timestamp to AsyncStorage:', e);
+         }
+        return { summary: null, error: null, source: 'live' };
+      }
+    } else {
+      console.log('[FitnessService] Using CACHED data (timestamp is fresh).');
+      const cachedResult = await this._getGarminDailySummaryInternal(date, false);
+
+      if (cachedResult && typeof cachedResult === 'object' && 'error' in cachedResult) {
+        // Cache fetch failed
+        return { summary: null, error: cachedResult, source: 'cache' };
+      }
+      // Cache fetch succeeded or returned null
+      return { summary: cachedResult as GarminDailySummary | null, error: null, source: 'cache' };
+    }
+  }
+
+  /**
+   * Manually forces a refresh from the Garmin API, bypassing client-side cache check.
+   * Updates the last fetch timestamp on success.
+   * @param date Date (YYYY-MM-DD)
+   * @returns Object containing summary or error
+   */
+  async forceRefreshGarminSummary(date: string): Promise<{ summary: GarminDailySummary | null; error: any | null }> {
+    console.log(`[FitnessService] Manual force refresh requested for ${date}`);
+    const now = new Date();
+
+    const result = await this._getGarminDailySummaryInternal(date, true);
+
+    // Check if the result is an error object
+    if (result && typeof result === 'object' && 'error' in result) {
+      console.warn('[FitnessService] Manual force refresh failed:', result);
+      return { summary: null, error: result };
+    } else if (result) {
+      // Manual force refresh succeeded, update timestamp
+      try {
+        await AsyncStorage.setItem(LAST_LIVE_FETCH_KEY, now.getTime().toString());
+        console.log('[FitnessService] Successfully updated live fetch timestamp after manual refresh.');
+      } catch (e) {
+        console.error('[FitnessService] Error saving Garmin timestamp to AsyncStorage after manual refresh:', e);
+      }
+      return { summary: result as GarminDailySummary, error: null };
+    } else {
+      // Manual force refresh returned null (e.g., no data for the day yet)
+      console.log('[FitnessService] Manual force refresh returned null/no data.');
+      try {
+        await AsyncStorage.setItem(LAST_LIVE_FETCH_KEY, now.getTime().toString());
+        console.log('[FitnessService] Successfully updated live fetch timestamp after manual refresh (null data).');
+      } catch (e) {
+        console.error('[FitnessService] Error saving Garmin timestamp to AsyncStorage after manual refresh:', e);
+      }
+      return { summary: null, error: null };
     }
   }
 

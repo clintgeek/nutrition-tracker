@@ -15,17 +15,18 @@ import {
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LogStackParamList } from '../../types/navigation';
+import { RootStackParamList } from '../../types/navigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { foodLogService } from '../../services/foodLogService';
 import { goalService } from '../../services/goalService';
+import { fitnessService, GarminDailySummary, RefreshedSummaryResult } from '../../services/fitnessService';
 import { FoodLog } from '../../services/foodLogService';
 import { formatDate, getTodayDate } from '../../utils/dateUtils';
 import EmptyState from '../../components/common/EmptyState';
 import { SkeletonCard, LoadingOverlay } from '../../components/common';
 
-type LogScreenNavigationProp = NativeStackNavigationProp<LogStackParamList>;
+type LogScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Log'>;
 
 const LogScreen: React.FC = () => {
   const navigation = useNavigation<LogScreenNavigationProp>();
@@ -43,6 +44,7 @@ const LogScreen: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
+  const [dailySummary, setDailySummary] = useState<GarminDailySummary | null>(null);
 
   const theme = useTheme();
 
@@ -200,66 +202,67 @@ const LogScreen: React.FC = () => {
     loadCalorieGoal();
   }, []);
 
-  const fetchLogs = async (dateToFetch = selectedDate) => {
+  // Combined fetch function for logs and potentially Garmin data
+  const fetchDataForDate = useCallback(async (dateToFetch: string) => {
+    setIsLoading(true);
+    // Reset states
+    setLogs([]);
+    setNutritionSummary({ calories: 0, protein: 0, carbs: 0, fat: 0 });
+    setDailySummary(null);
+
     try {
-      setIsLoading(true);
-      console.log('Fetching logs for date:', dateToFetch);
-      const logsData = await foodLogService.getLogs(dateToFetch);
-      console.log('API Response:', {
-        success: !!logsData,
-        logCount: logsData?.length || 0
-      });
+      // Fetch logs and Garmin summary concurrently
+      console.log('[LogScreen] Fetching data for date:', dateToFetch);
+      const [logsData, garminResult] = await Promise.all([
+        foodLogService.getLogs(dateToFetch),
+        fitnessService.getRefreshedGarminSummary(dateToFetch)
+      ]);
 
+      // Process Logs
+      console.log('[LogScreen] Logs API Response:', { success: !!logsData, logCount: logsData?.length || 0 });
       setLogs(logsData);
+      if (logsData && logsData.length > 0) {
+        const summary = logsData.reduce((acc, log) => {
+          const calories = log.calories_per_serving || 0;
+          const protein = log.protein_grams || 0;
+          const carbs = log.carbs_grams || 0;
+          const fat = log.fat_grams || 0;
+          const servings = log.servings || 1;
+          return {
+            calories: acc.calories + (calories * servings),
+            protein: acc.protein + (protein * servings),
+            carbs: acc.carbs + (carbs * servings),
+            fat: acc.fat + (fat * servings),
+          };
+        }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+        console.log('[LogScreen] Calculated nutrition summary:', summary);
+        setNutritionSummary(summary);
+      }
 
-      // Calculate nutrition summary
-      const summary = logsData.reduce((acc, log) => {
-        // Get values from the correct properties
-        const calories = log.calories_per_serving || 0;
-        const protein = log.protein_grams || 0;
-        const carbs = log.carbs_grams || 0;
-        const fat = log.fat_grams || 0;
-        const servings = log.servings || 1;
+      // Process Garmin Summary
+      console.log('[LogScreen] Garmin Summary Result:', garminResult);
+      setDailySummary(garminResult.summary);
+      if (garminResult.error) {
+        console.warn(`[LogScreen] Error fetching Garmin summary (Source: ${garminResult.source}):`, garminResult.error);
+        // Optionally set a Garmin-specific error state here if UI needs it
+      }
 
-        console.log('Processing log:', {
-          id: log.id,
-          food_name: log.food_name,
-          calories_per_serving: log.calories_per_serving,
-          protein_grams: log.protein_grams,
-          carbs_grams: log.carbs_grams,
-          fat_grams: log.fat_grams,
-          servings: log.servings
-        });
-
-        return {
-          calories: acc.calories + (calories * servings),
-          protein: acc.protein + (protein * servings),
-          carbs: acc.carbs + (carbs * servings),
-          fat: acc.fat + (fat * servings),
-        };
-      }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
-
-      console.log('Calculated summary:', summary);
-      setNutritionSummary(summary);
     } catch (error) {
-      console.error('Error fetching logs:', error);
+      console.error('[LogScreen] Error fetching data for date:', error);
+      // Handle combined error or specific errors if Promise.allSettled was used
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  // Fetch logs when selectedDate changes
-  useEffect(() => {
-    console.log('Date changed, fetching logs for:', selectedDate);
-    fetchLogs();
-  }, [selectedDate]);
-
-  // Also fetch logs when the screen comes into focus
+  // Fetch data when the screen comes into focus or date changes
   useFocusEffect(
     useCallback(() => {
-      console.log('Screen focused, refreshing logs');
-      fetchLogs();
-    }, [])
+      console.log('LogScreen focused, fetching data for', selectedDate);
+      fetchDataForDate(selectedDate);
+      // No cleanup needed for this effect
+      return () => {};
+    }, [selectedDate, fetchDataForDate]) // Depend on selectedDate and the fetch function
   );
 
   const handleDateChange = (event: any, date?: Date) => {
@@ -307,7 +310,7 @@ const LogScreen: React.FC = () => {
       await foodLogService.deleteLog(selectedLogId);
 
       // Refresh logs after deletion
-      await fetchLogs();
+      await fetchDataForDate(selectedDate);
       setShowDeleteDialog(false);
     } catch (error) {
       console.error('Error deleting log:', error);
@@ -341,14 +344,14 @@ const LogScreen: React.FC = () => {
         <Card.Title
           title={mealTitles[mealType]}
           subtitle={`${Math.round(mealCalories)} cal`}
-          left={(props) => (
+          left={(props: { size: number; color?: string }) => (
             <Avatar.Icon
               {...props}
               icon={mealIcons[mealType]}
               style={{ backgroundColor: theme.colors.primary }}
             />
           )}
-          right={(props) => (
+          right={(props: { size: number; color?: string }) => (
             <Button
               icon="plus"
               mode="text"
@@ -412,6 +415,15 @@ const LogScreen: React.FC = () => {
         )}
       </Card>
     );
+  };
+
+  // Example of how to potentially use the Garmin data (needs UI implementation)
+  const calculateBonusCalories = () => {
+    if (dailySummary && dailySummary.active_calories) {
+      // Placeholder logic: 50% of active calories as bonus
+      return Math.round(dailySummary.active_calories * 0.5);
+    }
+    return 0;
   };
 
   return (

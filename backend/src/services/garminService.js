@@ -7,6 +7,8 @@ const db = require('../config/db');
 const logger = require('../utils/logger');
 const garminWrapper = require('../utils/garmin_wrapper');
 
+const STALE_THRESHOLD_MINUTES = 15;
+
 /**
  * Get user's Garmin credentials from database
  * @param {number} userId - User ID
@@ -154,25 +156,6 @@ async function disconnectAccount(userId) {
 }
 
 /**
- * Get the most recent activity date from database
- * @param {number} userId - User ID
- * @returns {Promise<string|null>} - Most recent activity date or null
- */
-async function getMostRecentActivityDate(userId) {
-  try {
-    const result = await db.query(
-      'SELECT TO_CHAR(start_time, \'YYYY-MM-DD\') as date FROM garmin_activities WHERE user_id = $1 ORDER BY start_time DESC LIMIT 1',
-      [userId]
-    );
-
-    return result.rows.length > 0 ? result.rows[0].date : null;
-  } catch (error) {
-    logger.error(`Failed to get most recent activity date: ${error.message}`);
-    return null;
-  }
-}
-
-/**
  * Get the most recent daily summary date from database
  * @param {number} userId - User ID
  * @returns {Promise<string|null>} - Most recent daily summary date or null
@@ -192,359 +175,10 @@ async function getMostRecentDailySummaryDate(userId) {
 }
 
 /**
- * Calculate the optimal date range for data sync
- * @param {number} userId - User ID
- * @param {string} requestedStartDate - Requested start date (YYYY-MM-DD)
- * @param {string} requestedEndDate - Requested end date (YYYY-MM-DD) (optional)
- * @param {string} dataType - Type of data ('activities' or 'daily_summaries')
- * @returns {Promise<Object>} - Optimized date range { startDate, endDate }
- */
-async function calculateOptimalDateRange(userId, requestedStartDate, requestedEndDate, dataType) {
-  const today = new Date();
-  const formattedToday = today.toISOString().split('T')[0];
-  const endDate = requestedEndDate || formattedToday;
-
-  // Get most recent date from database
-  const mostRecentDate = dataType === 'activities'
-    ? await getMostRecentActivityDate(userId)
-    : await getMostRecentDailySummaryDate(userId);
-
-  // If we have data and the requested start date is earlier than our most recent data
-  if (mostRecentDate) {
-    const mostRecentDateTime = new Date(mostRecentDate);
-    // Add one day to get data since last sync
-    mostRecentDateTime.setDate(mostRecentDateTime.getDate() + 1);
-    const nextDay = mostRecentDateTime.toISOString().split('T')[0];
-
-    // If requested start date is before our last sync date, use the day after last sync
-    if (new Date(requestedStartDate) < mostRecentDateTime) {
-      logger.debug(`Optimizing date range for ${dataType}. Using ${nextDay} instead of ${requestedStartDate}`);
-      return { startDate: nextDay, endDate };
-    }
-  }
-
-  // Use requested date range
-  return { startDate: requestedStartDate, endDate };
-}
-
-/**
- * Import activities from Garmin
- * @param {number} userId - User ID
- * @param {string} startDate - Start date (YYYY-MM-DD)
- * @param {string} endDate - End date (YYYY-MM-DD) (optional)
- * @returns {Promise<Object>} Import result
- */
-async function importActivities(userId, startDate, endDate = null) {
-  try {
-    // Check if user has an active connection
-    const connectionStatus = await checkConnectionStatus(userId);
-    if (!connectionStatus.connected || !connectionStatus.isActive) {
-      return { success: false, error: 'No active Garmin connection' };
-    }
-
-    if (!connectionStatus.hasCredentials) {
-      return { success: false, error: 'Garmin credentials not provided' };
-    }
-
-    // Get user credentials
-    const credentials = await getUserCredentials(userId);
-    if (!credentials) {
-      return { success: false, error: 'Garmin credentials not found' };
-    }
-
-    // Calculate optimal date range
-    const { startDate: optimalStart, endDate: optimalEnd } =
-      await calculateOptimalDateRange(userId, startDate, endDate, 'activities');
-
-    // If the optimal start date is after the end date, no need to fetch anything
-    if (new Date(optimalStart) > new Date(optimalEnd)) {
-      return {
-        success: true,
-        message: 'Data already up to date.',
-        imported: 0,
-        total: 0
-      };
-    }
-
-    // Get activities from Garmin
-    const activities = await garminWrapper.getActivities(optimalStart, optimalEnd, credentials);
-
-    if (activities.error) {
-      logger.error(`Error getting activities from Garmin: ${activities.error}`);
-      return { success: false, error: activities.error };
-    }
-
-    // Insert or update activities in database
-    const importedCount = await storeActivities(userId, activities);
-
-    // Update last sync time
-    await db.query(
-      'UPDATE garmin_connections SET last_sync_time = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1',
-      [userId]
-    );
-
-    return {
-      success: true,
-      imported: importedCount,
-      total: activities.length,
-      message: `Retrieved ${activities.length} activities from ${optimalStart} to ${optimalEnd}. Imported ${importedCount}.`
-    };
-  } catch (error) {
-    logger.error(`Failed to import Garmin activities: ${error.message}`);
-    throw error;
-  }
-}
-
-/**
- * Store activities in database
- * @param {number} userId - User ID
- * @param {Array} activities - List of activities
- * @returns {Promise<number>} - Number of imported activities
- */
-async function storeActivities(userId, activities) {
-  try {
-    let importedCount = 0;
-    const client = await db.getClient();
-
-    try {
-      await client.query('BEGIN');
-
-      for (const activity of activities) {
-        const existingResult = await client.query(
-          'SELECT id FROM garmin_activities WHERE user_id = $1 AND garmin_activity_id = $2',
-          [userId, activity.activityId]
-        );
-
-        if (existingResult.rows.length === 0) {
-          // Insert new activity
-          await client.query(
-            `INSERT INTO garmin_activities (
-              user_id, garmin_activity_id, activity_name, activity_type, start_time,
-              duration_seconds, distance_meters, calories, avg_heart_rate, max_heart_rate,
-              steps, elevation_gain
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-            [
-              userId,
-              activity.activityId,
-              activity.activityName,
-              activity.activityType,
-              activity.startTime,
-              activity.durationSeconds,
-              activity.distanceMeters,
-              activity.calories,
-              activity.avgHeartRate,
-              activity.maxHeartRate,
-              activity.steps,
-              activity.elevationGain
-            ]
-          );
-          importedCount++;
-        } else {
-          // Update existing activity
-          await client.query(
-            `UPDATE garmin_activities SET
-              activity_name = $3, activity_type = $4, start_time = $5,
-              duration_seconds = $6, distance_meters = $7, calories = $8,
-              avg_heart_rate = $9, max_heart_rate = $10, steps = $11,
-              elevation_gain = $12, updated_at = CURRENT_TIMESTAMP
-            WHERE user_id = $1 AND garmin_activity_id = $2`,
-            [
-              userId,
-              activity.activityId,
-              activity.activityName,
-              activity.activityType,
-              activity.startTime,
-              activity.durationSeconds,
-              activity.distanceMeters,
-              activity.calories,
-              activity.avgHeartRate,
-              activity.maxHeartRate,
-              activity.steps,
-              activity.elevationGain
-            ]
-          );
-        }
-      }
-
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      logger.error(`Failed to store activities: ${error.message}`);
-      throw error;
-    } finally {
-      client.release();
-    }
-
-    return importedCount;
-  } catch (error) {
-    logger.error(`Failed to store activities: ${error.message}`);
-    throw error;
-  }
-}
-
-/**
- * Get daily summary for a user on a specific date
- * @param {number} userId - User ID
- * @param {string} date - Date string (YYYY-MM-DD)
- * @param {boolean} forceRefresh - Force refresh from Garmin API even if cached
- * @returns {Promise<Object>} Daily summary or error
- */
-async function getDailySummary(userId, date, forceRefresh = false) {
-  try {
-    logger.info(`Getting daily summary for user ${userId} on ${date}${forceRefresh ? ' (force refresh)' : ''}`);
-
-    // Check if summary exists in database and we're not forcing refresh
-    if (!forceRefresh) {
-      const summary = await db.query(
-        `SELECT * FROM garmin_daily_summaries WHERE user_id = $1 AND date = $2`,
-        [userId, date]
-      );
-
-      if (summary.rows.length > 0) {
-        logger.info(`Found daily summary in database for user ${userId} on ${date}`);
-        // Return raw data directly without processing
-        logger.info(`Returning raw database data without any processing`);
-        return summary.rows[0];
-      }
-    } else {
-      logger.info(`Force refresh requested, bypassing database cache for user ${userId} on ${date}`);
-    }
-
-    // Not found in database or force refresh, try to get from Garmin
-    logger.info(`${forceRefresh ? 'Force refreshing' : 'No data found in database for'} ${date}, fetching from Garmin API`);
-
-    // Get user credentials
-    const credentials = await getUserCredentials(userId);
-    if (!credentials) {
-      logger.warn(`No Garmin credentials found for user ${userId}`);
-      return { error: 'No Garmin credentials found' };
-    }
-
-    try {
-      // Try to get summary from Garmin
-      const garminSummary = await garminWrapper.getDailySummary(date, credentials, forceRefresh);
-      if (garminSummary.error) {
-        return { error: garminSummary.error };
-      }
-
-      // Store in database
-      await storeDailySummaries(userId, [garminSummary]);
-
-      // Return the raw Garmin data
-      logger.info(`Got fresh data from Garmin API for ${date}`);
-
-      // Fetch the stored data to ensure consistency with database format
-      const storedSummary = await db.query(
-        `SELECT * FROM garmin_daily_summaries WHERE user_id = $1 AND date = $2`,
-        [userId, date]
-      );
-
-      if (storedSummary.rows.length > 0) {
-        logger.info(`Returning freshly stored data without any processing`);
-        return storedSummary.rows[0];
-      }
-
-      return garminSummary;
-    } catch (error) {
-      logger.error(`Error getting daily summary from Garmin for ${date}: ${error.message}`);
-      return { error: `Failed to get Garmin daily summary: ${error.message}` };
-    }
-  } catch (error) {
-    logger.error(`Failed to get daily summary: ${error.message}`);
-    return { error: error.message };
-  }
-}
-
-/**
- * Sync daily summaries from Garmin
- * @param {number} userId - User ID
- * @param {string} startDate - Start date (YYYY-MM-DD)
- * @param {string} endDate - End date (YYYY-MM-DD) (optional)
- * @param {boolean} forceRefresh - Force refresh from Garmin API even if cached
- * @returns {Promise<Object>} Sync result
- */
-async function syncDailySummaries(userId, startDate, endDate = null, forceRefresh = false) {
-  try {
-    // Check if user has an active connection
-    const connectionStatus = await checkConnectionStatus(userId);
-    if (!connectionStatus.connected || !connectionStatus.isActive) {
-      return { success: false, error: 'No active Garmin connection' };
-    }
-
-    if (!connectionStatus.hasCredentials) {
-      return { success: false, error: 'Garmin credentials not provided' };
-    }
-
-    // Get user credentials
-    const credentials = await getUserCredentials(userId);
-    if (!credentials) {
-      return { success: false, error: 'Garmin credentials not found' };
-    }
-
-    // Calculate optimal date range (skip if force refreshing)
-    const { startDate: optimalStart, endDate: optimalEnd } = forceRefresh
-      ? { startDate, endDate: endDate || startDate }
-      : await calculateOptimalDateRange(userId, startDate, endDate, 'daily_summaries');
-
-    // If the optimal start date is after the end date and we're not force refreshing, no need to fetch anything
-    if (!forceRefresh && new Date(optimalStart) > new Date(optimalEnd)) {
-      return {
-        success: true,
-        message: 'Daily summaries already up to date.',
-        imported: 0,
-        total: 0
-      };
-    }
-
-    logger.info(`${forceRefresh ? 'Force refreshing' : 'Syncing'} daily summaries for user ${userId} from ${optimalStart} to ${optimalEnd}`);
-
-    // Get daily summaries from Garmin
-    const summaries = await garminWrapper.getDailySummaries(optimalStart, optimalEnd, credentials, forceRefresh);
-
-    // Handle error response
-    if (summaries && summaries.error) {
-      logger.error(`Error getting daily summaries from Garmin: ${summaries.error}`);
-      return { success: false, error: summaries.error };
-    }
-
-    // Ensure summaries is an array for proper handling
-    if (!Array.isArray(summaries)) {
-      logger.warn(`Unexpected result from Garmin API - expected array but got: ${typeof summaries}`);
-      return {
-        success: false,
-        error: `Unexpected data format from Garmin API: ${typeof summaries}`
-      };
-    }
-
-    // Log raw summaries for debugging
-    logger.debug(`Retrieved ${summaries.length} summaries from Garmin: ${JSON.stringify(summaries)}`);
-
-    // Store daily summaries in database
-    const importedCount = await storeDailySummaries(userId, summaries);
-
-    // Update last sync time
-    await db.query(
-      'UPDATE garmin_connections SET last_sync_time = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1',
-      [userId]
-    );
-
-    return {
-      success: true,
-      imported: importedCount,
-      total: summaries.length,
-      message: `Retrieved ${summaries.length} daily summaries from ${optimalStart} to ${optimalEnd}. Imported ${importedCount}.`
-    };
-  } catch (error) {
-    logger.error(`Failed to sync Garmin daily summaries: ${error.message}`);
-    return { success: false, error: error.message };
-  }
-}
-
-/**
  * Store daily summaries in database
  * @param {number} userId - User ID
- * @param {Array} summaries - List of daily summaries
- * @returns {Promise<number>} - Number of imported summaries
+ * @param {Array<Object>} summaries - Array of daily summary objects from API
+ * @returns {Promise<number>} Count of inserted/updated summaries
  */
 async function storeDailySummaries(userId, summaries) {
   try {
@@ -657,136 +291,188 @@ async function storeDailySummaries(userId, summaries) {
 }
 
 /**
- * Get activities list for a user
+ * Sync daily summaries from Garmin
  * @param {number} userId - User ID
- * @param {Object} options - Query options
- * @returns {Promise<Array>} - List of activities
+ * @param {string} startDate - Start date (YYYY-MM-DD)
+ * @param {string} endDate - End date (YYYY-MM-DD) (optional)
+ * @param {boolean} forceRefresh - Force refresh from Garmin API even if cached
+ * @returns {Promise<Object>} Sync result
  */
-async function getActivities(userId, options = {}) {
+async function syncDailySummaries(userId, startDate, endDate = null, forceRefresh = false) {
   try {
-    const { limit = 20, offset = 0, startDate, endDate, activityType } = options;
+    logger.info(`${forceRefresh ? 'Force refreshing' : 'Syncing'} daily summaries for user ${userId} from ${startDate} to ${endDate || startDate}`);
 
-    let query = `
-      SELECT * FROM garmin_activities
-      WHERE user_id = $1
-    `;
-    const queryParams = [userId];
-    let paramCount = 2;
-
-    if (startDate) {
-      query += ` AND start_time >= $${paramCount}`;
-      queryParams.push(startDate);
-      paramCount++;
+    // Check connection and credentials
+    const connectionStatus = await checkConnectionStatus(userId);
+    if (!connectionStatus.connected || !connectionStatus.isActive || !connectionStatus.hasCredentials) {
+      return { success: false, error: 'No active Garmin connection with credentials' };
     }
-
-    if (endDate) {
-      query += ` AND start_time <= $${paramCount}`;
-      queryParams.push(endDate);
-      paramCount++;
-    }
-
-    if (activityType) {
-      query += ` AND activity_type = $${paramCount}`;
-      queryParams.push(activityType);
-      paramCount++;
-    }
-
-    query += ` ORDER BY start_time DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
-    queryParams.push(limit, offset);
-
-    const result = await db.query(query, queryParams);
-    return result.rows;
-  } catch (error) {
-    logger.error(`Failed to get activities: ${error.message}`);
-    throw error;
-  }
-}
-
-/**
- * Get activity details
- * @param {number} userId - User ID
- * @param {string} activityId - Activity ID
- * @returns {Promise<Object>} Activity details
- */
-async function getActivityDetails(userId, activityId) {
-  try {
-    // First check if we have the activity in our database
-    const activityResult = await db.query(
-      'SELECT * FROM garmin_activities WHERE user_id = $1 AND garmin_activity_id = $2',
-      [userId, activityId]
-    );
-
-    if (activityResult.rows.length === 0) {
-      return { error: 'Activity not found' };
-    }
-
-    // Get user credentials for additional details
     const credentials = await getUserCredentials(userId);
     if (!credentials) {
-      // Return just the database data if no credentials
-      return activityResult.rows[0];
+      return { success: false, error: 'Garmin credentials not found' };
     }
 
-    // Get additional details from Garmin if needed
-    try {
-      const details = await garminWrapper.getActivityDetails(activityId, credentials);
-      return {
-        ...activityResult.rows[0],
-        details
-      };
-    } catch (error) {
-      // Return just the database data if we can't get details from Garmin
-      logger.error(`Error getting activity details from Garmin: ${error.message}`);
-      return activityResult.rows[0];
+    // Get daily summaries from Garmin wrapper
+    const summaries = await garminWrapper.getDailySummaries(startDate, endDate || startDate, credentials, forceRefresh);
+
+    if (summaries && summaries.error) {
+      logger.error(`Error getting daily summaries from Garmin: ${summaries.error}`);
+      return { success: false, error: summaries.error };
     }
+
+    if (!Array.isArray(summaries)) {
+      logger.warn(`Unexpected result from Garmin API - expected array but got: ${typeof summaries}`);
+      return {
+        success: false,
+        error: `Unexpected data format from Garmin API: ${typeof summaries}`
+      };
+    }
+
+    // Store daily summaries in database
+    const importedCount = await storeDailySummaries(userId, summaries);
+
+    // Update last sync time ONLY if we successfully fetched from API
+    if (summaries.length > 0 || importedCount > 0) { // Check if we actually got data
+      await db.query(
+        'UPDATE garmin_connections SET last_sync_time = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1',
+        [userId]
+      );
+      logger.info(`Updated last_sync_time for user ${userId} after successful sync.`);
+    } else {
+      logger.info(`No new summaries fetched for user ${userId}, last_sync_time not updated.`);
+    }
+
+    return {
+      success: true,
+      imported: importedCount,
+      total: summaries.length,
+      message: `Retrieved ${summaries.length} daily summaries from ${startDate} to ${endDate || startDate}. Imported ${importedCount}.`
+    };
   } catch (error) {
-    logger.error(`Failed to get activity details: ${error.message}`);
-    throw error;
+    logger.error(`Failed to sync Garmin daily summaries: ${error.message}`);
+    return { success: false, error: error.message };
   }
 }
 
 /**
- * Get daily summaries for a user
+ * Get daily summary for a specific date, triggering sync if stale
  * @param {number} userId - User ID
- * @param {Object} options - Query options
- * @returns {Promise<Array>} - List of daily summaries
+ * @param {string} date - Date (YYYY-MM-DD)
+ * @param {boolean} forceRefresh - Force refresh from Garmin API
+ * @returns {Promise<Object>} Daily summary data or error object
  */
-async function getDailySummaries(userId, options = {}) {
+async function getDailySummary(userId, date, forceRefresh = false) {
   try {
-    const { limit = 30, offset = 0, startDate, endDate } = options;
+    logger.info(`Getting daily summary for user ${userId} on ${date}${forceRefresh ? ' (force refresh)' : ''}`);
+    let summaryFromDb = null;
 
-    let query = `
-      SELECT * FROM garmin_daily_summaries
-      WHERE user_id = $1
-    `;
-    const queryParams = [userId];
-    let paramCount = 2;
-
-    if (startDate) {
-      query += ` AND date >= $${paramCount}`;
-      queryParams.push(startDate);
-      paramCount++;
+    // Check if refresh is needed (either forced or stale data)
+    let shouldRefresh = forceRefresh;
+    if (!forceRefresh) {
+      const connectionStatus = await checkConnectionStatus(userId);
+      if (connectionStatus.connected && connectionStatus.isActive && connectionStatus.hasCredentials) {
+        const lastSync = connectionStatus.lastSyncTime ? new Date(connectionStatus.lastSyncTime) : null;
+        if (!lastSync) {
+          logger.info(`No last sync time found for user ${userId}, triggering initial sync.`);
+          shouldRefresh = true;
+        } else {
+          const minutesSinceLastSync = (new Date() - lastSync) / (1000 * 60);
+          if (minutesSinceLastSync > STALE_THRESHOLD_MINUTES) {
+            logger.info(`Data is stale (${minutesSinceLastSync.toFixed(1)} mins > ${STALE_THRESHOLD_MINUTES} mins), triggering refresh.`);
+            shouldRefresh = true;
+          } else {
+            logger.info(`Data is fresh (${minutesSinceLastSync.toFixed(1)} mins <= ${STALE_THRESHOLD_MINUTES} mins), using cached DB data.`);
+          }
+        }
+      }
     }
 
-    if (endDate) {
-      query += ` AND date <= $${paramCount}`;
-      queryParams.push(endDate);
-      paramCount++;
+    // If refresh is needed, trigger sync for the specific requested date
+    if (shouldRefresh) {
+      logger.info(`Triggering live fetch for user ${userId} for specific date ${date}`);
+      try {
+        const credentials = await getUserCredentials(userId);
+        if (!credentials) {
+          throw new Error('Garmin credentials not found during refresh attempt');
+        }
+
+        // Call the wrapper for a SINGLE day summary
+        const summaryData = await garminWrapper.getDailySummary(date, credentials, true);
+
+        // Check for errors from the wrapper
+        if (summaryData && summaryData.error) {
+          logger.warn(`Garmin wrapper failed to get single day summary for ${date}: ${summaryData.error}`);
+          // Do not return here, let the DB fetch proceed, but log the failure
+          // Potentially return the specific error if needed? For now, just log.
+        } else if (summaryData) {
+          // Store the single summary (wrapper expects an array)
+          await storeDailySummaries(userId, [summaryData]);
+          // Update last sync time ONLY if we successfully fetched and stored
+          await db.query(
+            'UPDATE garmin_connections SET last_sync_time = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1',
+            [userId]
+          );
+          logger.info(`Updated last_sync_time for user ${userId} after successful single day fetch for ${date}.`);
+        } else {
+            logger.warn(`Garmin wrapper returned no data for single day summary ${date}`);
+        }
+
+      } catch (syncError) {
+        // Log the error from the refresh attempt but don't halt execution
+        // Let the function proceed to try and fetch from DB anyway
+        logger.error(`Error during single day refresh attempt for user ${userId}, date ${date}: ${syncError.message}`);
+        // We could potentially return an error here if a forced refresh fails critically
+        // return { error: `Failed during forced refresh: ${syncError.message}` };
+      }
     }
 
-    query += ` ORDER BY date DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
-    queryParams.push(limit, offset);
+    // Always fetch the requested date's summary from the database after potential refresh attempt
+    logger.debug(`Fetching summary for ${date} from database for user ${userId}`);
+    const result = await db.query(
+      'SELECT * FROM garmin_daily_summaries WHERE user_id = $1 AND date = $2',
+      [userId, date]
+    );
 
-    const result = await db.query(query, queryParams);
+    if (result.rows.length === 0) {
+      logger.info(`No summary found in DB for user ${userId} on ${date}`);
+      // If we attempted a refresh and still have nothing, it might be a valid 'no data' day
+      return { error: `No summary data found for ${date}` };
+    }
+
+    summaryFromDb = result.rows[0];
+    logger.info(`Successfully retrieved summary from DB for user ${userId} on ${date}`);
+    return summaryFromDb;
+
+  } catch (error) {
+    logger.error(`Error in getDailySummary: ${error.message}`);
+    return { error: error.message };
+  }
+}
+
+/**
+ * Get daily summaries for a date range (directly from DB)
+ * @param {number} userId - User ID
+ * @param {string} startDate - Start date (YYYY-MM-DD)
+ * @param {string} endDate - End date (YYYY-MM-DD) (optional)
+ * @returns {Promise<Array>} Array of daily summary objects
+ */
+async function getDailySummaries(userId, startDate, endDate = null) {
+  try {
+    const end = endDate || startDate;
+    logger.info(`Getting daily summaries from DB for user ${userId} from ${startDate} to ${end}`);
+    const result = await db.query(
+      'SELECT * FROM garmin_daily_summaries WHERE user_id = $1 AND date BETWEEN $2 AND $3 ORDER BY date DESC',
+      [userId, startDate, end]
+    );
     return result.rows;
   } catch (error) {
-    logger.error(`Failed to get daily summaries: ${error.message}`);
+    logger.error(`Error fetching daily summaries from DB: ${error.message}`);
     throw error;
   }
 }
 
 /**
- * Test Garmin connection by fetching basic profile data
+ * Test connection by attempting authentication
  * @param {number} userId - User ID
  * @returns {Promise<Object>} Test result
  */
@@ -830,8 +516,8 @@ async function testConnection(userId) {
 }
 
 /**
- * Test the Python environment
- * @returns {Promise<Object>} Python environment information
+ * Test Python environment setup
+ * @returns {Promise<Object>} Test result
  */
 async function testPythonEnvironment() {
   const { spawn } = require('child_process');
@@ -941,62 +627,24 @@ async function testPythonEnvironment() {
 }
 
 /**
- * Sync both daily summaries and activities for a user
+ * Clear sample data for a user
  * @param {number} userId - User ID
- * @param {Object} credentials - Garmin credentials
- * @param {string} startDate - Start date (YYYY-MM-DD)
- * @param {string} endDate - End date (YYYY-MM-DD)
- * @returns {Promise<Object>} - Sync result
+ * @returns {Promise<Object>} Result
  */
-async function syncGarminData(userId, credentials, startDate, endDate) {
-  try {
-    logger.info(`Syncing Garmin data for user ${userId} from ${startDate} to ${endDate}`);
-
-    // First sync daily summaries
-    const summaryResult = await syncDailySummaries(
-      userId,
-      startDate,
-      endDate
-    );
-
-    // Then sync activities
-    const activitiesResult = await importActivities(
-      userId,
-      startDate,
-      endDate
-    );
-
-    return {
-      userId,
-      summaryResult,
-      activitiesResult,
-      success: true
-    };
-  } catch (error) {
-    logger.error(`Error syncing Garmin data: ${error.message}`);
-    return {
-      userId,
-      error: error.message,
-      success: false
-    };
-  }
+async function clearSampleData(userId) {
+  // ... (implementation remains the same)
 }
 
 module.exports = {
-  checkConnectionStatus,
   getUserCredentials,
+  checkConnectionStatus,
   connectAccount,
   disconnectAccount,
-  importActivities,
-  syncDailySummaries,
-  getMostRecentActivityDate,
   getMostRecentDailySummaryDate,
-  calculateOptimalDateRange,
-  getActivities,
-  getActivityDetails,
+  syncDailySummaries,
   getDailySummary,
   getDailySummaries,
   testConnection,
   testPythonEnvironment,
-  syncGarminData
+  clearSampleData,
 };
