@@ -1,6 +1,6 @@
 # Nutrition Tracker
 
-A mobile-friendly nutrition tracking application with food logging, calorie goals, and data synchronization.
+A mobile-friendly nutrition tracking application with food logging, calorie goals, fitness integration, and data synchronization.
 
 ## Features
 
@@ -9,6 +9,8 @@ A mobile-friendly nutrition tracking application with food logging, calorie goal
 - **Food Logging**: Track your daily food intake with a simple and intuitive interface
 - **Nutrition Goals**: Set and monitor your calorie and macronutrient goals
 - **Progress Tracking**: View your nutrition history with charts and summaries
+- **Garmin Connect Integration**: Sync fitness data from Garmin devices, including daily summaries with steps, calories, and activity minutes
+- **Activity-Based Calorie Adjustment**: Automatically adjust your daily calorie targets based on actual activity levels
 - **Offline Support**: Use the app even without an internet connection
 - **Data Synchronization**: Seamlessly sync your data across multiple devices
 - **User Authentication**: Secure user accounts with JWT-based authentication
@@ -18,6 +20,7 @@ A mobile-friendly nutrition tracking application with food logging, calorie goal
 - **Frontend**: React Native with Expo (web-optimized)
 - **Backend**: Node.js with Express
 - **Database**: PostgreSQL
+- **Fitness Integration**: Python-based Garmin Connect API client
 - **Containerization**: Docker and Docker Compose
 - **Authentication**: JWT-based authentication
 
@@ -32,6 +35,7 @@ Additional documentation is available in the `docs` directory:
 - [Build Optimization Report](docs/BUILD-OPTIMIZATION-REPORT.md): Performance improvements and optimizations
 - [Deployment Guide](docs/DEPLOYMENT-SIMPLE.md): Instructions for deploying the application
 - [Food Search Enhancement Plan](docs/food-search-enhancement-plan.md): Plans for improving the food search functionality
+- [Garmin Integration Guide](docs/garmin-integration.md): Details on the Garmin Connect integration
 
 ## Getting Started
 
@@ -39,6 +43,7 @@ Additional documentation is available in the `docs` directory:
 
 - Docker and Docker Compose
 - Node.js (for development)
+- Python 3.8+ (for Garmin integration)
 
 ### Installation
 
@@ -56,9 +61,16 @@ cp .env.example .env
 3. Edit the `.env` file with your secure credentials:
    - Generate a secure JWT secret: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
    - Update database credentials
-   - Set API keys if needed
+   - Set API keys for food databases and Garmin integration if needed
 
-4. Start the application:
+4. Create a Python virtual environment for the Garmin integration (optional, but recommended):
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r backend/src/python/requirements.txt
+```
+
+5. Start the application:
 
    For production (full Expo web app):
    ```bash
@@ -70,7 +82,7 @@ cp .env.example .env
    docker compose up -d
    ```
 
-5. Access the application:
+6. Access the application:
    - Production Frontend: http://localhost:4080
    - Development Expo Server: http://localhost:19000
    - Backend API: http://localhost:4081/api
@@ -114,6 +126,32 @@ The application uses JWT (JSON Web Tokens) for authentication:
 - The frontend handles token expiration gracefully
 - Users are redirected to login when their session expires
 
+## Fitness Tracking System
+
+The application integrates with Garmin Connect to provide fitness tracking capabilities:
+
+### Garmin Connect Integration
+- Connect your Garmin account to sync fitness data directly into the app
+- Daily summaries include steps, distance, calories, and activity minutes
+- Background sync keeps your fitness data up-to-date automatically
+- Manually force a refresh when needed
+
+### Activity-Based Calorie Adjustments
+- Your daily calorie goals are automatically adjusted based on your activity level
+- The app calculates additional calories earned from high, moderate, and light activity
+- Sedentary time is factored into your overall calorie needs
+
+### Development Mode
+- Development environment can use the database without making live Garmin API calls
+- This helps prevent hitting API rate limits during development
+- Toggle between live API calls and database-only mode in the Garmin settings
+
+### Data Caching and Refresh Policies
+- Fitness data is cached to minimize API calls
+- Data automatically refreshes after 15 minutes
+- Force refresh option available for immediate updates
+- Smart refresh system respects Garmin's API rate limits
+
 ## Development
 
 ### Frontend Development
@@ -130,6 +168,25 @@ npm start
 cd backend
 npm install
 npm run dev
+```
+
+### Garmin Integration Development
+
+The Garmin integration uses a Python client for the Garmin Connect API. To set up the Python environment for development:
+
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r src/python/requirements.txt
+```
+
+To test the Garmin integration:
+
+```bash
+# Ensure the Python virtual environment is activated
+cd backend/src/python/garmin
+python garmin_service.py test_connection --username YOUR_USERNAME --password YOUR_PASSWORD
 ```
 
 ## Deployment Process
@@ -179,6 +236,33 @@ When updating backend files, it's important to do a complete rebuild of the back
    ssh server "cd /mnt/Media/Docker/nutrition-tracker && docker compose logs --tail=50 backend"
    ```
 
+### Deploying Garmin Integration Updates
+
+The Garmin integration involves Python scripts and dependencies that require special handling during deployment.
+
+#### Steps for Garmin Integration Updates:
+
+1. Copy the updated Python files to the server:
+   ```bash
+   scp backend/src/python/garmin/garmin_service.py server:/mnt/Media/Docker/nutrition-tracker/backend/src/python/garmin/
+   ```
+
+2. If Python dependencies have changed, update the requirements file and install them:
+   ```bash
+   scp backend/src/python/requirements.txt server:/mnt/Media/Docker/nutrition-tracker/backend/src/python/
+   ssh server "cd /mnt/Media/Docker/nutrition-tracker && python -m pip install -r backend/src/python/requirements.txt"
+   ```
+
+3. Restart the backend container to pick up the changes:
+   ```bash
+   ssh server "cd /mnt/Media/Docker/nutrition-tracker && docker compose restart backend"
+   ```
+
+4. Monitor the logs for any Python-related errors:
+   ```bash
+   ssh server "cd /mnt/Media/Docker/nutrition-tracker && docker compose logs --tail=50 backend | grep -i python"
+   ```
+
 #### Benefits of Complete Rebuild:
 
 - Ensures all changes are properly incorporated into the container
@@ -199,6 +283,9 @@ scp frontend/src/path/to/file.ts server:/mnt/Media/Docker/nutrition-tracker/fron
 
 # For backend files
 scp backend/src/path/to/file.js server:/mnt/Media/Docker/nutrition-tracker/backend/src/path/to/
+
+# For Python Garmin integration files
+scp backend/src/python/garmin/file.py server:/mnt/Media/Docker/nutrition-tracker/backend/src/python/garmin/
 ```
 
 #### 2. Rebuild and restart containers on the server:
@@ -221,16 +308,6 @@ docker compose rm -f backend
 docker compose up -d --build backend
 ```
 
-#### 3. Check logs to verify successful deployment:
-
-```bash
-# Check frontend logs
-docker compose logs --tail=50 frontend-web
-
-# Check backend logs
-docker compose logs --tail=50 backend
-```
-
 ## Troubleshooting
 
 If you encounter issues during deployment:
@@ -247,6 +324,51 @@ For persistent issues, you may need to:
 # Remove all containers and rebuild from scratch
 ssh server "cd /mnt/Media/Docker/nutrition-tracker && docker compose down && docker compose up -d --build"
 ```
+
+### Troubleshooting Garmin Integration Issues
+
+The Garmin integration can sometimes encounter specific issues:
+
+#### Python Environment Problems
+
+If you're seeing errors related to Python or missing modules:
+
+```bash
+# Check if the Python virtual environment exists
+ssh server "ls -la /mnt/Media/Docker/nutrition-tracker/venv"
+
+# Recreate the virtual environment if needed
+ssh server "cd /mnt/Media/Docker/nutrition-tracker && python -m venv venv && source venv/bin/activate && pip install -r backend/src/python/requirements.txt"
+```
+
+#### Garmin API Connection Issues
+
+If the Garmin API connection is failing:
+
+1. Check the status of your Garmin connection in the app settings
+2. Verify your Garmin credentials are correct and active
+3. Check if you've hit Garmin's rate limits (approximately 15 requests per hour)
+4. In development mode, toggle the API access setting to use database data only
+
+#### Database Issues with Garmin Data
+
+If Garmin data isn't showing up in the database:
+
+```bash
+# Connect to the database and check the Garmin tables
+ssh server "docker exec nutrition-tracker_db_1 psql -U postgres -d nutrition_tracker -c 'SELECT COUNT(*) FROM garmin_daily_summaries;'"
+
+# Check if the Garmin connection is properly stored
+ssh server "docker exec nutrition-tracker_db_1 psql -U postgres -d nutrition_tracker -c 'SELECT * FROM garmin_connections;'"
+```
+
+#### Development Mode Debugging
+
+In development mode, you can use the built-in debugging tools:
+
+1. Use the "Debug" button on the Fitness screen to get diagnostic information
+2. Toggle between live API and database-only mode in Garmin settings
+3. Check the backend console logs for detailed Python and API call information
 
 ## Security
 
