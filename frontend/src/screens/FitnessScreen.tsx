@@ -340,7 +340,7 @@ const FitnessScreen: React.FC = () => {
             </Button>
             <Button
               mode="outlined"
-              onPress={onForceRefreshPress}
+              onPress={handleManualForceRefresh}
               loading={forceRefreshing}
               disabled={refreshing || loading}
               style={styles(theme, fitnessColors).syncButton}
@@ -353,7 +353,7 @@ const FitnessScreen: React.FC = () => {
     );
   };
 
-  // Render daily summary card (updated error handling)
+  // Render daily summary card (updated)
   const renderDailySummary = () => {
     // Show loading indicator within card area if loading and not pull-refreshing
     if (loading && !refreshing) return null; // Main loading indicator handles this
@@ -371,6 +371,10 @@ const FitnessScreen: React.FC = () => {
        if (fetchError.error === 'RATE_LIMIT') {
            errorTitle = 'Garmin API Rate Limited';
            errorIcon = "timer-sand-paused";
+       } else if (fetchError.message && fetchError.message.includes('No summary data found')) {
+           errorTitle = 'No Data Available';
+           errorIcon = "database-off-outline";
+           errorMsg = "No fitness data found in the database for today. In dev mode, data is only shown if it exists in the database.";
        }
 
        return (
@@ -393,7 +397,7 @@ const FitnessScreen: React.FC = () => {
         <Card style={styles(theme, fitnessColors).card}>
           <Card.Content>
             <Title style={styles(theme, fitnessColors).cardTitle}>Today's Summary</Title>
-            <Paragraph>No summary data available for today.</Paragraph>
+            <Paragraph>No summary data available for today. In development mode, data is only shown if it exists in the database.</Paragraph>
             {/* Optional: Button to try force refresh */}
             <Button onPress={handleManualForceRefresh} loading={forceRefreshing} disabled={refreshing || loading} style={{marginTop: 10}}>
                 Try Refreshing Now

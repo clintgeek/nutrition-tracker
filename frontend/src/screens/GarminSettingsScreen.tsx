@@ -368,7 +368,11 @@ const GarminSettingsScreen: React.FC = () => {
         setIsApiEnabledInDev(newState);
         Alert.alert(
           'Development Mode Setting',
-          `Garmin API calls are now ${newState ? 'enabled' : 'disabled'} in development mode. ${newState ? 'Live API will be used.' : 'Mock data will be used.'}`
+          `Garmin API calls are now ${newState ? 'enabled' : 'disabled'} in development mode. ${
+            newState
+              ? 'Live API will be used for real-time data.'
+              : 'Database data will be shown (no live API calls). If no data exists in the database, empty results will be shown.'
+          }`
         );
       } else {
         Alert.alert('Error', 'Failed to update development mode setting');
@@ -553,6 +557,37 @@ const GarminSettingsScreen: React.FC = () => {
     );
   };
 
+  // Development mode settings section
+  const DevModeSettings = () => {
+    if (isDevMode) {
+      return (
+        <View style={styles(theme, garminColors).settingsGroup}>
+          <Title style={styles(theme, garminColors).sectionTitle}>Development Mode Settings</Title>
+          <Card style={styles(theme, garminColors).card}>
+            <Card.Content>
+              <View style={styles(theme, garminColors).settingRow}>
+                <View style={styles(theme, garminColors).settingInfo}>
+                  <Text style={styles(theme, garminColors).settingLabel}>Garmin API Calls</Text>
+                  <Text style={styles(theme, garminColors).settingDescription}>
+                    {isApiEnabledInDev ?
+                      'Enabled: Live API calls will be made to Garmin.' :
+                      'Disabled: Only database data will be shown. If no data exists in the database, no data will be displayed.'}
+                  </Text>
+                </View>
+                <Switch
+                  value={isApiEnabledInDev}
+                  onValueChange={toggleApiInDevMode}
+                  color={theme.colors.primary}
+                />
+              </View>
+            </Card.Content>
+          </Card>
+        </View>
+      );
+    }
+    return null;
+  };
+
   if (isLoading) {
     return (
       <View style={styles(theme, garminColors).loadingContainer}>
@@ -576,30 +611,6 @@ const GarminSettingsScreen: React.FC = () => {
             <Paragraph style={{ color: garminColors.text }}>Token Value: {authToken ? `${authToken.substring(0, 10)}...` : 'None'}</Paragraph>
           </Card.Content>
         </Card>
-
-        {/* Development mode section */}
-        {isDevMode && (
-          <Card style={styles(theme, garminColors).card}>
-            <Card.Content>
-              <Title style={styles(theme, garminColors).cardTitle}>Development Mode Settings</Title>
-              <Divider style={styles(theme).divider} />
-
-              <View style={styles(theme).settingRow}>
-                <Text style={styles(theme).settingText}>Enable Garmin API Calls</Text>
-                <Switch
-                  value={isApiEnabledInDev}
-                  onValueChange={toggleApiInDevMode}
-                  disabled={isSyncLoading}
-                  color={garminColors.primary}
-                />
-              </View>
-              <Paragraph style={styles(theme).helpText}>
-                When disabled, mock data will be returned instead of making real API calls.
-                This helps prevent hitting rate limits during development.
-              </Paragraph>
-            </Card.Content>
-          </Card>
-        )}
 
         {connectionStatus && connectionStatus.connected ? (
           <>
@@ -655,6 +666,8 @@ const GarminSettingsScreen: React.FC = () => {
 
         {renderCredentialsModal()}
         {renderSyncSettingsModal()}
+
+        <DevModeSettings />
       </View>
     </ScrollView>
   );
@@ -835,6 +848,22 @@ const styles = (theme: any, colors?: any) => StyleSheet.create({
   },
   helpText: {
     marginTop: 8,
+    color: colors?.placeholder || '#666',
+  },
+  settingsGroup: {
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: colors?.text || theme.colors.text,
+  },
+  settingInfo: {
+    flexDirection: 'column',
+  },
+  settingDescription: {
+    marginTop: 4,
     color: colors?.placeholder || '#666',
   },
 });

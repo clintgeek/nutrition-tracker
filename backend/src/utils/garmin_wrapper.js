@@ -249,13 +249,15 @@ async function executeGarminCommand(command, args = {}, credentials = {}, option
   // Check if Garmin API is disabled entirely
   if (!ENABLE_GARMIN_API) {
     logger.warn(`Garmin API calls are disabled globally: ${command}. Set ENABLE_GARMIN_API=true to enable.`);
-    return getMockDataForCommand(command);
+    // Return empty data instead of mock data - let DB layer handle this
+    return { success: false, error: 'Garmin API disabled', data: [] };
   }
 
   // Check if in development mode and API calls are disabled
   if (isDevMode && !ENABLE_GARMIN_API_IN_DEV) {
     logger.warn(`Garmin API call blocked in dev mode: ${command}. Set ENABLE_GARMIN_API_IN_DEV=true to enable.`);
-    return getMockDataForCommand(command);
+    // Return empty data instead of mock data - let DB layer handle this
+    return { success: false, error: 'Garmin API disabled in dev mode', data: [] };
   }
 
   const username = credentials.username;
@@ -446,45 +448,6 @@ async function executeGarminCommand(command, args = {}, credentials = {}, option
       clearTimeout(timeout);
     });
   });
-}
-
-/**
- * Get mock data for a command when API is disabled
- * @param {string} command - The command being called
- * @returns {Object} - Mock data appropriate for the command
- */
-function getMockDataForCommand(command) {
-  // Return mock data based on command type
-  switch (command) {
-    case 'authenticate':
-      return { success: true, message: 'Mock authentication' };
-    case 'profile':
-      return {
-        success: true,
-        data: {
-          displayName: 'Mock User',
-          userProfileId: 12345678,
-          location: 'Mock Location',
-          gender: 'N/A',
-          weight: 70,
-          height: 175,
-          age: 30
-        }
-      };
-    case 'activities':
-      return { success: true, data: [], message: 'Mock - no activities returned' };
-    case 'activity_details':
-      return { success: true, data: {}, message: 'Mock - no activity details returned' };
-    case 'daily_summary':
-    case 'daily_summaries':
-      return {
-        success: true,
-        data: [],
-        message: 'Mock - no daily summaries returned'
-      };
-    default:
-      return { success: false, error: `Unknown command: ${command}` };
-  }
 }
 
 /**

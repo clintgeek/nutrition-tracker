@@ -57,7 +57,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     { id: 'weightTrend', title: 'Goal Weight Trend', enabled: true, order: 2 },
     { id: 'fitnessData', title: 'Fitness Activity', enabled: true, order: 3 },
     { id: 'mealPlan', title: 'Meal Plan', enabled: true, order: 4 },
-    { id: 'recentActivity', title: 'Recent Activity', enabled: true, order: 5 },
+    { id: 'recentActivity', title: 'Recent Foods', enabled: true, order: 5 },
   ];
 
   // Set token when it changes
@@ -379,101 +379,27 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         return <MealPlanCard />;
       case 'recentActivity':
         return (
-          <View style={styles.activitySection}>
-            {isLoading ? (
-              <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-                <Card.Content>
-                  <Title style={styles.sectionTitle}>Recent Activity</Title>
-                  <SkeletonLoader width="100%" height={24} style={styles.skeletonItem} />
-                  <SkeletonLoader width="100%" height={24} style={styles.skeletonItem} />
-                  <SkeletonLoader width="100%" height={24} style={styles.skeletonItem} />
-                </Card.Content>
-              </Card>
-            ) : recentLogs.length > 0 ? (
-              <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-                <Card.Content>
-                  <View style={styles.sectionHeader}>
-                    <Title style={styles.sectionTitle}>Recent Activity</Title>
-                    <TouchableOpacity onPress={navigateToFoodLog}>
-                      <Text style={styles.seeAllLink}>See All</Text>
-                    </TouchableOpacity>
-                  </View>
-                  {recentLogs.map((log, index) => (
-                    <React.Fragment key={log.id || index}>
-                      <View style={styles.activityItem}>
-                        <MaterialCommunityIcons
-                          name="food-apple"
-                          size={24}
-                          color={theme.colors.primary}
-                        />
-                        <View style={styles.activityDetails}>
-                          <Text style={styles.activityName}>{log.food_name || 'Food item'}</Text>
-                          <Text style={styles.activityTime}>{formatLogDate(log.created_at)}</Text>
-                        </View>
-                        <Text style={styles.activityCalories}>
-                          {(() => {
-                            // Extract the correct calories value from the log
-
-                            // Check if we have a food item from the LogScreen format
-                            if (log.calories_per_serving !== undefined && log.calories_per_serving !== null) {
-                              // This is from logService
-                              const servings = parseFloat(log.servings?.toString() || "1");
-                              return Math.round(log.calories_per_serving * servings) + " cal";
-                            }
-
-                            // Check alternate format (calories_per_serving vs caloriesPerServing)
-                            if (log.caloriesPerServing !== undefined && log.caloriesPerServing !== null) {
-                              const servings = parseFloat(log.servings?.toString() || "1");
-                              return Math.round(log.caloriesPerServing * servings) + " cal";
-                            }
-
-                            // Check for protein_grams format (from LogScreen)
-                            if (log.protein_grams !== undefined) {
-                              // This log came from the foodLogService format
-                              if (log.calories_per_serving) {
-                                return Math.round(log.calories_per_serving) + " cal";
-                              }
-                            }
-
-                            // Check for direct calories field
-                            if (log.calories) {
-                              return Math.round(log.calories) + " cal";
-                            }
-
-                            // Last resort - total calories
-                            if (log.total_calories) {
-                              return Math.round(log.total_calories) + " cal";
-                            }
-
-                            // No valid calorie data found
-                            return "--- cal";
-                          })()}
-                        </Text>
-                      </View>
-                      {index < recentLogs.length - 1 && <Divider style={styles.activityDivider} />}
-                    </React.Fragment>
-                  ))}
-                </Card.Content>
-              </Card>
-            ) : (
-              <Card style={[styles.emptyCard, { backgroundColor: theme.colors.surface }]}>
-                <Card.Content>
-                  <Title style={styles.sectionTitle}>Recent Activity</Title>
-                  <View style={styles.emptyContent}>
-                    <MaterialCommunityIcons name="food" size={40} color="#ccc" />
-                    <Text style={styles.emptyText}>No recent food logs</Text>
-                    <Button
-                      mode="contained"
-                      onPress={navigateToFoodLog}
-                      style={styles.logButton}
-                    >
-                      Log Food
-                    </Button>
-                  </View>
-                </Card.Content>
-              </Card>
-            )}
-          </View>
+          <Card key={cardId} style={styles.card}>
+            <Card.Title title="Recent Foods" />
+            <Card.Content>
+              {recentLogs.length > 0 ? (
+                recentLogs.map((log, index) => (
+                  <React.Fragment key={log.id || index}>
+                    <View style={styles.recentLogItem}>
+                      <Text style={styles.recentLogText}>{log.food_name}</Text>
+                      <Text style={styles.recentLogDate}>{formatLogDate(log.log_date)}</Text>
+                    </View>
+                    {index < recentLogs.length - 1 && <Divider />}
+                  </React.Fragment>
+                ))
+              ) : (
+                <Text>No recent foods logged.</Text>
+              )}
+            </Card.Content>
+            <Card.Actions>
+              <Button onPress={navigateToFoodLog}>Go to Log</Button>
+            </Card.Actions>
+          </Card>
         );
       default:
         return null;
@@ -617,6 +543,20 @@ const styles = StyleSheet.create({
   editButtonContent: {
     flexDirection: 'row-reverse', // Puts icon after text
     paddingHorizontal: 16,
+  },
+  recentLogItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  recentLogText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  recentLogDate: {
+    fontSize: 12,
+    color: '#666',
   },
 });
 
