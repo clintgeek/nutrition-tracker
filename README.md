@@ -10,10 +10,14 @@ A mobile-friendly nutrition tracking application with food logging, calorie goal
 - **Nutrition Goals**: Set and monitor your calorie and macronutrient goals
 - **Progress Tracking**: View your nutrition history with charts and summaries
 - **Garmin Connect Integration**: Sync fitness data from Garmin devices, including daily summaries with steps, calories, and activity minutes
-- **Activity-Based Calorie Adjustment**: Automatically adjust your daily calorie targets based on actual activity levels
-- **Offline Support**: Use the app even without an internet connection
 - **Data Synchronization**: Seamlessly sync your data across multiple devices
 - **User Authentication**: Secure user accounts with JWT-based authentication
+
+## Planned Features
+
+- **Activity-Based Calorie Adjustment**: Automatically adjust your daily calorie targets based on actual activity levels
+- **Offline Support**: Use the app even without an internet connection
+- **Mobile App**: Native mobile applications for iOS and Android
 
 ## Technology Stack
 
@@ -136,10 +140,11 @@ The application integrates with Garmin Connect to provide fitness tracking capab
 - Background sync keeps your fitness data up-to-date automatically
 - Manually force a refresh when needed
 
-### Activity-Based Calorie Adjustments
-- Your daily calorie goals are automatically adjusted based on your activity level
-- The app calculates additional calories earned from high, moderate, and light activity
-- Sedentary time is factored into your overall calorie needs
+### Planned: Activity-Based Calorie Adjustments
+- This feature is coming soon but not yet implemented
+- Once implemented, your daily calorie goals will be automatically adjusted based on your activity level
+- The app will calculate additional calories earned from high, moderate, and light activity
+- Sedentary time will be factored into your overall calorie needs
 
 ### Development Mode
 - Development environment can use the database without making live Garmin API calls
@@ -382,7 +387,18 @@ In development mode, you can use the built-in debugging tools:
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
+## Conclusion
+
+The Nutrition Tracker project demonstrates a comprehensive approach to building a full-stack mobile application with modern technologies. The combination of React Native, TypeScript, Node.js, PostgreSQL, and Python provides a robust foundation for a feature-rich health tracking application that integrates nutrition, weight management, and fitness data. The integration of AI assistance in the development process has proven to be a valuable approach for accelerating development while maintaining high code quality.
+
 ## Acknowledgments
 
-- OpenFoodFacts for the food database
-- USDA FoodData Central for nutritional information
+### External APIs
+- [OpenFoodFacts API](https://world.openfoodfacts.org/data) - Primary food database
+- [USDA FoodData Central](https://fdc.nal.usda.gov/) - Secondary food database
+- [Nutritionix API](https://www.nutritionix.com/business/api) - Additional food data source
+- [Spoonacular API](https://spoonacular.com/food-api) - Recipe and ingredient analysis
+- [Garmin Connect API](https://developer.garmin.com/) - Fitness data integration
+
+### Special Thanks
+- Chef and Sage, you know who you are

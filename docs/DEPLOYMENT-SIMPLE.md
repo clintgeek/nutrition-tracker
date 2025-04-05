@@ -7,6 +7,7 @@ This guide explains how to deploy the Nutrition Tracker application as a mobile-
 - Docker and Docker Compose installed on your server
 - A domain name (optional, but recommended)
 - Basic knowledge of server administration
+- Python 3.8 or higher (for Garmin integration)
 
 ## Deployment Steps
 
@@ -35,9 +36,36 @@ nano .env
    - `POSTGRES_DB`: The database name
    - `JWT_SECRET`: A secure random string for JWT token generation
      - Generate with: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+   - `ENABLE_GARMIN_API`: Set to `true` to enable Garmin API access
+   - `ENABLE_GARMIN_API_IN_DEV`: Set to `false` to disable live API calls in development
+   - `PYTHON_PATH`: Path to your Python executable (e.g., `/usr/bin/python3` or `/path/to/venv/bin/python3`)
    - Port settings if needed (`FRONTEND_PORT`, `BACKEND_PORT`, `DATABASE_PORT`)
 
-### 3. Create Docker Compose File
+### 3. Set Up Python Environment (for Garmin Integration)
+
+1. Create a Python virtual environment (recommended):
+```bash
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+2. Install required Python packages:
+```bash
+pip install -r backend/src/python/requirements.txt
+```
+
+3. Update the `PYTHON_PATH` in your `.env` file to point to the virtual environment:
+```
+PYTHON_PATH=/absolute/path/to/nutrition-tracker/venv/bin/python3
+```
+
+4. Verify the Python setup:
+```bash
+# Test if the garminconnect package is installed correctly
+python3 -c "import garminconnect; print('Garmin Connect package installed successfully')"
+```
+
+### 4. Create Docker Compose File
 
 1. Copy the example Docker Compose file:
 ```bash
@@ -46,7 +74,7 @@ cp docker-compose.web.example.yml docker-compose.web.yml
 
 2. The file is already configured to use environment variables from your `.env` file, so no additional changes are needed unless you want to customize the configuration.
 
-### 4. Deploy with Docker Compose
+### 5. Deploy with Docker Compose
 
 ```bash
 docker-compose -f docker-compose.web.yml up -d
@@ -58,7 +86,7 @@ This will:
 - Set up the PostgreSQL database
 - Start all services in detached mode
 
-### 5. Access Your Application
+### 6. Access Your Application
 
 Your application will be available at:
 - http://your-server-ip:4080 (or your domain if configured)
@@ -72,7 +100,7 @@ The PostgreSQL database will be available at:
 - Password: As configured in your .env file
 - Database: nutrition_tracker (or as configured in .env)
 
-### 6. Setting Up a Domain (Optional)
+### 7. Setting Up a Domain (Optional)
 
 For a production deployment, you should set up a domain name with HTTPS:
 
@@ -170,6 +198,10 @@ To update your application with the latest changes:
 # Pull the latest code
 git pull
 
+# Update Python dependencies (for Garmin integration)
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r backend/src/python/requirements.txt
+
 # Rebuild and restart the containers
 docker-compose -f docker-compose.web.yml up -d --build
 ```
@@ -208,6 +240,28 @@ docker-compose -f docker-compose.web.yml logs
 
 # Specific service
 docker-compose -f docker-compose.web.yml logs frontend-web
+
+# Garmin integration logs (look for Python process logs)
+docker-compose -f docker-compose.web.yml logs backend | grep -i "garmin\|python"
+```
+
+### Checking Garmin API Status
+
+To check if the Garmin API integration is working correctly:
+
+```bash
+# Check if the Garmin API is enabled
+grep ENABLE_GARMIN_API .env
+
+# Check if the Python path is correctly set
+grep PYTHON_PATH .env
+
+# Verify the Python executable exists and is accessible
+ls -l $(grep PYTHON_PATH .env | cut -d= -f2)
+
+# Check for Garmin connections in the database
+source .env
+docker exec -t nutrition-tracker_db_1 psql -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT * FROM garmin_connections;"
 ```
 
 ## Troubleshooting
@@ -248,26 +302,69 @@ docker-compose -f docker-compose.web.yml logs backend
 docker-compose -f docker-compose.web.yml restart backend
 ```
 
-### Database Issues
+### Garmin Integration Issues
 
-If there are database connection problems:
+If the Garmin integration is not working correctly:
+
+#### Python Environment Problems
 
 ```bash
-# Check the database container logs
-docker-compose -f docker-compose.web.yml logs db
+# Check Python environment variables
+grep PYTHON backend/.env
 
-# Check if the database container is running
-docker ps | grep nutrition-tracker_db
+# Verify Python executable and packages
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+python -c "import garminconnect; print(garminconnect.__version__)"
+
+# Check if the Python script exists
+ls -l backend/src/python/garmin/garmin_service.py
+
+# Try running the test function directly
+cd backend/src/python/garmin
+python garmin_service.py test_connection --help
 ```
 
-### Environment Variable Issues
-
-If your environment variables aren't being applied:
+#### Database Issues
 
 ```bash
-# Check if your .env file is being loaded
-docker-compose -f docker-compose.web.yml config
+# Check if the Garmin tables exist
+source .env
+docker exec -t nutrition-tracker_db_1 psql -U $POSTGRES_USER -d $POSTGRES_DB -c "\dt garmin*"
 
-# Verify the environment variables in a running container
-docker exec nutrition-tracker_backend_1 env | grep POSTGRES
+# Check for data in the daily summaries table
+docker exec -t nutrition-tracker_db_1 psql -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT COUNT(*) FROM garmin_daily_summaries;"
+```
+
+#### API Rate Limiting
+
+If you're encountering rate limit errors from Garmin:
+
+1. Temporarily disable the Garmin API in development mode to prevent further API calls:
+   ```bash
+   # Update the .env file
+   sed -i 's/ENABLE_GARMIN_API_IN_DEV=true/ENABLE_GARMIN_API_IN_DEV=false/' .env
+
+   # Restart the backend to apply changes
+   docker-compose -f docker-compose.web.yml restart backend
+   ```
+
+2. Check the API call count in the logs:
+   ```bash
+   docker-compose -f docker-compose.web.yml logs backend | grep -i "rate limit"
+   ```
+
+3. Wait at least one hour before re-enabling API access.
+
+#### Reset Garmin Connection
+
+If a user's Garmin connection is malfunctioning, you can reset it:
+
+```bash
+# Connect to the database
+source .env
+docker exec -it nutrition-tracker_db_1 psql -U $POSTGRES_USER -d $POSTGRES_DB
+
+# Inside the PostgreSQL prompt, run:
+UPDATE garmin_connections SET is_active = false WHERE user_id = [USER_ID];
+# Replace [USER_ID] with the actual user ID
 ```
