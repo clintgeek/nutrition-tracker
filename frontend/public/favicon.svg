@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
   <!-- Background -->
-  <rect width="64" height="64" fill="#FF4B2B"/>
+  <rect width="64" height="64" fill="#6098CC"/>
 
   <!-- Letters -->
   <g transform="translate(8,8)">

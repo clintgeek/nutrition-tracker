@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
   <!-- Background -->
-  <rect width="512" height="512" fill="#1976D2"/>
+  <rect width="512" height="512" fill="#6098CC"/>
 
   <!-- Material Design Restaurant Menu Icon -->
   <g transform="translate(128,128) scale(10.66)">
