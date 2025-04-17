@@ -22,25 +22,25 @@ const RecentLogsCard: React.FC<RecentLogsCardProps> = ({ recentLogs }) => {
   const renderLogItem = ({ item }: { item: FoodLog }) => {
     return (
       <View>
-        <View style={styles.logItem}>
-          <View style={styles.foodImageContainer}>
+        <View style={styles(theme).logItem}>
+          <View style={styles(theme).foodImageContainer}>
             <Avatar.Icon
               icon="food"
               size={40}
-              color="white"
+              color={theme.colors.onPrimary}
               style={{ backgroundColor: theme.colors.primary }}
             />
           </View>
 
-          <View style={styles.foodInfo}>
-            <Text style={styles.foodName}>{item.food?.name || item.food_name || 'Unknown Food'}</Text>
-            <Text style={styles.foodDetails}>
+          <View style={styles(theme).foodInfo}>
+            <Text style={styles(theme).foodName}>{item.food?.name || item.food_name || 'Unknown Food'}</Text>
+            <Text style={styles(theme).foodDetails}>
               {item.serving_size || item.servings || '1'} {item.serving_unit || 'servings'} • {formatDate(item.log_date || item.created_at || new Date().toISOString())} • {item.meal_type || 'meal'}
             </Text>
           </View>
 
-          <View style={styles.caloriesContainer}>
-            <Text style={styles.calories}>
+          <View style={styles(theme).caloriesContainer}>
+            <Text style={styles(theme).calories}>
               {Math.round(
                 Number(item.total_calories) ||
                 Number(item.calories) ||
@@ -48,29 +48,29 @@ const RecentLogsCard: React.FC<RecentLogsCardProps> = ({ recentLogs }) => {
                 0
               )}
             </Text>
-            <Text style={styles.caloriesLabel}>cal</Text>
+            <Text style={styles(theme).caloriesLabel}>cal</Text>
           </View>
         </View>
-        <Divider />
+        <Divider style={styles(theme).divider} />
       </View>
     );
   };
 
   return (
-    <Card style={styles.card}>
+    <Card style={styles(theme).card}>
       <Card.Content>
-        <Title style={styles.title}>Recent Food Logs</Title>
+        <Title style={styles(theme).title}>Recent Food Logs</Title>
 
         {recentLogs.length > 0 ? (
           <FlatList
             data={recentLogs.slice(0, 5)} // Show only the 5 most recent logs
             renderItem={renderLogItem}
             keyExtractor={(item) => item.id.toString()}
-            ItemSeparatorComponent={() => <Divider />}
+            ItemSeparatorComponent={() => <Divider style={styles(theme).divider} />}
             scrollEnabled={false}
           />
         ) : (
-          <Text style={styles.noLogsText}>
+          <Text style={styles(theme).noLogsText}>
             No recent food logs. Start tracking your meals to see them here.
           </Text>
         )}
@@ -79,7 +79,7 @@ const RecentLogsCard: React.FC<RecentLogsCardProps> = ({ recentLogs }) => {
       {recentLogs.length > 0 && (
         <Card.Actions>
           <Text
-            style={styles.viewAllButton}
+            style={styles(theme).viewAllButton}
             onPress={() => navigation.navigate('Log')}
           >
             View All Logs
@@ -90,13 +90,18 @@ const RecentLogsCard: React.FC<RecentLogsCardProps> = ({ recentLogs }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = (theme: any) => StyleSheet.create({
   card: {
     marginBottom: 16,
     elevation: 2,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 8,
   },
   title: {
     marginBottom: 16,
+    color: theme.colors.onSurface,
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   logItem: {
     flexDirection: 'row',
@@ -114,35 +119,37 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
     fontSize: 16,
     marginBottom: 4,
+    color: theme.colors.onSurface,
   },
   foodDetails: {
     fontSize: 12,
-    color: '#757575',
+    color: theme.colors.onSurfaceVariant,
   },
   caloriesContainer: {
     alignItems: 'center',
+    marginLeft: 8,
   },
   calories: {
     fontWeight: 'bold',
     fontSize: 16,
+    color: theme.colors.onSurface,
   },
   caloriesLabel: {
     fontSize: 12,
-    color: '#757575',
+    color: theme.colors.onSurfaceVariant,
   },
   noLogsText: {
     textAlign: 'center',
     marginVertical: 20,
-    color: '#757575',
+    color: theme.colors.onSurfaceVariant,
   },
   viewAllButton: {
-    color: '#2196F3',
+    color: theme.colors.primary,
     fontWeight: 'bold',
   },
-  brandName: {
-    fontSize: 12,
-    color: '#757575',
-    marginBottom: 2,
+  divider: {
+    backgroundColor: theme.colors.surfaceVariant,
+    height: 1,
   },
 });
 

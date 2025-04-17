@@ -558,34 +558,31 @@ const GarminSettingsScreen: React.FC = () => {
   };
 
   // Development mode settings section
-  const DevModeSettings = () => {
-    if (isDevMode) {
-      return (
-        <View style={styles(theme, garminColors).settingsGroup}>
-          <Title style={styles(theme, garminColors).sectionTitle}>Development Mode Settings</Title>
-          <Card style={styles(theme, garminColors).card}>
-            <Card.Content>
-              <View style={styles(theme, garminColors).settingRow}>
-                <View style={styles(theme, garminColors).settingInfo}>
-                  <Text style={styles(theme, garminColors).settingLabel}>Garmin API Calls</Text>
-                  <Text style={styles(theme, garminColors).settingDescription}>
-                    {isApiEnabledInDev ?
-                      'Enabled: Live API calls will be made to Garmin.' :
-                      'Disabled: Only database data will be shown. If no data exists in the database, no data will be displayed.'}
-                  </Text>
-                </View>
-                <Switch
-                  value={isApiEnabledInDev}
-                  onValueChange={toggleApiInDevMode}
-                  color={theme.colors.primary}
-                />
+  const ApiToggleSettings = () => {
+    return (
+      <View style={styles(theme, garminColors).settingsGroup}>
+        <Title style={styles(theme, garminColors).sectionTitle}>Garmin API Settings</Title>
+        <Card style={styles(theme, garminColors).card}>
+          <Card.Content>
+            <View style={styles(theme, garminColors).settingRow}>
+              <View style={styles(theme, garminColors).settingInfo}>
+                <Text style={styles(theme, garminColors).settingLabel}>Garmin API Calls</Text>
+                <Text style={styles(theme, garminColors).settingDescription}>
+                  {isApiEnabledInDev ?
+                    'Enabled: Live API calls will be made to Garmin.' :
+                    'Disabled: Only database data will be shown. If no data exists in the database, no data will be displayed.'}
+                </Text>
               </View>
-            </Card.Content>
-          </Card>
-        </View>
-      );
-    }
-    return null;
+              <Switch
+                value={isApiEnabledInDev}
+                onValueChange={toggleApiInDevMode}
+                color={theme.colors.primary}
+              />
+            </View>
+          </Card.Content>
+        </Card>
+      </View>
+    );
   };
 
   if (isLoading) {
@@ -667,7 +664,7 @@ const GarminSettingsScreen: React.FC = () => {
         {renderCredentialsModal()}
         {renderSyncSettingsModal()}
 
-        <DevModeSettings />
+        <ApiToggleSettings />
       </View>
     </ScrollView>
   );

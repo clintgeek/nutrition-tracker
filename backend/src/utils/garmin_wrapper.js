@@ -10,7 +10,6 @@ const logger = require('../config/logger');
 
 // Get environment variables for configuration
 const NODE_ENV = process.env.NODE_ENV || 'development';
-const ENABLE_GARMIN_API_IN_DEV = process.env.ENABLE_GARMIN_API_IN_DEV === 'true';
 const ENABLE_GARMIN_API = process.env.ENABLE_GARMIN_API !== 'false'; // Default to enabled
 const isDevMode = NODE_ENV === 'development';
 
@@ -28,7 +27,6 @@ logger.info(`Garmin Python Configuration:
   - Environment: ${NODE_ENV}
   - Python Path: ${PYTHON_VENV_PATH}
   - Script Path: ${PYTHON_SCRIPT_PATH}
-  - API Enabled in Dev: ${ENABLE_GARMIN_API_IN_DEV}
   - API Enabled: ${ENABLE_GARMIN_API}
 `);
 
@@ -246,18 +244,11 @@ const validCommands = [
  * @returns {Promise<Object>} - The command results
  */
 async function executeGarminCommand(command, args = {}, credentials = {}, options = {}) {
-  // Check if Garmin API is disabled entirely
+  // Check if Garmin API is disabled
   if (!ENABLE_GARMIN_API) {
-    logger.warn(`Garmin API calls are disabled globally: ${command}. Set ENABLE_GARMIN_API=true to enable.`);
+    logger.warn(`Garmin API calls are disabled: ${command}. Set ENABLE_GARMIN_API=true to enable.`);
     // Return empty data instead of mock data - let DB layer handle this
     return { success: false, error: 'Garmin API disabled', data: [] };
-  }
-
-  // Check if in development mode and API calls are disabled
-  if (isDevMode && !ENABLE_GARMIN_API_IN_DEV) {
-    logger.warn(`Garmin API call blocked in dev mode: ${command}. Set ENABLE_GARMIN_API_IN_DEV=true to enable.`);
-    // Return empty data instead of mock data - let DB layer handle this
-    return { success: false, error: 'Garmin API disabled in dev mode', data: [] };
   }
 
   const username = credentials.username;

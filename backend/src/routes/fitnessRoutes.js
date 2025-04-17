@@ -492,28 +492,23 @@ router.post('/garmin/sync/now', authenticate, isAdmin, async (req, res) => {
 
 /**
  * @route GET /api/fitness/garmin/dev-mode-status
- * @desc Check if Garmin API calls are enabled in development mode
+ * @desc Check if Garmin API calls are enabled
  * @access Private
  */
 router.get('/garmin/dev-mode-status', authenticate, async (req, res) => {
   try {
-    // Only allow this route in development mode
-    if (process.env.NODE_ENV !== 'development') {
-      return res.json({ enabled: true, mode: 'production' });
-    }
-
     // Check the current setting
-    const enabled = process.env.ENABLE_GARMIN_API_IN_DEV === 'true';
+    const enabled = process.env.ENABLE_GARMIN_API !== 'false';
 
     res.json({
       enabled,
-      mode: 'development'
+      mode: process.env.NODE_ENV
     });
   } catch (error) {
-    logger.error(`Error checking dev mode status: ${error.message}`);
+    logger.error(`Error checking Garmin API status: ${error.message}`);
     res.status(500).json({
       success: false,
-      message: 'Failed to check development mode status',
+      message: 'Failed to check Garmin API status',
       error: error.message
     });
   }
@@ -521,22 +516,14 @@ router.get('/garmin/dev-mode-status', authenticate, async (req, res) => {
 
 /**
  * @route POST /api/fitness/garmin/toggle-dev-mode
- * @desc Toggle Garmin API access in development mode
+ * @desc Toggle Garmin API access
  * @access Private
  */
 router.post('/garmin/toggle-dev-mode', authenticate, async (req, res) => {
   try {
-    // Only allow this route in development mode
-    if (process.env.NODE_ENV !== 'development') {
-      return res.status(403).json({
-        success: false,
-        message: 'This feature is only available in development mode'
-      });
-    }
-
     const { enabled } = req.body;
 
-    // Read the current .env.local file
+    // Read the current .env file
     const envPath = path.resolve(process.cwd(), '.env.local');
     let envConfig = {};
 
@@ -545,11 +532,11 @@ router.post('/garmin/toggle-dev-mode', authenticate, async (req, res) => {
         envConfig = dotenv.parse(fs.readFileSync(envPath));
       }
     } catch (err) {
-      logger.error(`Error reading .env.local: ${err.message}`);
+      logger.error(`Error reading .env file: ${err.message}`);
     }
 
     // Update the setting
-    envConfig.ENABLE_GARMIN_API_IN_DEV = enabled ? 'true' : 'false';
+    envConfig.ENABLE_GARMIN_API = enabled ? 'true' : 'false';
 
     // Write it back to the file
     const envContent = Object.entries(envConfig)
@@ -559,21 +546,21 @@ router.post('/garmin/toggle-dev-mode', authenticate, async (req, res) => {
     fs.writeFileSync(envPath, envContent);
 
     // Update the environment variable in the current process
-    process.env.ENABLE_GARMIN_API_IN_DEV = enabled ? 'true' : 'false';
+    process.env.ENABLE_GARMIN_API = enabled ? 'true' : 'false';
 
     // Log the change
-    logger.info(`Garmin API in dev mode set to: ${enabled ? 'enabled' : 'disabled'}`);
+    logger.info(`Garmin API set to: ${enabled ? 'enabled' : 'disabled'}`);
 
     res.json({
       success: true,
       enabled,
-      message: `Garmin API calls in development mode are now ${enabled ? 'enabled' : 'disabled'}`
+      message: `Garmin API calls are now ${enabled ? 'enabled' : 'disabled'}`
     });
   } catch (error) {
-    logger.error(`Error updating dev mode setting: ${error.message}`);
+    logger.error(`Error updating Garmin API setting: ${error.message}`);
     res.status(500).json({
       success: false,
-      message: 'Failed to update development mode setting',
+      message: 'Failed to update Garmin API setting',
       error: error.message
     });
   }
