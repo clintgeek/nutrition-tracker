@@ -119,15 +119,12 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
         if (status.connected) {
           const todayStr = getTodayDate(); // Returns YYYY-MM-DD string
-          console.log(`[HomeScreen] Fetching summary for ${todayStr} using getRefreshedGarminSummary`);
           const result: RefreshedSummaryResult = await fitnessService.getRefreshedGarminSummary(todayStr);
-
-          console.log('[HomeScreen] Summary Result:', result);
           setDailySummary(result.summary);
-
           // Log any errors encountered during fetch
           if (result.error) {
-            console.warn(`[HomeScreen] Error/Info fetching Garmin summary (Source: ${result.source}):`, result.error);
+            // Keep error logging for production debugging
+            console.error(`[HomeScreen] Error/Info fetching Garmin summary (Source: ${result.source}):`, result.error);
           }
         } else {
           setDailySummary(null); // Clear summary if not connected
@@ -167,7 +164,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   // Refresh data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      console.log('HomeScreen focused, refreshing data');
       // Call loadData directly if token exists
       if (token) {
         loadData();

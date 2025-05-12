@@ -511,10 +511,10 @@ module.exports = {
   executeGarminCommand,
   PYTHON_SCRIPT_PATH,
   PYTHON_VENV_PATH,
-  authenticate,
-  getUserProfile,
+  authenticate: async () => ({ success: false, error: 'Garmin disabled' }),
+  getUserProfile: async () => ({ success: false, error: 'Garmin disabled' }),
   getDailySummary,
-  getDailySummaries,
+  getDailySummaries: async () => ({ success: false, error: 'Garmin disabled' }),
   testConnection,
   // Removed getActivities, getActivityDetails
 };

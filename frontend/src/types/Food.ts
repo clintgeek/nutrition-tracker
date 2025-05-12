@@ -21,6 +21,8 @@ export interface ApiFood {
   is_deleted?: boolean;
 }
 
+export type FoodSource = 'custom' | 'usda' | 'recipe' | 'nutritionix' | 'openFoodFacts' | 'spoonacular';
+
 // Food interface for internal use (after conversion)
 export interface Food {
   id: number;
@@ -31,17 +33,18 @@ export interface Food {
   protein: number;
   carbs: number;
   fat: number;
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  updated_at: string;
   user_created?: boolean;
   user_id?: string;
   sync_status?: 'synced' | 'pending' | 'failed';
-  source: 'custom' | 'usda' | 'recipe';
+  source: FoodSource;
   barcode?: string;
   brand?: string;
   source_id?: string;
   sync_id?: string;
   is_deleted?: boolean;
+  is_custom: boolean;
 }
 
 // Interface for API responses

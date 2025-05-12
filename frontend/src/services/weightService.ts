@@ -72,11 +72,8 @@ export const weightService = {
 
       // Check if logs exist
       if (!response.logs || !Array.isArray(response.logs)) {
-        console.log('No weight logs found in API response');
         return [];
       }
-
-      console.log('Raw weight logs from API:', JSON.stringify(response.logs[0]));
 
       // Transform the response to match our interface
       const transformedLogs: WeightLog[] = response.logs.map(log => ({
@@ -106,11 +103,8 @@ export const weightService = {
 
       // Check if logs exist
       if (!response.logs || !Array.isArray(response.logs)) {
-        console.log('No weight logs found in date range API response');
         return [];
       }
-
-      console.log('Raw weight logs from date range API:', JSON.stringify(response.logs[0]));
 
       // Transform the response to match our interface
       const transformedLogs: WeightLog[] = response.logs.map(log => ({

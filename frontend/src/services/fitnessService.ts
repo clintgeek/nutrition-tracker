@@ -89,6 +89,8 @@ const isRateLimitError = (error: any): boolean => {
     (error?.response?.data?.error && error.response?.data?.error.includes('Too Many Requests'));
 };
 
+export const GARMIN_ENABLED = false;
+
 /**
  * Service class for fitness-related API calls
  */
@@ -98,14 +100,14 @@ class FitnessService {
    * @returns Connection status
    */
   async checkGarminConnectionStatus(): Promise<GarminConnectionStatus> {
+    if (!GARMIN_ENABLED) throw new Error('Garmin functionality is disabled');
     try {
-      console.log('Checking Garmin connection status from fitness service');
       // Add timestamp to prevent caching
       const timestamp = new Date().getTime();
       const response = await api.get(`/fitness/garmin/status?_=${timestamp}`);
-      console.log('Raw connection status response:', response.data);
       return response.data;
     } catch (error) {
+      // Keep error logging for production debugging
       console.error('Error checking Garmin connection:', error);
       return { connected: false };
     }
@@ -117,10 +119,12 @@ class FitnessService {
    * @returns Connection result
    */
   async connectGarminAccount(credentials: GarminCredentials): Promise<SyncResult> {
+    if (!GARMIN_ENABLED) throw new Error('Garmin functionality is disabled');
     try {
       const response = await api.post('/fitness/garmin/connect', credentials);
       return response.data;
     } catch (error: any) {
+      // Keep error logging for production debugging
       console.error('Error connecting Garmin account:', error);
 
       // Check if this is a rate limit error
@@ -144,10 +148,12 @@ class FitnessService {
    * @returns Disconnection result
    */
   async disconnectGarminAccount(): Promise<SyncResult> {
+    if (!GARMIN_ENABLED) throw new Error('Garmin functionality is disabled');
     try {
       const response = await api.post('/fitness/garmin/disconnect');
       return response.data;
     } catch (error: any) {
+      // Keep error logging for production debugging
       console.error('Error disconnecting Garmin account:', error);
       return {
         success: false,
@@ -164,24 +170,24 @@ class FitnessService {
    * @returns Daily summary or error object
    */
   private async _getGarminDailySummaryInternal(date: string, forceRefresh?: boolean): Promise<GarminDailySummary | null | { error: string; message: string }> {
+    if (!GARMIN_ENABLED) throw new Error('Garmin functionality is disabled');
     try {
       const params = forceRefresh ? { forceRefresh: 'true' } : {};
       const url = `/fitness/garmin/daily/${date}`;
       // Add timestamp cache buster only if forcing refresh
       const cacheBuster = forceRefresh ? `?_=${new Date().getTime()}` : '';
-      console.log(`[FitnessService] Calling API endpoint: ${api.defaults.baseURL}${url}${cacheBuster} with forceRefresh=${forceRefresh}`);
       const response = await api.get(`${url}${cacheBuster}`, { params });
-      console.log(`[FitnessService] API response for ${date} (forceRefresh=${forceRefresh}):`, response.data);
+
       // Ensure empty data is returned as null for consistency
       if (response.data && Object.keys(response.data).length === 0) {
-        console.log(`[FitnessService] Empty object received for ${date}, treating as null.`);
         return null;
       }
       return response.data as GarminDailySummary;
     } catch (error: any) {
-      console.error(`[FitnessService] Error getting Garmin daily summary for ${date} (forceRefresh=${forceRefresh}):`, error);
+      // Keep error logging for production debugging
+      console.error(`[FitnessService] Error getting Garmin daily summary for ${date}:`, error);
+
       if (error.response?.status === 429 || error.response?.data?.error === 'RATE_LIMIT') {
-        console.warn(`[FitnessService] Rate limit hit for ${date} (forceRefresh=${forceRefresh})`);
         return {
           error: 'RATE_LIMIT',
           message: error.response?.data?.message || 'Garmin API rate limit reached. Please try again later.'
@@ -200,6 +206,7 @@ class FitnessService {
    * @returns RefreshedSummaryResult object
    */
   async getRefreshedGarminSummary(date: string): Promise<RefreshedSummaryResult> {
+    if (!GARMIN_ENABLED) throw new Error('Garmin functionality is disabled');
     let lastFetchTimestampStr: string | null = null;
     let minutesSinceLastFetch: number | null = null;
     const now = new Date();
@@ -209,11 +216,9 @@ class FitnessService {
       if (lastFetchTimestampStr) {
         const lastFetchTime = new Date(parseInt(lastFetchTimestampStr, 10));
         minutesSinceLastFetch = differenceInMinutes(now, lastFetchTime);
-        console.log(`[FitnessService] Last live fetch for Garmin was ${minutesSinceLastFetch} minutes ago.`);
-      } else {
-        console.log('[FitnessService] No previous Garmin live fetch timestamp found.');
       }
     } catch (e) {
+      // Keep error logging for production debugging
       console.error('[FitnessService] Error reading Garmin timestamp from AsyncStorage:', e);
       // Proceed as if no timestamp exists
     }
@@ -221,12 +226,10 @@ class FitnessService {
     const shouldForceRefresh = minutesSinceLastFetch === null || minutesSinceLastFetch >= CACHE_DURATION_MINUTES;
 
     if (shouldForceRefresh) {
-      console.log('[FitnessService] Attempting LIVE fetch (cache expired or missing).');
       const liveResult = await this._getGarminDailySummaryInternal(date, true);
 
       // Check if the result is an error object
       if (liveResult && typeof liveResult === 'object' && 'error' in liveResult) {
-        console.warn('[FitnessService] Live fetch failed. Attempting CACHE fallback.', liveResult);
         const fallbackResult = await this._getGarminDailySummaryInternal(date, false);
 
         if (fallbackResult && typeof fallbackResult === 'object' && 'error' in fallbackResult) {
@@ -240,32 +243,29 @@ class FitnessService {
         // Live fetch succeeded
         try {
           await AsyncStorage.setItem(LAST_LIVE_FETCH_KEY, now.getTime().toString());
-          console.log('[FitnessService] Successfully updated live fetch timestamp.');
         } catch (e) {
+          // Keep error logging for production debugging
           console.error('[FitnessService] Error saving Garmin timestamp to AsyncStorage:', e);
         }
-        return { summary: liveResult as GarminDailySummary, error: null, source: 'live' };
+        return { summary: liveResult, error: null, source: 'live' };
       } else {
-        // Live fetch returned null (e.g., no data for the day yet)
-        console.log('[FitnessService] Live fetch returned null/no data.');
-         try {
+        // Live fetch returned null/no data
+        try {
           await AsyncStorage.setItem(LAST_LIVE_FETCH_KEY, now.getTime().toString());
-           console.log('[FitnessService] Successfully updated live fetch timestamp even though data was null.');
-         } catch (e) {
-           console.error('[FitnessService] Error saving Garmin timestamp to AsyncStorage:', e);
-         }
+        } catch (e) {
+          // Keep error logging for production debugging
+          console.error('[FitnessService] Error saving Garmin timestamp to AsyncStorage:', e);
+        }
         return { summary: null, error: null, source: 'live' };
       }
     } else {
-      console.log('[FitnessService] Using CACHED data (timestamp is fresh).');
+      // Use cached data
       const cachedResult = await this._getGarminDailySummaryInternal(date, false);
-
-      if (cachedResult && typeof cachedResult === 'object' && 'error' in cachedResult) {
-        // Cache fetch failed
-        return { summary: null, error: cachedResult, source: 'cache' };
-      }
-      // Cache fetch succeeded or returned null
-      return { summary: cachedResult as GarminDailySummary | null, error: null, source: 'cache' };
+      return {
+        summary: cachedResult as GarminDailySummary | null,
+        error: null,
+        source: 'cache'
+      };
     }
   }
 
@@ -276,6 +276,7 @@ class FitnessService {
    * @returns Object containing summary or error
    */
   async forceRefreshGarminSummary(date: string): Promise<{ summary: GarminDailySummary | null; error: any | null }> {
+    if (!GARMIN_ENABLED) throw new Error('Garmin functionality is disabled');
     console.log(`[FitnessService] Manual force refresh requested for ${date}`);
     const now = new Date();
 
@@ -317,6 +318,7 @@ class FitnessService {
     startDate: string,
     endDate?: string
   ): Promise<GarminDailySummary[]> {
+    if (!GARMIN_ENABLED) throw new Error('Garmin functionality is disabled');
     try {
       const params = { startDate, endDate };
       const response = await api.get('/fitness/garmin/daily', { params });
@@ -333,6 +335,7 @@ class FitnessService {
    * @returns Update result
    */
   async updateGarminCredentials(credentials: GarminCredentials): Promise<SyncResult> {
+    if (!GARMIN_ENABLED) throw new Error('Garmin functionality is disabled');
     try {
       const response = await api.put('/fitness/garmin/credentials', credentials);
       return response.data;
@@ -350,6 +353,7 @@ class FitnessService {
    * @returns Connection test result
    */
   async testGarminConnection(): Promise<SyncResult> {
+    if (!GARMIN_ENABLED) throw new Error('Garmin functionality is disabled');
     try {
       const response = await api.get('/fitness/garmin/test');
       return response.data;
@@ -367,6 +371,7 @@ class FitnessService {
    * @returns Sync status
    */
   async getSyncStatus(): Promise<SyncStatus> {
+    if (!GARMIN_ENABLED) throw new Error('Garmin functionality is disabled');
     try {
       const response = await api.get('/fitness/garmin/sync/status');
       return response.data;
@@ -386,6 +391,7 @@ class FitnessService {
    * @returns Operation result
    */
   async startBackgroundSync(intervalMinutes?: number): Promise<SyncResult> {
+    if (!GARMIN_ENABLED) throw new Error('Garmin functionality is disabled');
     try {
       const response = await api.post('/fitness/garmin/sync/start', { intervalMinutes });
       return response.data;
@@ -403,6 +409,7 @@ class FitnessService {
    * @returns Operation result
    */
   async stopBackgroundSync(): Promise<SyncResult> {
+    if (!GARMIN_ENABLED) throw new Error('Garmin functionality is disabled');
     try {
       const response = await api.post('/fitness/garmin/sync/stop');
       return response.data;
@@ -421,6 +428,7 @@ class FitnessService {
    * @returns Operation result
    */
   async updateSyncInterval(intervalMinutes: number): Promise<SyncResult> {
+    if (!GARMIN_ENABLED) throw new Error('Garmin functionality is disabled');
     try {
       const response = await api.post('/fitness/garmin/sync/update-interval', { intervalMinutes });
       return response.data;
@@ -438,6 +446,7 @@ class FitnessService {
    * @returns Operation result
    */
   async triggerManualSync(): Promise<SyncResult> {
+    if (!GARMIN_ENABLED) throw new Error('Garmin functionality is disabled');
     try {
       const response = await api.post('/fitness/garmin/sync/now');
       return response.data;
@@ -458,6 +467,7 @@ class FitnessService {
    * @returns Sync result
    */
   async syncGarminData(startDate: string, endDate?: string, forceRefresh?: boolean): Promise<SyncResult> {
+    if (!GARMIN_ENABLED) throw new Error('Garmin functionality is disabled');
     try {
       const response = await api.post('/fitness/garmin/sync', {
         startDate,
@@ -489,6 +499,7 @@ class FitnessService {
    * @returns Development mode status
    */
   async getDevModeStatus(): Promise<DevModeStatus> {
+    if (!GARMIN_ENABLED) throw new Error('Garmin functionality is disabled');
     try {
       const response = await api.get('/fitness/garmin/dev-mode-status');
       return response.data;
@@ -507,6 +518,7 @@ class FitnessService {
    * @returns Toggle result
    */
   async toggleDevModeApiAccess(enabled: boolean): Promise<any> {
+    if (!GARMIN_ENABLED) throw new Error('Garmin functionality is disabled');
     try {
       const response = await api.post('/fitness/garmin/toggle-dev-mode', { enabled });
       return response.data;

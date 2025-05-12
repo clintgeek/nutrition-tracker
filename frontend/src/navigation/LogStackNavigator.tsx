@@ -10,7 +10,7 @@ import type { DrawerNavigationProp } from '@react-navigation/drawer';
 import LogScreen from '../screens/log/LogScreen';
 import AddLogScreen from '../screens/log/AddLogScreen';
 import AddFoodToLogModal from '../screens/log/AddFoodToLogModal';
-import SearchFoodForLogScreen from '../screens/log/SearchFoodForLogScreen';
+import { SearchFoodForLogScreen } from '../screens/log/SearchFoodForLogScreen';
 import CustomHeader from '../components/CustomHeader';
 import { Food } from '../types/Food';
 
@@ -93,7 +93,7 @@ const LogStackNavigator: React.FC = () => {
         }}
       />
       <Stack.Screen
-        name="SearchFoodForLog"
+        name="SearchFoodForLogScreen"
         component={SearchFoodForLogScreen}
         options={{
           title: 'Search Foods',

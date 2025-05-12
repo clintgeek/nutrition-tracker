@@ -1,6 +1,6 @@
 const { validationResult } = require('express-validator');
 const FoodItem = require('../models/FoodItem');
-const FoodApiService = require('../utils/foodApiService');
+const foodApiService = require('../utils/foodApiService');
 const nutritionixService = require('../utils/nutritionixService');
 const spoonacularService = require('../utils/spoonacularService');
 const logger = require('../config/logger');
@@ -8,6 +8,7 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const db = require('../config/db');
 const redisService = require('../services/redisService');
 const openFoodFactsService = require('../utils/openFoodFactsService');
+const EdamamService = require('../utils/edamamService');
 
 // Helper function to invalidate food-related caches
 const invalidateFoodCaches = async () => {
@@ -26,136 +27,44 @@ const invalidateFoodCaches = async () => {
 };
 
 /**
- * Debug endpoint to check raw API results
- * @route GET /api/foods/debug-search
- */
-const debugSearch = asyncHandler(async (req, res) => {
-  const { query } = req.query;
-
-  if (!query || query.length < 2) {
-    return res.status(400).json({ message: 'Search query must be at least 2 characters' });
-  }
-
-  try {
-    logger.info(`Debug search for: ${query}`);
-
-    // Run searches from each API source in parallel
-    const [nutritionixResults, openFoodFactsResults, usdaResults, spoonacularResults] = await Promise.all([
-      nutritionixService.searchByName(query).catch(e => {
-        logger.error('Nutritionix error:', e.message);
-        return [];
-      }),
-      openFoodFactsService.searchByName(query).catch(e => {
-        logger.error('OpenFoodFacts error:', e.message);
-        return [];
-      }),
-      FoodApiService.searchUSDAByName(query, true).catch(e => {
-        logger.error('USDA error:', e.message);
-        return [];
-      }),
-      spoonacularService.searchByName(query).catch(e => {
-        logger.error('Spoonacular error:', e.message);
-        return [];
-      })
-    ]);
-
-    // Calculate total results before deduplication
-    const totalBeforeDedup = nutritionixResults.length + openFoodFactsResults.length + usdaResults.length + spoonacularResults.length;
-
-    // Combine all results in priority order
-    const combinedResults = [
-      ...nutritionixResults,
-      ...openFoodFactsResults,
-      ...usdaResults,
-      ...spoonacularResults
-    ];
-
-    // Get deduplicated results with the same logic used in the regular search
-    const dedupResults = FoodApiService.deduplicateResults(combinedResults, query);
-
-    res.json({
-      stats: {
-        query: query,
-        nutritionix: nutritionixResults.length,
-        openFoodFacts: openFoodFactsResults.length,
-        usda: usdaResults.length,
-        spoonacular: spoonacularResults.length,
-        total_before_dedup: totalBeforeDedup,
-        total_after_dedup: dedupResults.length,
-        duplicates_removed: totalBeforeDedup - dedupResults.length
-      },
-      results: {
-        nutritionix: nutritionixResults.slice(0, 5),
-        openFoodFacts: openFoodFactsResults.slice(0, 5),
-        usda: usdaResults.slice(0, 5),
-        spoonacular: spoonacularResults.slice(0, 5),
-        combined: dedupResults.slice(0, 10)
-      }
-    });
-  } catch (error) {
-    logger.error('Debug search error:', error);
-    res.status(500).json({
-      error: `Search failed: ${error.message}`,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-/**
- * Search food items
+ * Search food items with quality scoring and deduplication
  * @route GET /api/foods/search
  */
-const searchFood = asyncHandler(async (req, res) => {
-  const { query } = req.query;
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 30;
-  const offset = (page - 1) * limit;
-
-  if (!query || query.length < 2) {
-    return res.status(400).json({ message: 'Search query must be at least 2 characters' });
-  }
-
+const searchFood = async (req, res) => {
   try {
-    logger.info(`Search request with limit: ${limit}, page: ${page}, offset: ${offset}`);
+    const { query, limit = 30, offset = 0 } = req.query;
 
-    // Search local database and external APIs in parallel
-    const [localResults, apiResults] = await Promise.all([
-      FoodItem.search(query, limit, offset),
-      FoodApiService.searchFood(query)
-    ]);
-
-    logger.info(`Local results: ${localResults.length}, API results: ${apiResults.length}`);
-
-    // Filter out items that are already in local results
-    const localSourceIds = new Set(localResults.map(item => `${item.source}:${item.source_id}`));
-    const filteredApiResults = apiResults.filter(item =>
-      !localSourceIds.has(`${item.source}:${item.source_id}`)
-    );
-
-    // Combine results with local results first, then add API results up to the limit
-    const combinedResults = [...localResults];
-    const remainingSlots = limit - localResults.length;
-
-    if (remainingSlots > 0 && filteredApiResults.length > 0) {
-      // Add API results up to the remaining slots
-      // The API results are already sorted by relevance by FoodApiService.deduplicateResults
-      const apiResultsToAdd = filteredApiResults.slice(0, remainingSlots);
-      combinedResults.push(...apiResultsToAdd);
+    if (!query || query.length < 2) {
+      return res.status(400).json({ error: 'Search query must be at least 2 characters long' });
     }
 
-    res.json({
-      foods: combinedResults,
-      page,
-      limit,
-      source: 'combined',
-      total_local: localResults.length,
-      total_api: filteredApiResults.length
-    });
+    const results = await foodApiService.searchFood(query, { limit, offset, includeLocal: true });
+    res.json(results);
   } catch (error) {
-    logger.error(`Error searching foods: ${error.message}`);
-    res.status(500).json({ message: 'Error searching foods', error: error.message });
+    console.error('Error in searchFood:', error);
+    res.status(500).json({ error: error.message });
   }
-});
+};
+
+/**
+ * Debug endpoint to see raw API responses and transformation process
+ * @route GET /api/foods/debug-search
+ */
+const debugSearch = async (req, res) => {
+  try {
+    const { query } = req.query;
+
+    if (!query || query.length < 2) {
+      return res.status(400).json({ error: 'Search query must be at least 2 characters long' });
+    }
+
+    const results = await foodApiService.searchFood(query, { limit: 30, offset: 0, includeLocal: true });
+    res.json(results);
+  } catch (error) {
+    console.error('Error in debugSearch:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
 
 /**
  * Get food item by barcode
@@ -172,7 +81,7 @@ const getFoodByBarcode = asyncHandler(async (req, res) => {
   }
 
   // If not found locally, search external APIs
-  const apiFood = await FoodApiService.fetchFoodByBarcode(barcode);
+  const apiFood = await foodApiService.fetchFoodByBarcode(barcode);
 
   if (!apiFood) {
     return res.status(404).json({ message: 'Food item not found' });

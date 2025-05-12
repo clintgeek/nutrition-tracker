@@ -1,6 +1,13 @@
 // Load environment variables from .env.local in development
 if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config({ path: '.env.local' });
+  const path = require('path');
+  const dotenv = require('dotenv');
+  const result = dotenv.config({ path: path.join(__dirname, '../../.env.local') });
+
+  if (result.error) {
+    console.error('Error loading .env.local:', result.error);
+    process.exit(1);
+  }
   console.log('Loaded .env.local for development environment');
 } else {
   require('dotenv').config();

@@ -73,6 +73,15 @@ export type RecipeStackParamList = {
   SearchFoodForRecipe: { recipeId: number | 'new' };
 };
 
+// Log Stack Types
+export type LogStackParamList = {
+  LogList: undefined;
+  LogDetails: { logId: string };
+  AddLog: { date: string; mealType?: string };
+  AddFoodToLogModal: { food: Food; mealType?: string; date?: string };
+  SearchFoodForLogScreen: { mealType: string; date: string };
+};
+
 // Type for useNavigation hook
 export type RootStackScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<RootStackParamList, T>;
 

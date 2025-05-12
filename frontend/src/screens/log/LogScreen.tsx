@@ -210,75 +210,67 @@ const LogScreen: React.FC = () => {
     setNutritionSummary({ calories: 0, protein: 0, carbs: 0, fat: 0 });
     setDailySummary(null);
 
+    let logsData = [];
+    let garminResult = null;
     try {
-      // Fetch logs and Garmin summary concurrently
-      console.log('[LogScreen] Fetching data for date:', dateToFetch);
-      const [logsData, garminResult] = await Promise.all([
-        foodLogService.getLogs(dateToFetch),
-        fitnessService.getRefreshedGarminSummary(dateToFetch)
-      ]);
-
-      // Process Logs
-      console.log('[LogScreen] Logs API Response:', { success: !!logsData, logCount: logsData?.length || 0 });
-      setLogs(logsData);
-      if (logsData && logsData.length > 0) {
-        const summary = logsData.reduce((acc, log) => {
-          const calories = log.calories_per_serving || 0;
-          const protein = log.protein_grams || 0;
-          const carbs = log.carbs_grams || 0;
-          const fat = log.fat_grams || 0;
-          const servings = log.servings || 1;
-          return {
-            calories: acc.calories + (calories * servings),
-            protein: acc.protein + (protein * servings),
-            carbs: acc.carbs + (carbs * servings),
-            fat: acc.fat + (fat * servings),
-          };
-        }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
-        console.log('[LogScreen] Calculated nutrition summary:', summary);
-        setNutritionSummary(summary);
+      // Always fetch logs, even if Garmin fails
+      try {
+        logsData = await foodLogService.getLogs(dateToFetch);
+        setLogs(logsData);
+        if (logsData && logsData.length > 0) {
+          const summary = logsData.reduce((acc, log) => {
+            const calories = log.calories_per_serving || 0;
+            const protein = log.protein_grams || 0;
+            const carbs = log.carbs_grams || 0;
+            const fat = log.fat_grams || 0;
+            const servings = log.servings || 1;
+            return {
+              calories: acc.calories + (calories * servings),
+              protein: acc.protein + (protein * servings),
+              carbs: acc.carbs + (carbs * servings),
+              fat: acc.fat + (fat * servings),
+            };
+          }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+          setNutritionSummary(summary);
+        }
+      } catch (err) {
+        // Keep error logging for production debugging
+        console.error('[LogScreen] Error fetching logs:', err);
       }
 
-      // Process Garmin Summary
-      console.log('[LogScreen] Garmin Summary Result:', garminResult);
-      setDailySummary(garminResult.summary);
-      if (garminResult.error) {
-        console.warn(`[LogScreen] Error fetching Garmin summary (Source: ${garminResult.source}):`, garminResult.error);
-        // Optionally set a Garmin-specific error state here if UI needs it
+      try {
+        garminResult = await fitnessService.getRefreshedGarminSummary(dateToFetch);
+        setDailySummary(garminResult.summary);
+        if (garminResult.error) {
+          // Keep error logging for production debugging
+          console.warn(`[LogScreen] Error fetching Garmin summary (Source: ${garminResult.source}):`, garminResult.error);
+        }
+      } catch (err) {
+        // Keep error logging for production debugging
+        console.warn('[LogScreen] Garmin fetch failed:', err);
       }
-
-    } catch (error) {
-      console.error('[LogScreen] Error fetching data for date:', error);
-      // Handle combined error or specific errors if Promise.allSettled was used
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Fetch data when the screen comes into focus or date changes
+  // Load data when screen is focused
   useFocusEffect(
     useCallback(() => {
-      console.log('LogScreen focused, fetching data for', selectedDate);
       fetchDataForDate(selectedDate);
-      // No cleanup needed for this effect
-      return () => {};
-    }, [selectedDate, fetchDataForDate]) // Depend on selectedDate and the fetch function
+    }, [selectedDate, fetchDataForDate])
   );
 
   const handleDateChange = (event: any, date?: Date) => {
     setShowDatePicker(false);
     if (date) {
-      const formattedDate = date.toISOString().split('T')[0];
-      console.log('Date picker changed to:', formattedDate);
+      const formattedDate = formatDate(date);
       setSelectedDate(formattedDate);
     }
   };
 
   const navigateToAddLog = (mealType: string) => {
-    navigation.navigate('SearchFoodForLog', {
-      mealType,
-      date: selectedDate
-    });
+    navigation.navigate('SearchFoodForLogScreen', { saveContext: { type: 'log', date: selectedDate, mealType } });
   };
 
   const navigateToLogDetails = (logId: string) => {
@@ -313,6 +305,7 @@ const LogScreen: React.FC = () => {
       await fetchDataForDate(selectedDate);
       setShowDeleteDialog(false);
     } catch (error) {
+      // Keep error logging for production debugging
       console.error('Error deleting log:', error);
       Alert.alert('Error', 'Failed to delete log. Please try again.');
     } finally {

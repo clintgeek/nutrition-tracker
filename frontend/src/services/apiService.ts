@@ -19,7 +19,6 @@ let API_URL = '/api'; // Default for production web - this will use the current 
 // Check if we have a global API config override (set in index.html)
 if (typeof window !== 'undefined' && window.API_CONFIG && window.API_CONFIG.baseURL) {
   API_URL = window.API_CONFIG.baseURL;
-  console.log('Using API URL from global config:', API_URL);
 }
 // For development
 else if (__DEV__) {
@@ -28,15 +27,11 @@ else if (__DEV__) {
     const hostname = window.location.hostname;
     const backendPort = 4081; // Backend port
     API_URL = `http://${hostname}:${backendPort}/api`;
-    console.log('Development API URL:', API_URL);
   } else {
     // Native development - use IP address
     API_URL = 'http://192.168.1.17:4081/api';
-    console.log('Native API URL:', API_URL);
   }
 }
-
-console.log('Final API URL:', API_URL);
 
 // Create axios instance
 const api: AxiosInstance = axios.create({
@@ -66,6 +61,7 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    // Keep error logging for production debugging
     console.error('[ApiService] Request error:', error);
     return Promise.reject(error);
   }
