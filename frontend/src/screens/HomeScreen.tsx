@@ -375,25 +375,47 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         return <MealPlanCard />;
       case 'recentActivity':
         return (
-          <Card key={cardId} style={styles.card}>
-            <Card.Title title="Recent Foods" />
+          <Card key={cardId} style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+            <Card.Title
+              title="Recent Foods"
+              titleStyle={{ color: theme.colors.onSurface }}
+            />
             <Card.Content>
               {recentLogs.length > 0 ? (
                 recentLogs.map((log, index) => (
                   <React.Fragment key={log.id || index}>
                     <View style={styles.recentLogItem}>
-                      <Text style={styles.recentLogText}>{log.food_name}</Text>
-                      <Text style={styles.recentLogDate}>{formatLogDate(log.log_date)}</Text>
+                      <View style={styles.recentLogInfo}>
+                        <Text style={[styles.recentLogText, { color: theme.colors.onSurface }]}>
+                          {log.food_name}
+                        </Text>
+                        <Text style={[styles.recentLogDate, { color: theme.colors.onSurfaceVariant }]}>
+                          {formatLogDate(log.log_date)}
+                        </Text>
+                      </View>
+                      <Text style={[styles.recentLogCalories, { color: theme.colors.primary }]}>
+                        {log.calories || log.total_calories || 0} cal
+                      </Text>
                     </View>
-                    {index < recentLogs.length - 1 && <Divider />}
+                    {index < recentLogs.length - 1 && (
+                      <Divider style={{ backgroundColor: theme.colors.surfaceVariant }} />
+                    )}
                   </React.Fragment>
                 ))
               ) : (
-                <Text>No recent foods logged.</Text>
+                <Text style={[styles.noLogsText, { color: theme.colors.onSurfaceVariant }]}>
+                  No recent foods logged.
+                </Text>
               )}
             </Card.Content>
             <Card.Actions>
-              <Button onPress={navigateToFoodLog}>Go to Log</Button>
+              <Button
+                mode="text"
+                onPress={navigateToFoodLog}
+                textColor={theme.colors.primary}
+              >
+                Go to Log
+              </Button>
             </Card.Actions>
           </Card>
         );
@@ -544,15 +566,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 12,
+  },
+  recentLogInfo: {
+    flex: 1,
   },
   recentLogText: {
     fontSize: 16,
     fontWeight: '500',
+    marginBottom: 4,
   },
   recentLogDate: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 14,
+  },
+  recentLogCalories: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  noLogsText: {
+    textAlign: 'center',
+    marginVertical: 20,
+    fontSize: 16,
   },
 });
 

@@ -10,6 +10,7 @@ import {
   Alert,
   Platform,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { format, subDays, subMonths } from 'date-fns';
 import { useNavigation } from '@react-navigation/native';
@@ -339,7 +340,7 @@ const BloodPressureScreen: React.FC = () => {
     switch (activeTab) {
       case 'trends':
         return (
-          <View style={styles(theme).tabContent}>
+          <ScrollView style={styles(theme).tabContent} contentContainerStyle={{ flexGrow: 1 }}>
             <View style={styles(theme).chartCard}>
               <View style={styles(theme).chartHeader}>
                 <Text style={styles(theme).chartTitle}>Blood Pressure Trends</Text>
@@ -402,11 +403,11 @@ const BloodPressureScreen: React.FC = () => {
                 ))}
               </View>
             </View>
-          </View>
+          </ScrollView>
         );
       case 'log':
         return (
-          <View style={styles(theme).tabContent}>
+          <View style={[styles(theme).tabContent, { flex: 1 }]}>
             <View style={styles(theme).logsCard}>
               <View style={styles(theme).logsHeader}>
                 <Text style={styles(theme).sectionTitle}>Blood Pressure Logs</Text>
@@ -430,6 +431,7 @@ const BloodPressureScreen: React.FC = () => {
                     />
                   </View>
                 }
+                style={{ flexGrow: 1 }}
               />
             </View>
           </View>
