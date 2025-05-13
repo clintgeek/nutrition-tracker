@@ -37,6 +37,46 @@ self.addEventListener('activate', event => {
   );
 });
 
+// Handle background sync
+self.addEventListener('sync', event => {
+  if (event.tag === 'sync-food-logs') {
+    event.waitUntil(syncFoodLogs());
+  }
+});
+
+// Sync food logs with server
+async function syncFoodLogs() {
+  try {
+    const db = await openDB('fitnessgeek-offline', 1);
+    const queue = await db.getAll('syncQueue');
+
+    for (const item of queue) {
+      if (item.status === 'pending') {
+        try {
+          const response = await fetch(`${self.registration.scope}api/${item.action}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(item.data),
+          });
+
+          if (response.ok) {
+            await db.put('syncQueue', {
+              ...item,
+              status: 'completed'
+            });
+          }
+        } catch (error) {
+          console.error('Sync failed:', error);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Database error:', error);
+  }
+}
+
 // Fetch event - network first, fallback to cache
 self.addEventListener('fetch', event => {
   // Skip cross-origin requests
@@ -47,7 +87,28 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       fetch(event.request)
         .catch(() => {
-          return caches.match(event.request);
+          // If offline, try to get from IndexedDB
+          return new Promise((resolve) => {
+            const request = event.request.clone();
+            request.json().then(data => {
+              // Store in sync queue for later
+              const db = openDB('fitnessgeek-offline', 1);
+              db.then(db => {
+                db.add('syncQueue', {
+                  action: request.url.split('/api/')[1],
+                  data,
+                  timestamp: new Date().toISOString(),
+                  status: 'pending'
+                });
+              });
+
+              // Return a success response to the client
+              resolve(new Response(JSON.stringify({
+                success: true,
+                message: 'Stored offline, will sync when online'
+              })));
+            });
+          });
         })
     );
     return;

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="2048" height="2048" viewBox="0 0 2048 2048" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="2048" height="2048" fill="rgb(96, 152, 204)"/>
+
+  <!-- Fork (scaled up) -->
+  <path d="M768 256v1536M768 256c0-70.7 57.3-128 128-128s128 57.3 128 128v1536M768 256c0 70.7-57.3 128-128 128s-128-57.3-128-128v1536"
+        stroke="white" stroke-width="128" stroke-linecap="round"/>
+
+  <!-- Knife (scaled up) -->
+  <path d="M1280 256l-384 1536" stroke="white" stroke-width="128" stroke-linecap="round"/>
+  <path d="M1280 256c70.7 0 128 57.3 128 128s-57.3 128-128 128" stroke="white" stroke-width="128" stroke-linecap="round"/>
+</svg>
