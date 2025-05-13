@@ -1,5 +1,10 @@
 # Build stage
-FROM node:16-alpine as build
+FROM node:18-alpine as build
+
+# Install bash and symlink for compatibility
+RUN apk add --no-cache bash && \
+    ln -sf /bin/bash /usr/bin/bash && \
+    ln -sf /bin/bash /bin/sh
 
 # Set working directory
 WORKDIR /app
@@ -20,6 +25,9 @@ COPY package*.json ./
 RUN npm config set registry=http://registry.npmjs.org/ && \
     npm config set strict-ssl=false && \
     npm cache clean --force
+
+# Debug: check bash presence before npm install
+RUN ls -l /bin/bash /usr/bin/bash /bin/sh && bash --version
 
 # Install dependencies with additional workarounds
 RUN npm install --legacy-peer-deps --no-audit --no-fund --network-timeout=100000

@@ -1,7 +1,7 @@
 FROM node:18-alpine
 
-# Install Python 3 and required dependencies
-RUN apk add --no-cache python3 py3-pip bash
+# Install Python 3, pip, bash, and symlink bash for compatibility
+RUN apk add --no-cache python3 py3-pip bash && ln -sf /bin/bash /usr/bin/bash
 
 # Set working directory
 WORKDIR /app
