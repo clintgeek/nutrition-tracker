@@ -37,9 +37,10 @@ const BloodPressureScreen: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [selectedLog, setSelectedLog] = useState<BloodPressureLog | undefined>();
   const [refreshing, setRefreshing] = useState(false);
-  const [timeSpan, setTimeSpan] = useState<TimeSpan>('7D');
+  const [timeSpan, setTimeSpan] = useState<TimeSpan>('3M');
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [showPdfTooltip, setShowPdfTooltip] = useState(false);
+  const [activeTab, setActiveTab] = useState<'trends' | 'log'>('trends');
 
   const navigation = useNavigation();
   const theme = useTheme();
@@ -66,22 +67,12 @@ const BloodPressureScreen: React.FC = () => {
           startDate = format(subMonths(now, 12), 'yyyy-MM-dd');
           break;
         case 'ALL':
-          // For ALL, we'll fetch from the beginning of 2023
-          startDate = '2023-01-01';
+          startDate = '1970-01-01';
           break;
       }
 
       const endDate = format(now, 'yyyy-MM-dd');
-      console.log('Fetching logs with date range:', { startDate, endDate });
       const fetchedLogs = await bloodPressureService.getBloodPressureLogs(startDate, endDate);
-      console.log('Fetched logs:', {
-        timeSpan,
-        startDate,
-        endDate,
-        count: fetchedLogs.length,
-        oldestLog: fetchedLogs.length > 0 ? fetchedLogs[fetchedLogs.length - 1].log_date : 'none',
-        newestLog: fetchedLogs.length > 0 ? fetchedLogs[0].log_date : 'none'
-      });
 
       setLogs(fetchedLogs);
     } catch (error) {
@@ -94,10 +85,8 @@ const BloodPressureScreen: React.FC = () => {
     fetchLogs();
   }, [fetchLogs]);
 
-  // Refresh data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      console.log('BloodPressureScreen focused, refreshing logs');
       fetchLogs();
     }, [fetchLogs])
   );
@@ -108,13 +97,8 @@ const BloodPressureScreen: React.FC = () => {
         const hasSeenTooltip = await AsyncStorage.getItem('hasSeenPdfTooltip');
 
         if (hasSeenTooltip !== 'true' && logs.length > 0) {
-          // Only show tooltip if there's data and user hasn't seen it before
           setShowPdfTooltip(true);
-
-          // Mark tooltip as seen
           await AsyncStorage.setItem('hasSeenPdfTooltip', 'true');
-
-          // Auto-hide tooltip after 8 seconds
           setTimeout(() => {
             setShowPdfTooltip(false);
           }, 8000);
@@ -124,7 +108,6 @@ const BloodPressureScreen: React.FC = () => {
       }
     };
 
-    // Check if we should show tooltip when logs are loaded
     if (logs.length > 0) {
       checkPdfTooltipStatus();
     }
@@ -162,23 +145,16 @@ const BloodPressureScreen: React.FC = () => {
   };
 
   const handleDeleteLog = async (log: BloodPressureLog) => {
-    console.log('handleDeleteLog called with log:', log.id);
     const confirmed = window.confirm('Are you sure you want to delete this blood pressure log?');
     if (confirmed) {
       try {
-        console.log('Delete confirmed for log:', log.id);
         await bloodPressureService.deleteBloodPressureLog(log.id);
-        console.log('Delete service call completed for log:', log.id);
 
-        // Update local state first
         setLogs(prevLogs => {
-          console.log('Updating logs state, removing log:', log.id);
           return prevLogs.filter(l => l.id !== log.id);
         });
 
-        // Wait a bit before refreshing to avoid race condition
         setTimeout(() => {
-          console.log('Refreshing logs after deletion');
           fetchLogs();
         }, 100);
       } catch (error) {
@@ -192,7 +168,6 @@ const BloodPressureScreen: React.FC = () => {
     try {
       setGeneratingPDF(true);
 
-      // Get date range based on current timeSpan
       const now = new Date();
       let startDate: string | undefined;
 
@@ -213,16 +188,13 @@ const BloodPressureScreen: React.FC = () => {
           startDate = format(subMonths(now, 12), 'yyyy-MM-dd');
           break;
         case 'ALL':
-          // For ALL, undefined will fetch all logs
           break;
       }
 
       const endDate = format(now, 'yyyy-MM-dd');
 
-      // Generate PDF report with current timespan data
       const blob = await bloodPressureService.generateReport(startDate, endDate, timeSpan);
 
-      // Download the PDF
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.style.display = 'none';
@@ -239,6 +211,91 @@ const BloodPressureScreen: React.FC = () => {
     } finally {
       setGeneratingPDF(false);
     }
+  };
+
+  const calculateStats = useCallback(() => {
+    if (logs.length === 0) return null;
+
+    const stats = {
+      systolic: {
+        avg: 0,
+        min: Infinity,
+        max: -Infinity
+      },
+      diastolic: {
+        avg: 0,
+        min: Infinity,
+        max: -Infinity
+      },
+      pulse: {
+        avg: 0,
+        min: Infinity,
+        max: -Infinity,
+        count: 0
+      }
+    };
+
+    logs.forEach(log => {
+      // Systolic stats
+      stats.systolic.avg += log.systolic;
+      stats.systolic.min = Math.min(stats.systolic.min, log.systolic);
+      stats.systolic.max = Math.max(stats.systolic.max, log.systolic);
+
+      // Diastolic stats
+      stats.diastolic.avg += log.diastolic;
+      stats.diastolic.min = Math.min(stats.diastolic.min, log.diastolic);
+      stats.diastolic.max = Math.max(stats.diastolic.max, log.diastolic);
+
+      // Pulse stats (only if pulse exists)
+      if (log.pulse) {
+        stats.pulse.avg += log.pulse;
+        stats.pulse.min = Math.min(stats.pulse.min, log.pulse);
+        stats.pulse.max = Math.max(stats.pulse.max, log.pulse);
+        stats.pulse.count++;
+      }
+    });
+
+    // Calculate averages
+    stats.systolic.avg = Math.round(stats.systolic.avg / logs.length);
+    stats.diastolic.avg = Math.round(stats.diastolic.avg / logs.length);
+    if (stats.pulse.count > 0) {
+      stats.pulse.avg = Math.round(stats.pulse.avg / stats.pulse.count);
+    }
+
+    return stats;
+  }, [logs]);
+
+  const renderStatsRow = () => {
+    const stats = calculateStats();
+    if (!stats) return null;
+
+    return (
+      <View style={styles(theme).statsRow}>
+        <View style={styles(theme).statItem}>
+          <Text style={styles(theme).statLabel}>Systolic</Text>
+          <Text style={styles(theme).statValue}>{stats.systolic.avg}</Text>
+          <Text style={styles(theme).statRange}>
+            {stats.systolic.min} - {stats.systolic.max}
+          </Text>
+        </View>
+        <View style={styles(theme).statItem}>
+          <Text style={styles(theme).statLabel}>Diastolic</Text>
+          <Text style={styles(theme).statValue}>{stats.diastolic.avg}</Text>
+          <Text style={styles(theme).statRange}>
+            {stats.diastolic.min} - {stats.diastolic.max}
+          </Text>
+        </View>
+        {stats.pulse.count > 0 && (
+          <View style={styles(theme).statItem}>
+            <Text style={styles(theme).statLabel}>Pulse</Text>
+            <Text style={styles(theme).statValue}>{stats.pulse.avg}</Text>
+            <Text style={styles(theme).statRange}>
+              {stats.pulse.min} - {stats.pulse.max}
+            </Text>
+          </View>
+        )}
+      </View>
+    );
   };
 
   const renderItem = ({ item }: { item: BloodPressureLog }) => (
@@ -267,7 +324,6 @@ const BloodPressureScreen: React.FC = () => {
       </TouchableOpacity>
       <TouchableOpacity
         onPress={() => {
-          console.log('Delete button pressed for log:', item.id);
           handleDeleteLog(item);
         }}
         style={styles(theme).deleteButton}
@@ -279,84 +335,127 @@ const BloodPressureScreen: React.FC = () => {
 
   const hasData = logs.length > 0;
 
-  return (
-    <View style={styles(theme).container}>
-      {hasData ? (
-        <View style={styles(theme).chartCard}>
-          <View style={styles(theme).chartHeader}>
-            <Text style={styles(theme).chartTitle}>Blood Pressure Trends</Text>
-            {Platform.OS === 'web' && (
-              <Button
-                mode="contained"
-                icon="file-pdf-box"
-                onPress={handleGeneratePDF}
-                loading={generatingPDF}
-                disabled={generatingPDF || logs.length === 0}
-                style={styles(theme).pdfButton}
-              >
-                Export PDF
-              </Button>
-            )}
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'trends':
+        return (
+          <View style={styles(theme).tabContent}>
+            <View style={styles(theme).chartCard}>
+              <View style={styles(theme).chartHeader}>
+                <Text style={styles(theme).chartTitle}>Blood Pressure Trends</Text>
+                {Platform.OS === 'web' && (
+                  <Button
+                    mode="contained"
+                    icon="file-pdf-box"
+                    onPress={handleGeneratePDF}
+                    loading={generatingPDF}
+                    disabled={generatingPDF || logs.length === 0}
+                    style={styles(theme).pdfButton}
+                  >
+                    Export PDF
+                  </Button>
+                )}
+              </View>
+              {hasData ? (
+                <>
+                  <NivoBloodPressureChart data={logs} timeSpan={timeSpan} />
+                  {renderStatsRow()}
+                </>
+              ) : (
+                <View style={styles(theme).noDataContainer}>
+                  <Ionicons name="pulse" size={48} color="#666" />
+                  <Text style={styles(theme).noDataText}>
+                    No blood pressure readings for {timeSpan === '7D' ? 'the last 7 days' :
+                      timeSpan === '1M' ? 'the last month' :
+                      timeSpan === '3M' ? 'the last 3 months' :
+                      timeSpan === '6M' ? 'the last 6 months' :
+                      timeSpan === '1Y' ? 'the last year' :
+                      'the selected period'}
+                  </Text>
+                  <Text style={styles(theme).noDataSubtext}>
+                    Try selecting a different time range or add your first reading using the + button below
+                  </Text>
+                </View>
+              )}
+              <View style={styles(theme).timeSpanSelector}>
+                {(['7D', '1M', '3M', '6M', '1Y', 'ALL'] as TimeSpan[]).map((span) => (
+                  <TouchableOpacity
+                    key={span}
+                    style={[
+                      styles(theme).timeSpanButton,
+                      timeSpan === span && styles(theme).timeSpanButtonActive
+                    ]}
+                    onPress={() => {
+                      setTimeSpan(span);
+                      fetchLogs();
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles(theme).timeSpanText,
+                        timeSpan === span && styles(theme).timeSpanTextActive
+                      ]}
+                    >
+                      {span}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
           </View>
-          <NivoBloodPressureChart data={logs} timeSpan={timeSpan} />
-          <View style={styles(theme).timeSpanSelector}>
-            {(['7D', '1M', '3M', '6M', '1Y', 'ALL'] as TimeSpan[]).map((span) => (
-              <TouchableOpacity
-                key={span}
-                style={[
-                  styles(theme).timeSpanButton,
-                  timeSpan === span && styles(theme).timeSpanButtonActive
-                ]}
-                onPress={() => {
-                  setTimeSpan(span);
-                  fetchLogs();  // Fetch new logs with the updated time span
-                }}
-              >
-                <Text
-                  style={[
-                    styles(theme).timeSpanText,
-                    timeSpan === span && styles(theme).timeSpanTextActive
-                  ]}
-                >
-                  {span}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      ) : (
-        <View style={styles(theme).noDataCard}>
-          <Text style={styles(theme).noDataText}>No blood pressure logs yet</Text>
-          <Text style={styles(theme).noDataSubtext}>Add your first log using the + button below</Text>
-        </View>
-      )}
-
-      <View style={styles(theme).logsCard}>
-        <View style={styles(theme).logsHeader}>
-          <Text style={styles(theme).sectionTitle}>Blood Pressure Logs</Text>
-        </View>
-        <FlatList
-          data={logs}
-          renderItem={renderItem}
-          keyExtractor={item => item.id.toString()}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          contentContainerStyle={styles(theme).listContent}
-          ListEmptyComponent={
-            <Text style={styles(theme).emptyListText}>No logs to display for the selected time period</Text>
-          }
-          ListFooterComponent={
-            <View style={styles(theme).listFooter}>
-              <BloodPressureImportButton
-                onImportComplete={fetchLogs}
-                existingLogs={logs}
+        );
+      case 'log':
+        return (
+          <View style={styles(theme).tabContent}>
+            <View style={styles(theme).logsCard}>
+              <View style={styles(theme).logsHeader}>
+                <Text style={styles(theme).sectionTitle}>Blood Pressure Logs</Text>
+              </View>
+              <FlatList
+                data={logs}
+                renderItem={renderItem}
+                keyExtractor={item => item.id.toString()}
+                refreshControl={
+                  <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
+                contentContainerStyle={styles(theme).listContent}
+                ListEmptyComponent={
+                  <Text style={styles(theme).emptyListText}>No logs to display for the selected time period</Text>
+                }
+                ListFooterComponent={
+                  <View style={styles(theme).listFooter}>
+                    <BloodPressureImportButton
+                      onImportComplete={fetchLogs}
+                      existingLogs={logs}
+                    />
+                  </View>
+                }
               />
             </View>
-          }
-        />
-      </View>
+          </View>
+        );
+      default:
+        return null;
+    }
+  };
 
+  return (
+    <View style={styles(theme).container}>
+      <View style={styles(theme).tabBar}>
+        <TouchableOpacity
+          style={[styles(theme).tab, activeTab === 'trends' && styles(theme).activeTab]}
+          onPress={() => setActiveTab('trends')}
+        >
+          <Text style={[styles(theme).tabText, activeTab === 'trends' && styles(theme).activeTabText]}>Trends</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles(theme).tab, activeTab === 'log' && styles(theme).activeTab]}
+          onPress={() => setActiveTab('log')}
+        >
+          <Text style={[styles(theme).tabText, activeTab === 'log' && styles(theme).activeTabText]}>Log</Text>
+        </TouchableOpacity>
+      </View>
+      {renderTabContent()}
       <FAB
         icon="plus"
         style={styles(theme).fab}
@@ -368,7 +467,6 @@ const BloodPressureScreen: React.FC = () => {
         labelTextColor="white"
         theme={{ colors: { onSecondaryContainer: 'white' }}}
       />
-
       <Modal visible={showForm} animationType="slide" transparent>
         <View style={styles(theme).modalContainer}>
           <View style={styles(theme).modalContent}>
@@ -387,8 +485,6 @@ const BloodPressureScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-
-      {/* PDF Generation Loading Modal */}
       <Portal>
         <Modal
           visible={generatingPDF}
@@ -398,31 +494,10 @@ const BloodPressureScreen: React.FC = () => {
           <View style={styles(theme).loadingModalContainer}>
             <View style={styles(theme).loadingModalContent}>
               <ActivityIndicator size="large" color={theme.colors.primary} />
-              <Text style={styles(theme).loadingModalText}>
-                Generating PDF report...
-              </Text>
             </View>
           </View>
         </Modal>
       </Portal>
-
-      {/* PDF Feature Tooltip - Using custom tooltip instead of Snackbar */}
-      {showPdfTooltip && Platform.OS === 'web' && (
-        <View style={[styles(theme).customTooltip, { backgroundColor: theme.colors.primary }]}>
-          <View style={styles(theme).tooltipContent}>
-            <Ionicons name="information-circle" size={20} color="white" />
-            <Text style={styles(theme).tooltipText}>
-              NEW: You can now export your blood pressure data as a PDF report!
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => setShowPdfTooltip(false)}
-            style={styles(theme).tooltipButton}
-          >
-            <Text style={styles(theme).tooltipButtonText}>Got it</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </View>
   );
 };
@@ -431,52 +506,149 @@ const styles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    paddingTop: 12,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    marginBottom: 0,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTab: {
+    borderBottomColor: '#2196F3',
+  },
+  tabText: {
+    marginTop: 4,
+    fontSize: 14,
+    color: '#666',
+  },
+  activeTabText: {
+    color: '#2196F3',
+    fontWeight: 'bold',
+  },
+  tabContent: {
     padding: 16,
   },
   chartCard: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    marginBottom: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
     padding: 16,
+    marginBottom: 16,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 2,
+  },
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  chartTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+  },
+  pdfButton: {
+    backgroundColor: '#2196F3',
+  },
+  timeSpanSelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 16,
+  },
+  timeSpanButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    backgroundColor: '#f0f0f0',
+  },
+  timeSpanButtonActive: {
+    backgroundColor: '#2196F3',
+  },
+  timeSpanText: {
+    color: '#666',
+  },
+  timeSpanTextActive: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  noDataContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    minHeight: 200,
+  },
+  noDataText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  noDataSubtext: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 8,
+    paddingHorizontal: 32,
   },
   logsCard: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    marginBottom: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
     padding: 16,
-    paddingBottom: 0,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    flex: 1,
+    marginBottom: 16,
+  },
+  logsHeader: {
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
+    fontSize: 20,
+    fontWeight: '600',
     color: '#333',
+  },
+  listContent: {
+    paddingBottom: 16,
+  },
+  emptyListText: {
+    textAlign: 'center',
+    color: '#666',
+    marginTop: 16,
+  },
+  listFooter: {
+    marginTop: 16,
   },
   logItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-    backgroundColor: 'white',
+    borderBottomColor: '#e0e0e0',
   },
   mainContent: {
     flex: 1,
   },
   readingContainer: {
-    flexDirection: 'column',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   readings: {
     flexDirection: 'row',
@@ -485,157 +657,38 @@ const styles = (theme: any) => StyleSheet.create({
   mainReading: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000',
+    color: '#333',
   },
   separator: {
-    fontSize: 18,
-    fontWeight: '600',
+    marginHorizontal: 4,
     color: '#666',
-    marginHorizontal: 8,
   },
   date: {
     fontSize: 14,
     color: '#666',
-    marginTop: 2,
   },
   deleteButton: {
     padding: 8,
-    marginLeft: 16,
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addButton: {
-    position: 'absolute',
-    bottom: 80, // Increased to account for tab bar
-    right: 20,
-    backgroundColor: '#007AFF',
-    borderRadius: 30,
-    width: 60,
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  noDataCard: {
-    backgroundColor: 'white',
-    padding: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  noDataText: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 8,
-  },
-  noDataSubtext: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  emptyListText: {
-    textAlign: 'center',
-    color: '#666',
-    padding: 20,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    width: '90%',
-    maxWidth: 500,
-    maxHeight: '90%',
-    overflow: 'hidden',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  bottomButtonContainer: {
-    marginBottom: 80, // Increased to account for tab bar and add button
-  },
-  timeSpanSelector: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 16,
-    flexWrap: 'wrap',
-  },
-  timeSpanButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    marginHorizontal: 4,
-    marginBottom: 8,
-    backgroundColor: '#f0f0f0',
-  },
-  timeSpanButtonActive: {
-    backgroundColor: '#007AFF',
-  },
-  timeSpanText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  timeSpanTextActive: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  listContent: {
-    paddingBottom: 20, // Added to provide space at the bottom of the list
-  },
-  listFooter: {
-    marginTop: 20,
-    marginBottom: 20,
-    paddingHorizontal: 10,
   },
   fab: {
     position: 'absolute',
     margin: 16,
     right: 0,
-    bottom: 4, // Reduced to be closer to the tab bar
-    backgroundColor: theme.colors.primary,
+    bottom: 0,
+    backgroundColor: '#2196F3',
   },
-  chartHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  chartTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: theme.colors.primary,
-  },
-  pdfButton: {
-    marginLeft: 'auto',
-  },
-  pdfButtonSmall: {
-    marginLeft: 8,
-    height: 36,
-  },
-  logsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    width: '90%',
+    maxWidth: 500,
   },
   loadingModalContainer: {
     flex: 1,
@@ -644,55 +697,37 @@ const styles = (theme: any) => StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   loadingModalContent: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 20,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
   },
-  loadingModalText: {
-    marginTop: 10,
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  customTooltip: {
-    position: 'absolute',
-    bottom: 70, // Position above FAB
-    left: 16,
-    right: 16,
-    backgroundColor: theme.colors.primary,
-    borderRadius: 4,
-    padding: 12,
+  statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    elevation: 6,
-    zIndex: 1000,
+    justifyContent: 'space-around',
+    marginTop: 16,
+    marginBottom: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
   },
-  tooltipContent: {
-    flexDirection: 'row',
+  statItem: {
     alignItems: 'center',
     flex: 1,
   },
-  tooltipText: {
-    color: 'white',
-    marginLeft: 8,
+  statLabel: {
     fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
   },
-  tooltipButton: {
-    marginLeft: 16,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: 4,
+  statValue: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#2196F3',
   },
-  tooltipButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  statRange: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
 });
 
