@@ -103,9 +103,14 @@ const getFoodByBarcode = asyncHandler(async (req, res) => {
  * @route POST /api/foods/custom
  */
 const createCustomFood = asyncHandler(async (req, res) => {
+  logger.info('=== CREATE CUSTOM FOOD REQUEST ===');
+  logger.info('Request body:', JSON.stringify(req.body, null, 2));
+  logger.info('User ID:', req.user.id);
+
   // Validate request
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    logger.error('Validation errors:', errors.array());
     return res.status(400).json({ errors: errors.array() });
   }
 
@@ -120,6 +125,18 @@ const createCustomFood = asyncHandler(async (req, res) => {
     barcode,
     brand
   } = req.body;
+
+  logger.info('Extracted data:', {
+    name,
+    calories,
+    protein,
+    carbs,
+    fat,
+    serving_size,
+    serving_unit,
+    barcode,
+    brand
+  });
 
   // Check for existing food with same name or barcode
   let existingFood = null;
@@ -195,6 +212,7 @@ const createCustomFood = asyncHandler(async (req, res) => {
         // Invalidate caches after updating food
         await invalidateFoodCaches();
 
+        logger.info('Returning updated existing food');
         return res.status(200).json({
           message: 'Using existing food item with updated information',
           food: updatedFood,
@@ -206,6 +224,7 @@ const createCustomFood = asyncHandler(async (req, res) => {
       // If update fails, we'll still return the existing food without changes
     }
 
+    logger.info('Returning existing food without updates');
     return res.status(200).json({
       message: 'Using existing food item',
       food: existingFood,
@@ -217,6 +236,8 @@ const createCustomFood = asyncHandler(async (req, res) => {
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(2, 10);
   const uniqueSourceId = `custom-${req.user.id}-${timestamp}-${randomStr}`;
+
+  logger.info('Creating new food with source_id:', uniqueSourceId);
 
   // Create food item
   const foodItem = await FoodItem.create({
@@ -234,9 +255,12 @@ const createCustomFood = asyncHandler(async (req, res) => {
     user_id: req.user.id,
   });
 
+  logger.info('Food created successfully with ID:', foodItem.id);
+
   // Invalidate caches after creating new food
   await invalidateFoodCaches();
 
+  logger.info('=== CREATE CUSTOM FOOD SUCCESS ===');
   res.status(201).json({
     message: 'Custom food item created',
     food: foodItem,

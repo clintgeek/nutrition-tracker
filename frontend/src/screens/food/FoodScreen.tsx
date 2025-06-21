@@ -133,6 +133,9 @@ const FoodScreen: React.FC = () => {
       // Update the selected food state
       setSelectedFood(scannedFood);
 
+      // Automatically show the food details modal for scanned foods
+      setIsFoodDetailsVisible(true);
+
       if (fromLog === true) {
         console.log(`Scanned food with fromLog=true. Will show Add button for log context.`);
       }
@@ -244,7 +247,121 @@ const FoodScreen: React.FC = () => {
     try {
       console.log('Starting food save process...');
       console.log(`Selected food: ${JSON.stringify(selectedFood)}`);
+      console.log(`Selected food ID: ${selectedFood.id} (type: ${typeof selectedFood.id})`);
 
+      // Debug alert for mobile
+      Alert.alert('DEBUG', `Starting save process for: ${selectedFood.name} (ID: ${selectedFood.id})`);
+
+      // Check if this is a placeholder food (from barcode scanner)
+      const isPlaceholder = selectedFood.isPlaceholder || selectedFood.id?.toString().startsWith('temp-');
+
+      console.log(`Placeholder check: isPlaceholder=${isPlaceholder}, selectedFood.isPlaceholder=${selectedFood.isPlaceholder}, selectedFood.id=${selectedFood.id}`);
+
+      if (isPlaceholder) {
+        console.log('=== TAKING PLACEHOLDER PATH ===');
+        console.log('This is a placeholder food from barcode scanner, creating new food');
+        console.log(`Placeholder ID: ${selectedFood.id} - will be replaced with real database ID`);
+        Alert.alert('DEBUG', 'Detected placeholder food, creating new food');
+
+        // Create a truly unique source_id for this food
+        const timestamp = Date.now();
+        const randomStr = Math.random().toString(36).substring(2, 10);
+        const uniqueSourceId = `custom-${timestamp}-${randomStr}`;
+
+        // Prepare the food data with proper barcode handling
+        // IMPORTANT: Don't include the temporary ID in the food data
+        const foodToSave = {
+          name: selectedFood.name || `Food with barcode ${selectedFood.barcode || 'unknown'}`,
+          calories: Number(selectedFood.calories || 0),
+          protein: Number(selectedFood.protein || 0),
+          carbs: Number(selectedFood.carbs || 0),
+          fat: Number(selectedFood.fat || 0),
+          serving_size: Number(selectedFood.serving_size || 100),
+          serving_unit: selectedFood.serving_unit || 'g',
+          source: 'custom' as const,
+          source_id: uniqueSourceId,
+          barcode: selectedFood.barcode || undefined,
+          brand: selectedFood.brand || undefined,
+        };
+
+        console.log('Creating new food from placeholder with data:', JSON.stringify(foodToSave));
+        Alert.alert('DEBUG', `Saving food: ${foodToSave.name}`);
+
+        // Create a new food
+        const newFood = await foodService.createCustomFood(foodToSave);
+        console.log('Food created successfully with ID:', newFood.id);
+        console.log('New food object:', JSON.stringify(newFood, null, 2));
+        Alert.alert('DEBUG', `Food created with ID: ${newFood.id} (type: ${typeof newFood.id})`);
+
+        // Validate that we got a proper database ID
+        if (!newFood.id || typeof newFood.id !== 'number') {
+          throw new Error(`Invalid food ID returned: ${newFood.id} (type: ${typeof newFood.id})`);
+        }
+
+        // Add the new food to our state immediately
+        const updatedFoods = [...foods, newFood];
+        setFoods(updatedFoods);
+        setFilteredFoods(updatedFoods);
+
+        // Check if we came from the log screen and have a meal type
+        if (fromLog && selectedMealType) {
+          console.log(`Adding new food to ${selectedMealType} log`);
+          Alert.alert('DEBUG', `Adding to ${selectedMealType} log`);
+
+          // Ensure meal_type is valid
+          const validMealType = (selectedMealType === 'breakfast' ||
+                                selectedMealType === 'lunch' ||
+                                selectedMealType === 'dinner' ||
+                                selectedMealType === 'snack')
+                                ? selectedMealType
+                                : 'snack';
+
+          // Create a food log entry
+          const foodLogEntry = {
+            food_id: newFood.id,
+            meal_type: validMealType as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+            quantity: quantity,
+            log_date: selectedDate || new Date().toISOString().split('T')[0],
+            food_item_id: newFood.id,
+            servings: quantity,
+            user_id: 1 // Required field
+          };
+
+          // Validate that we're using a proper database ID
+          if (typeof foodLogEntry.food_item_id !== 'number' || foodLogEntry.food_item_id <= 0) {
+            throw new Error(`Invalid food_item_id: ${foodLogEntry.food_item_id} (type: ${typeof foodLogEntry.food_item_id})`);
+          }
+
+          console.log('Creating food log entry:', JSON.stringify(foodLogEntry, null, 2));
+          console.log('Using food_item_id from newFood:', newFood.id);
+          console.log('SelectedFood ID (should be ignored):', selectedFood.id);
+          Alert.alert('DEBUG', `Creating log with food_item_id: ${foodLogEntry.food_item_id} (from newFood)`);
+
+          await foodLogService.createLog(foodLogEntry);
+          console.log('Food log created successfully');
+          Alert.alert('DEBUG', 'Food log created, navigating back');
+
+          // Navigate back to the log screen
+          Alert.alert(
+            'Success',
+            `Food added to ${validMealType}!`,
+            [{ text: 'OK', onPress: () => navigateBackToLog() }]
+          );
+        } else {
+          // Just show success message
+          Alert.alert(
+            'Success',
+            'Food saved successfully!',
+            [{ text: 'OK' }]
+          );
+        }
+
+        return; // Exit early for placeholder foods
+      }
+
+      // For non-placeholder foods, continue with the existing logic...
+      console.log('=== TAKING NON-PLACEHOLDER PATH ===');
+      Alert.alert('DEBUG', 'Processing non-placeholder food');
       // First, check for duplicate foods using multiple strategies
       let existingFood = null;
 
@@ -400,6 +517,13 @@ const FoodScreen: React.FC = () => {
       // Create a new food
       const newFood = await foodService.createCustomFood(foodToSave);
       console.log('Food created successfully with ID:', newFood.id);
+      console.log('New food object:', JSON.stringify(newFood, null, 2));
+      Alert.alert('DEBUG', `Food created with ID: ${newFood.id} (type: ${typeof newFood.id})`);
+
+      // Validate that we got a proper database ID
+      if (!newFood.id || typeof newFood.id !== 'number') {
+        throw new Error(`Invalid food ID returned: ${newFood.id} (type: ${typeof newFood.id})`);
+      }
 
       // Add the new food to our state immediately
       const updatedFoods = [...foods, newFood];
@@ -409,6 +533,7 @@ const FoodScreen: React.FC = () => {
       // Check if we came from the log screen and have a meal type
       if (fromLog && selectedMealType) {
         console.log(`Adding new food to ${selectedMealType} log`);
+        Alert.alert('DEBUG', `Adding to ${selectedMealType} log`);
 
         // Ensure meal_type is valid
         const validMealType = (selectedMealType === 'breakfast' ||
@@ -429,8 +554,19 @@ const FoodScreen: React.FC = () => {
           user_id: 1 // Required field
         };
 
+        // Validate that we're using a proper database ID
+        if (typeof foodLogEntry.food_item_id !== 'number' || foodLogEntry.food_item_id <= 0) {
+          throw new Error(`Invalid food_item_id: ${foodLogEntry.food_item_id} (type: ${typeof foodLogEntry.food_item_id})`);
+        }
+
+        console.log('Creating food log entry:', JSON.stringify(foodLogEntry, null, 2));
+        console.log('Using food_item_id from newFood:', newFood.id);
+        console.log('SelectedFood ID (should be ignored):', selectedFood.id);
+        Alert.alert('DEBUG', `Creating log with food_item_id: ${foodLogEntry.food_item_id} (from newFood)`);
+
         await foodLogService.createLog(foodLogEntry);
         console.log('Food log created successfully');
+        Alert.alert('DEBUG', 'Food log created, navigating back');
 
         // Navigate back to the log screen
         Alert.alert(
@@ -448,7 +584,34 @@ const FoodScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error saving food:', error);
-      Alert.alert('Error', 'Failed to save food. Please try again.');
+
+      // Log more details about the error
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
+
+      // Show a more specific error message
+      let errorMessage = 'Failed to save food. Please try again.';
+      if (error instanceof Error) {
+        if (error.message.includes('Name is required')) {
+          errorMessage = 'Food name is required. Please enter a name for the food.';
+        } else if (error.message.includes('network') || error.message.includes('Network')) {
+          errorMessage = 'Network error. Please check your internet connection and try again.';
+        } else if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+          errorMessage = 'Authentication error. Please log in again.';
+        } else if (error.message.includes('500') || error.message.includes('Server error')) {
+          errorMessage = 'Server error. Please try again later.';
+        }
+      }
+
+      // Debug alert for mobile
+      Alert.alert('DEBUG ERROR', `Error: ${errorMessage}\n\nFull error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+      Alert.alert('Error', errorMessage);
     } finally {
       setIsSaving(false);
       setSelectedFood(null);
@@ -458,21 +621,34 @@ const FoodScreen: React.FC = () => {
   // Helper function to navigate back to log screen with proper error handling
   const navigateBackToLog = () => {
     console.log('Attempting to navigate back to log screen...');
+    Alert.alert('DEBUG', 'Attempting to navigate back to log screen');
 
     const params = route.params || {};
     const { fromLog, mealType, date } = params;
     console.log(`Route params for back navigation: fromLog=${fromLog}, mealType=${mealType}, date=${date}`);
+    console.log(`Route params: fromLog=${fromLog}, mealType=${mealType}, date=${date}`);
 
     if (fromLog !== true) {
       console.log('Not from log screen, staying on food screen');
+      Alert.alert('DEBUG', 'Not from log screen, staying on food screen');
       return;
     }
 
-    // Use direct navigation to Log stack with proper screen name
+    // Navigate to Log stack with proper screen name
     try {
       console.log('Navigating to Log -> SearchFoodForLogScreen with params:', { mealType, date });
+      Alert.alert('DEBUG', 'Trying to navigate to Log screen');
 
-      // First try with the new screen name
+      // First, try to go back to the previous screen
+      if (navigation.canGoBack()) {
+        console.log('Can go back, using goBack()');
+        Alert.alert('DEBUG', 'Using goBack()');
+        navigation.goBack();
+        return;
+      }
+
+      // If we can't go back, navigate to the log screen
+      Alert.alert('DEBUG', 'Using navigate() to Log screen');
       navigation.navigate('Log', {
         screen: 'SearchFoodForLogScreen',
         params: {
@@ -482,30 +658,18 @@ const FoodScreen: React.FC = () => {
         }
       });
     } catch (error) {
-      console.error('Primary navigation failed:', error);
+      console.error('Navigation failed:', error);
+      Alert.alert('DEBUG ERROR', `Navigation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
 
-      // Fall back to old screen name if that fails
+      // Last resort - just go to Log tab
       try {
-        console.log('Trying fallback with SearchFoodForLog screen name');
-        navigation.navigate('Log', {
-          screen: 'SearchFoodForLog',
-          params: {
-            mealType,
-            date,
-            refresh: Date.now()
-          }
-        });
-      } catch (secondError) {
-        console.error('Secondary navigation failed:', secondError);
-
-        // Last resort - just go to Log tab
-        try {
-          console.log('Last resort: navigating to Log tab');
-          navigation.navigate('Log');
-        } catch (finalError) {
-          console.error('All navigation attempts failed:', finalError);
-          Alert.alert('Navigation Error', 'Unable to return to log screen. Please use the bottom tab to navigate manually.');
-        }
+        console.log('Last resort: navigating to Log tab');
+        Alert.alert('DEBUG', 'Last resort: navigating to Log tab');
+        navigation.navigate('Log');
+      } catch (finalError) {
+        console.error('All navigation attempts failed:', finalError);
+        Alert.alert('DEBUG ERROR', `All navigation failed: ${finalError instanceof Error ? finalError.message : 'Unknown error'}`);
+        Alert.alert('Navigation Error', 'Unable to return to log screen. Please use the bottom tab to navigate manually.');
       }
     }
   };

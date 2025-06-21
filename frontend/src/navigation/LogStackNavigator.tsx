@@ -30,7 +30,7 @@ export type LogStackParamList = {
   LogDetails: { logId: string };
   AddLog: { date: string; mealType?: string };
   AddFoodToLogModal: { food: Food; mealType?: string; date?: string };
-  SearchFoodForLog: { mealType: string; date: string };
+  SearchFoodForLogScreen: { mealType: string; date: string };
 };
 
 // Create the stack navigator

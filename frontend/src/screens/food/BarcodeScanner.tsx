@@ -203,19 +203,21 @@ export default function BarcodeScanner() {
         food = await foodService.getFoodByBarcode(code);
         console.log(`Found food with barcode ${code} in database: ${JSON.stringify(food)}`);
       } catch (error) {
-        console.log(`Could not find food with barcode ${code}, creating empty food with barcode`);
-        // Create a placeholder food with the barcode
+        console.log(`Could not find food with barcode ${code}, creating placeholder food`);
+        // Create a placeholder food with the barcode - this will be a temporary object
+        // that gets properly created when the user saves it
         food = {
-          id: Date.now(),
-          name: "New Food",
-          barcode: code, // Ensure barcode is added here
+          id: `temp-${Date.now()}`, // Use a temporary ID that won't conflict
+          name: `Food with barcode ${code}`, // More descriptive name
+          barcode: code,
           calories: 0,
           protein: 0,
           carbs: 0,
           fat: 0,
           serving_size: 100,
           serving_unit: 'g',
-          source: 'custom'
+          source: 'custom',
+          isPlaceholder: true // Mark as placeholder so we know it needs to be created
         };
       }
 
@@ -236,23 +238,23 @@ export default function BarcodeScanner() {
 
       // Navigate differently based on where we came from
       if (fromLog) {
-        // If coming from the log screen, navigate back to the log stack with the food
+        // If coming from the log screen, preserve that context
         console.log(`Navigation from log - params: mealType=${mealType}, date=${date}, fromLog=${fromLog}`);
 
-        // Navigate directly to the AddFoodToLogModal in the Log stack
-        navigation.navigate('Log', {
-          screen: 'AddFoodToLogModal',
+        navigation.navigate('Food', {
+          screen: 'FoodList',
           params: {
-            food,
+            scannedFood: food,
             mealType,
-            date
+            date,
+            fromLog: true
           }
         });
       } else {
         // Regular navigation to Food screen
-        console.log(`Regular navigation to Food screen with scanned food (barcode: ${food.barcode})`);
+        console.log(`Regular navigation to Food screen with scanned food`);
         navigation.navigate('Food', {
-          screen: 'FoodScreen',
+          screen: 'FoodList',
           params: {
             scannedFood: food
           }
@@ -304,19 +306,21 @@ export default function BarcodeScanner() {
         food = await foodService.getFoodByBarcode(manualBarcode);
         console.log(`Found food with barcode ${manualBarcode} in database: ${JSON.stringify(food)}`);
       } catch (error) {
-        console.log(`Could not find food with barcode ${manualBarcode}, creating empty food with barcode`);
-        // Create a placeholder food with the barcode
+        console.log(`Could not find food with barcode ${manualBarcode}, creating placeholder food`);
+        // Create a placeholder food with the barcode - this will be a temporary object
+        // that gets properly created when the user saves it
         food = {
-          id: Date.now(),
-          name: "New Food",
-          barcode: manualBarcode, // Ensure barcode is added here
+          id: `temp-${Date.now()}`, // Use a temporary ID that won't conflict
+          name: `Food with barcode ${manualBarcode}`, // More descriptive name
+          barcode: manualBarcode,
           calories: 0,
           protein: 0,
           carbs: 0,
           fat: 0,
           serving_size: 100,
           serving_unit: 'g',
-          source: 'custom'
+          source: 'custom',
+          isPlaceholder: true // Mark as placeholder so we know it needs to be created
         };
       }
 
@@ -337,23 +341,23 @@ export default function BarcodeScanner() {
 
       // Navigate differently based on where we came from
       if (fromLog) {
-        // If coming from the log screen, navigate back to the log stack with the food
+        // If coming from the log screen, preserve that context
         console.log(`Navigation from log - params: mealType=${mealType}, date=${date}, fromLog=${fromLog}`);
 
-        // Navigate directly to the AddFoodToLogModal in the Log stack
-        navigation.navigate('Log', {
-          screen: 'AddFoodToLogModal',
+        navigation.navigate('Food', {
+          screen: 'FoodList',
           params: {
-            food,
+            scannedFood: food,
             mealType,
-            date
+            date,
+            fromLog: true
           }
         });
       } else {
         // Regular navigation to Food screen
-        console.log(`Regular navigation to Food screen with scanned food (barcode: ${food.barcode})`);
+        console.log(`Regular navigation to Food screen with scanned food`);
         navigation.navigate('Food', {
-          screen: 'FoodScreen',
+          screen: 'FoodList',
           params: {
             scannedFood: food
           }

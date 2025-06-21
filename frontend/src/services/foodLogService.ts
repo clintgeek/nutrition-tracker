@@ -113,8 +113,13 @@ export const foodLogService = {
     const syncId = uuid.v4() as string;
 
     try {
+      console.log('=== FOOD LOG CREATION DEBUG ===');
+      console.log('Log data received:', JSON.stringify(logData, null, 2));
+      console.log('Food item ID type:', typeof logData.food_item_id);
+      console.log('Food item ID value:', logData.food_item_id);
+
       // Try to create log via API
-      const log = await apiService.post<{ message: string; log: FoodLog }>('/logs', {
+      const requestData = {
         ...logData,
         sync_id: syncId,
         food_item: logData.food_item ? {
@@ -128,10 +133,17 @@ export const foodLogService = {
         } : undefined,
         // Only include food_item_id if it's provided and food_item is not provided
         ...(logData.food_item_id && !logData.food_item ? { food_item_id: logData.food_item_id } : {})
-      }).then((response) => response.log);
+      };
 
+      console.log('Request data being sent to backend:', JSON.stringify(requestData, null, 2));
+
+      const log = await apiService.post<{ message: string; log: FoodLog }>('/logs', requestData).then((response) => response.log);
+
+      console.log('Log created successfully:', JSON.stringify(log, null, 2));
       return log;
     } catch (error) {
+      console.error('Error creating food log:', error);
+
       // If API call fails, save log offline
       const offlineLog: FoodLog = {
         ...logData,

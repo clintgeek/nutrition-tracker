@@ -218,6 +218,27 @@ export default function ZXingBarcodeScanner() {
       setIsLoading(true);
       const food = await foodService.getFoodByBarcode(code);
 
+      // Check if food was found, if not create a placeholder
+      let foodToUse;
+      if (!food || !food.id) {
+        console.log(`Could not find food with barcode ${code}, creating placeholder food`);
+        foodToUse = {
+          id: `temp-${Date.now()}`,
+          name: `Food with barcode ${code}`,
+          barcode: code,
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          serving_size: 100,
+          serving_unit: 'g',
+          source: 'custom',
+          isPlaceholder: true
+        };
+      } else {
+        foodToUse = food;
+      }
+
       // Get route params from the navigation
       const navigationState = navigation.getState();
       const routes = navigationState.routes;
@@ -233,9 +254,9 @@ export default function ZXingBarcodeScanner() {
         console.log(`Navigation from log - params: mealType=${mealType}, date=${date}, fromLog=${fromLog}`);
 
         navigation.navigate('Food', {
-          screen: 'FoodScreen',
+          screen: 'FoodList',
           params: {
-            scannedFood: food,
+            scannedFood: foodToUse,
             mealType,
             date,
             fromLog: true
@@ -245,9 +266,9 @@ export default function ZXingBarcodeScanner() {
         // Regular navigation to Food screen
         console.log(`Regular navigation to Food screen with scanned food`);
         navigation.navigate('Food', {
-          screen: 'FoodScreen',
+          screen: 'FoodList',
           params: {
-            scannedFood: food
+            scannedFood: foodToUse
           }
         });
       }
@@ -290,7 +311,45 @@ export default function ZXingBarcodeScanner() {
       }
 
       // Look up the food by barcode
-      const food = await foodService.getFoodByBarcode(manualBarcode);
+      let foodToUse;
+      try {
+        const food = await foodService.getFoodByBarcode(manualBarcode);
+
+        // Check if food was found, if not create a placeholder
+        if (!food || !food.id) {
+          console.log(`Could not find food with barcode ${manualBarcode}, creating placeholder food`);
+          foodToUse = {
+            id: `temp-${Date.now()}`,
+            name: `Food with barcode ${manualBarcode}`,
+            barcode: manualBarcode,
+            calories: 0,
+            protein: 0,
+            carbs: 0,
+            fat: 0,
+            serving_size: 100,
+            serving_unit: 'g',
+            source: 'custom',
+            isPlaceholder: true
+          };
+        } else {
+          foodToUse = food;
+        }
+      } catch (error) {
+        console.log(`Error looking up barcode ${manualBarcode}, creating placeholder food`);
+        foodToUse = {
+          id: `temp-${Date.now()}`,
+          name: `Food with barcode ${manualBarcode}`,
+          barcode: manualBarcode,
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          serving_size: 100,
+          serving_unit: 'g',
+          source: 'custom',
+          isPlaceholder: true
+        };
+      }
 
       // Get route params from the navigation
       const navigationState = navigation.getState();
@@ -307,9 +366,9 @@ export default function ZXingBarcodeScanner() {
         console.log(`Manual barcode - Navigation from log - params: mealType=${mealType}, date=${date}, fromLog=${fromLog}`);
 
         navigation.navigate('Food', {
-          screen: 'FoodScreen',
+          screen: 'FoodList',
           params: {
-            scannedFood: food,
+            scannedFood: foodToUse,
             mealType,
             date,
             fromLog: true
@@ -319,9 +378,9 @@ export default function ZXingBarcodeScanner() {
         // Regular navigation to Food screen
         console.log(`Manual barcode - Regular navigation to Food screen with scanned food`);
         navigation.navigate('Food', {
-          screen: 'FoodScreen',
+          screen: 'FoodList',
           params: {
-            scannedFood: food
+            scannedFood: foodToUse
           }
         });
       }

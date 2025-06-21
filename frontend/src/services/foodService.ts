@@ -1,6 +1,7 @@
 import { Food, ApiFood, CreateFoodDTO, FoodSearchResult, FoodSearchParams, FoodSource } from '../types/Food';
 import { apiService } from './apiService';
 import { API_URL } from '../config';
+import { Alert } from 'react-native';
 
 // Food item interface
 export interface FoodItem {
@@ -413,11 +414,32 @@ export const foodService = {
   // Create custom food
   async createCustomFood(food: CreateFoodDTO): Promise<Food> {
     try {
+      console.log('Creating custom food with data:', JSON.stringify(food));
+
+      // Debug alert for mobile
+      const debugInfo = `Creating food:\nName: ${food.name}\nCalories: ${food.calories}\nProtein: ${food.protein}\nCarbs: ${food.carbs}\nFat: ${food.fat}\nBarcode: ${food.barcode || 'none'}`;
+      Alert.alert('DEBUG', debugInfo);
+
       const response = await apiService.post<Food>('/foods/custom', food);
+
+      console.log('Food created successfully:', JSON.stringify(response));
+      Alert.alert('DEBUG', `Food created successfully with ID: ${response.id}`);
       return response;
     } catch (error: unknown) {
       // Keep error logging for production debugging
-      console.error('Error creating custom food:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('Error creating custom food:', error);
+
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
+
+      // Debug alert for mobile
+      Alert.alert('DEBUG ERROR', `Food creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
       throw error;
     }
   },

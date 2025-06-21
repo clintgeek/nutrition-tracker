@@ -50,8 +50,12 @@ export const SearchFoodForLogScreen: React.FC<SearchFoodForLogScreenProps> = ({ 
   }, [navigation]);
 
   const handleBarcodePress = useCallback(() => {
-    navigation.navigate('BarcodeScanner');
-  }, [navigation]);
+    navigation.navigate('BarcodeScanner', {
+      mealType: saveContext.mealType,
+      date: saveContext.date,
+      fromLog: true
+    });
+  }, [navigation, saveContext]);
 
   return (
     <View style={styles.container}>
