@@ -85,30 +85,36 @@ export const FoodSearch: React.FC<FoodSearchProps> = ({
         };
       } else {
         results = await foodService.searchFood(query, 1, 20);
-        recentFoods = showRecentFoods ? await foodService.getRecentFoods() : [];
-        customFoods = showCustomFoods ? await foodService.getCustomFoods() : [];
-        recipeFoods = showRecipeFoods ? await foodService.getRecipeFoods() : [];
-        // Sort: custom and recent foods to top
-        const isRecent = (food: Food) => recentFoods.some(rf => rf.id === food.id);
-        results.foods.sort((a, b) => {
-          const aIsCustom = a.source === 'custom';
-          const bIsCustom = b.source === 'custom';
-          const aIsRecent = isRecent(a);
-          const bIsRecent = isRecent(b);
-          if (aIsRecent && !bIsRecent) return -1;
-          if (!aIsRecent && bIsRecent) return 1;
-          if (aIsCustom && !bIsCustom) return -1;
-          if (!aIsCustom && bIsCustom) return 1;
-          return 0;
-        });
-        // Merge in custom/recent foods that match the query but are missing from results
-        const queryLower = query.toLowerCase();
-        const matchesQuery = (food: Food) =>
-          food.name.toLowerCase().includes(queryLower) || (food.brand && food.brand.toLowerCase().includes(queryLower));
-        const searchIds = new Set(results.foods.map(f => f.id));
-        const extraRecent = recentFoods.filter(f => matchesQuery(f) && !searchIds.has(f.id));
-        const extraCustom = customFoods.filter(f => matchesQuery(f) && !searchIds.has(f.id));
-        results.foods = [...extraRecent, ...extraCustom, ...results.foods];
+
+        if (results && results.foods) {
+          recentFoods = showRecentFoods ? await foodService.getRecentFoods() : [];
+          customFoods = showCustomFoods ? await foodService.getCustomFoods() : [];
+          recipeFoods = showRecipeFoods ? await foodService.getRecipeFoods() : [];
+          // Sort: custom and recent foods to top
+          const isRecent = (food: Food) => recentFoods.some(rf => rf.id === food.id);
+          results.foods.sort((a, b) => {
+            const aIsCustom = a.source === 'custom';
+            const bIsCustom = b.source === 'custom';
+            const aIsRecent = isRecent(a);
+            const bIsRecent = isRecent(b);
+            if (aIsRecent && !bIsRecent) return -1;
+            if (!aIsRecent && bIsRecent) return 1;
+            if (aIsCustom && !bIsCustom) return -1;
+            if (!aIsCustom && bIsCustom) return 1;
+            return 0;
+          });
+          // Merge in custom/recent foods that match the query but are missing from results
+          const queryLower = query.toLowerCase();
+          const matchesQuery = (food: Food) =>
+            food.name.toLowerCase().includes(queryLower) || (food.brand && food.brand.toLowerCase().includes(queryLower));
+          const searchIds = new Set(results.foods.map(f => f.id));
+          const extraRecent = recentFoods.filter(f => matchesQuery(f) && !searchIds.has(f.id));
+          const extraCustom = customFoods.filter(f => matchesQuery(f) && !searchIds.has(f.id));
+          results.foods = [...extraRecent, ...extraCustom, ...results.foods];
+        } else {
+          // If no results, create an empty structure to avoid crashes
+          results = { foods: [], total: 0, page: 1, limit: 20 };
+        }
       }
 
       const mappedFoods = results.foods.map((food: Food) => ({

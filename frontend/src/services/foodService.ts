@@ -258,7 +258,15 @@ export const foodService = {
       const response = await apiService.get<SearchResponse>(`/foods/search`, {
         params: { query, page, limit }
       });
-      return response;
+
+      if (response && Array.isArray(response.foods)) {
+        return {
+          ...response,
+          foods: response.foods.map(transformFood),
+        };
+      }
+
+      return { foods: [], total: 0, page, limit };
     } catch (error) {
       // Keep error logging for production debugging
       console.error('Error in regular search:', error);

@@ -552,21 +552,21 @@ class FoodApiService {
           logger.error('OpenFoodFacts API error:', error);
           return [];
         }),
+        this.apis.spoonacular.searchByName(normalizedQuery).catch(error => {
+          logger.error('Spoonacular API error:', error);
+          return [];
+        }),
         this.searchUSDAByName(normalizedQuery).catch(error => {
           logger.error('USDA API error:', error);
           return [];
         }),
-        this.apis.spoonacular.searchByName(normalizedQuery).catch(error => {
-          logger.error('Spoonacular API error:', error);
-          return [];
-        })
       ]);
 
       // Transform results
       const transformedResults = results
         .filter(r => r.status === 'fulfilled')
         .flatMap((r, i) => {
-          const source = ['nutritionix', 'openFoodFacts', 'usda', 'spoonacular'][i];
+          const source = ['nutritionix', 'openFoodFacts', 'spoonacular', 'usda'][i];
           return FoodTransformer.transformApiResponse(r.value, source);
         });
 

@@ -50,7 +50,7 @@ export const EditFoodForLogModal: React.FC<EditFoodForLogModalProps> = ({ food, 
         });
       } else if (!editedFood.is_custom) {
         // Create a new custom food for non-custom foods
-        foodToLog = await foodService.createCustomFood({
+        const response = await foodService.createCustomFood({
           name: editedFood.name,
           brand: editedFood.brand,
           calories: Number(editedFood.calories),
@@ -61,6 +61,7 @@ export const EditFoodForLogModal: React.FC<EditFoodForLogModalProps> = ({ food, 
           serving_unit: editedFood.serving_unit,
           source: 'custom',
         });
+        foodToLog = response.food; // Extract the food object from the response
       }
       await saveFoodToContext(foodToLog, saveContext);
       onClose(true);
