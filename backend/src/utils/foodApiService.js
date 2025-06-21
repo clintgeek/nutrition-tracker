@@ -669,9 +669,9 @@ class FoodApiService {
         return b.quality_score - a.quality_score;
       }
 
-      // Then by brand presence (branded items first)
+      // Then by brand presence (basic foods first, then branded items)
       if (!!b.brand !== !!a.brand) {
-        return b.brand ? 1 : -1;
+        return a.brand ? 1 : -1; // Changed from b.brand ? 1 : -1 to prioritize non-branded foods
       }
 
       // Then by source priority
@@ -759,7 +759,7 @@ class FoodApiService {
     }
 
     return results;
-        }
+  }
 
   calculateStats(foods, apiResults) {
     return {
@@ -837,11 +837,11 @@ class FoodApiService {
       }
     });
 
-    // Brand match bonus
+    // Brand match bonus (reduced)
     if (foodBrand) {
       searchTerms.forEach(term => {
         if (foodBrand.includes(term)) {
-          score += 5;
+          score += 2; // Reduced from 5 to 2
         }
       });
     }
@@ -863,21 +863,53 @@ class FoodApiService {
     if (food.serving_size !== undefined) score += 2;
     if (food.serving_unit !== undefined) score += 2;
 
-    // Branded item bonus
+    // Penalize processed/branded foods to prioritize basic foods
     if (food.brand) {
-      score += 10; // Increased from 5 to 10
-      // Extra bonus for exact brand match
-      if (foodBrand === 'liquid iv') {
-        score += 20; // Increased from 10 to 20
-        // Additional bonus for peach flavor
-        if (foodName.includes('peach')) {
-          score += 15;
-        }
+      // Small bonus for branded items (reduced from 10 to 3)
+      score += 3;
+
+      // Penalize heavily processed foods
+      const processedKeywords = [
+        'candy', 'chips', 'cookies', 'cake', 'pie', 'ice cream', 'soda', 'pop', 'drink',
+        'juice', 'smoothie', 'shake', 'bar', 'cereal', 'snack', 'treat', 'dessert',
+        'sauce', 'dressing', 'spread', 'dip', 'soup', 'broth', 'stock', 'bouillon',
+        'seasoning', 'spice', 'herb', 'extract', 'flavor', 'artificial', 'natural',
+        'organic', 'gluten-free', 'vegan', 'vegetarian', 'low-fat', 'low-carb',
+        'sugar-free', 'diet', 'light', 'lite', 'reduced', 'fat-free', 'zero'
+      ];
+
+      const isProcessed = processedKeywords.some(keyword =>
+        foodName.includes(keyword) || foodBrand.includes(keyword)
+      );
+
+      if (isProcessed) {
+        score -= 15; // Significant penalty for processed foods
       }
     }
 
-    // Barcode bonus
-    if (food.barcode) score += 5;
+    // Bonus for basic whole foods
+    const basicFoodKeywords = [
+      'apple', 'orange', 'banana', 'grape', 'strawberry', 'blueberry', 'raspberry',
+      'peach', 'pear', 'plum', 'cherry', 'lemon', 'lime', 'grapefruit', 'pineapple',
+      'mango', 'kiwi', 'avocado', 'tomato', 'cucumber', 'carrot', 'broccoli',
+      'cauliflower', 'spinach', 'lettuce', 'kale', 'cabbage', 'onion', 'garlic',
+      'potato', 'sweet potato', 'yam', 'corn', 'peas', 'beans', 'lentils',
+      'chicken', 'beef', 'pork', 'fish', 'salmon', 'tuna', 'shrimp', 'egg',
+      'milk', 'cheese', 'yogurt', 'butter', 'bread', 'rice', 'pasta', 'oatmeal',
+      'almond', 'walnut', 'peanut', 'cashew', 'sunflower', 'pumpkin', 'flax',
+      'olive', 'coconut', 'sesame', 'chia', 'quinoa', 'brown rice', 'wild rice'
+    ];
+
+    const isBasicFood = basicFoodKeywords.some(keyword =>
+      foodName.includes(keyword) && !food.brand
+    );
+
+    if (isBasicFood) {
+      score += 20; // Significant bonus for basic whole foods
+    }
+
+    // Barcode bonus (reduced)
+    if (food.barcode) score += 2; // Reduced from 5 to 2
 
     // Normalize score to 0-10 range
     return Math.min(10, score / 10);

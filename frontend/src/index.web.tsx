@@ -2,7 +2,7 @@ import { AppRegistry, Platform } from 'react-native';
 import { createRoot } from 'react-dom/client';
 import { NavigationContainer } from '@react-navigation/native';
 import { Provider as PaperProvider } from 'react-native-paper';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from './utils/safeArea';
 import { AuthProvider } from './contexts/AuthContext';
 import { SyncProvider } from './contexts/SyncContext';
 import AppNavigator from './navigation/AppNavigator';

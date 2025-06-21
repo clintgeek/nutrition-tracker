@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Platform, Dimensions } from 'react-native';
+import { StyleSheet, View, Platform, Dimensions, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Text, Button, Card, useTheme, Divider } from 'react-native-paper';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from '../../utils/safeArea';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { loggingService } from '../../services/loggingService';
 
@@ -61,22 +61,55 @@ export default function BarcodeScannerSelector() {
     }
   };
 
-  const navigateToScanner = (scannerType: string) => {
+  const handleScannerSelect = (scannerType: string) => {
     switch (scannerType) {
-      case 'original':
-        navigation.navigate('BarcodeScanner');
+      case 'expo':
+        navigation.navigate('BarcodeScanner' as never);
         break;
       case 'quagga':
-        navigation.navigate('QuaggaBarcodeScanner');
+        navigation.navigate('QuaggaBarcodeScanner' as never);
         break;
       case 'zxing':
-        navigation.navigate('ZXingBarcodeScanner');
+        navigation.navigate('ZXingBarcodeScanner' as never);
         break;
-      case 'manual':
-        navigation.navigate('BarcodeScanner', { showManualInput: true });
+      case 'simplified':
+        navigation.navigate('SimplifiedBarcodeScanner' as never);
         break;
+      default:
+        Alert.alert('Error', 'Unknown scanner type');
     }
   };
+
+  const scannerOptions = [
+    {
+      id: 'expo',
+      title: 'Expo Camera Scanner',
+      description: 'Uses Expo Camera with ML Kit',
+      icon: 'camera',
+      color: '#007AFF'
+    },
+    {
+      id: 'quagga',
+      title: 'QuaggaJS Scanner',
+      description: 'Pure JavaScript barcode scanner',
+      icon: 'barcode-scan',
+      color: '#34C759'
+    },
+    {
+      id: 'zxing',
+      title: 'ZXing Scanner',
+      description: 'ZXing library integration',
+      icon: 'qrcode-scan',
+      color: '#FF9500'
+    },
+    {
+      id: 'simplified',
+      title: 'Simplified Scanner',
+      description: 'Basic camera with manual input',
+      icon: 'camera-plus',
+      color: '#AF52DE'
+    }
+  ];
 
   const renderRecommendation = () => {
     if (Platform.OS === 'web') {
@@ -116,60 +149,41 @@ export default function BarcodeScannerSelector() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerText}>Choose Barcode Scanner</Text>
-        <Text style={styles.subHeaderText}>
-          Select the scanner that works best with your device
+        <Text style={[styles.title, { color: theme.colors.primary }]}>
+          Choose Barcode Scanner
+        </Text>
+        <Text style={[styles.subtitle, { color: theme.colors.onSurface }]}>
+          Select the scanner that works best for you
         </Text>
       </View>
 
       {renderRecommendation()}
 
-      <View style={styles.options}>
-        <Card style={styles.optionCard} onPress={() => navigateToScanner('original')}>
-          <Card.Content>
-            <MaterialCommunityIcons name="camera" size={36} color={theme.colors.primary} style={styles.optionIcon} />
-            <Text style={styles.optionTitle}>Native Camera Scanner</Text>
-            <Text style={styles.optionDescription}>
-              Uses the Expo Camera API for barcode scanning.
-              Works best on native apps and modern browsers.
-            </Text>
-          </Card.Content>
-        </Card>
-
-        <Card style={styles.optionCard} onPress={() => navigateToScanner('quagga')}>
-          <Card.Content>
-            <MaterialCommunityIcons name="barcode-scan" size={36} color={theme.colors.primary} style={styles.optionIcon} />
-            <Text style={styles.optionTitle}>QuaggaJS Scanner</Text>
-            <Text style={styles.optionDescription}>
-              Web-optimized barcode scanner using QuaggaJS.
-              Good alternative for PWAs and web browsers.
-            </Text>
-          </Card.Content>
-        </Card>
-
-        <Card style={styles.optionCard} onPress={() => navigateToScanner('zxing')}>
-          <Card.Content>
-            <MaterialCommunityIcons name="qrcode-scan" size={36} color={theme.colors.primary} style={styles.optionIcon} />
-            <Text style={styles.optionTitle}>ZXing Scanner</Text>
-            <Text style={styles.optionDescription}>
-              Alternative scanner using ZXing library.
-              Works well on most Android devices, including Samsung.
-            </Text>
-          </Card.Content>
-        </Card>
-
-        <Divider style={styles.divider} />
-
-        <Card style={styles.optionCard} onPress={() => navigateToScanner('manual')}>
-          <Card.Content>
-            <MaterialCommunityIcons name="keyboard" size={36} color={theme.colors.primary} style={styles.optionIcon} />
-            <Text style={styles.optionTitle}>Manual Entry</Text>
-            <Text style={styles.optionDescription}>
-              Type the barcode number manually.
-              Works on all devices and browsers.
-            </Text>
-          </Card.Content>
-        </Card>
+      <View style={styles.optionsContainer}>
+        {scannerOptions.map((option) => (
+          <TouchableOpacity
+            key={option.id}
+            style={[styles.optionCard, { backgroundColor: theme.colors.surface }]}
+            onPress={() => handleScannerSelect(option.id)}
+          >
+            <View style={[styles.iconContainer, { backgroundColor: option.color }]}>
+              <MaterialCommunityIcons name={option.icon as any} size={24} color="white" />
+            </View>
+            <View style={styles.optionContent}>
+              <Text style={[styles.optionTitle, { color: theme.colors.onSurface }]}>
+                {option.title}
+              </Text>
+              <Text style={[styles.optionDescription, { color: theme.colors.onSurfaceVariant }]}>
+                {option.description}
+              </Text>
+            </View>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={24}
+              color={theme.colors.onSurfaceVariant}
+            />
+          </TouchableOpacity>
+        ))}
       </View>
 
       <View style={styles.diagnosticInfo}>
@@ -205,55 +219,53 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   header: {
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-    backgroundColor: '#ffffff',
+    padding: 20,
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    opacity: 0.7,
+  },
+  optionsContainer: {
+    padding: 20,
+  },
+  optionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowRadius: 4,
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 16,
   },
-  headerText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  subHeaderText: {
-    fontSize: 16,
-    color: '#666666',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  options: {
-    padding: 16,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-around',
-  },
-  optionCard: {
-    width: cardWidth,
-    marginBottom: 16,
-    elevation: 3,
-  },
-  optionIcon: {
-    alignSelf: 'center',
-    marginBottom: 12,
+  optionContent: {
+    flex: 1,
   },
   optionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 8,
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
   },
   optionDescription: {
-    textAlign: 'center',
-    color: '#666666',
-  },
-  divider: {
-    width: '100%',
-    marginVertical: 16,
-    height: 1,
+    fontSize: 14,
+    opacity: 0.7,
   },
   footer: {
     position: 'absolute',

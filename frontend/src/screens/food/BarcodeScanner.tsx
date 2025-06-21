@@ -3,10 +3,11 @@ import { StyleSheet, View, Platform, Dimensions, Vibration, TextInput } from 're
 import { useNavigation } from '@react-navigation/native';
 import { useRoute } from '@react-navigation/core';
 import { ActivityIndicator, Text, useTheme, Button, Portal, Dialog } from 'react-native-paper';
+import { Camera, CameraType, BarCodeScanningResult } from 'expo-camera';
 import { foodService } from '../../services/foodService';
 import { loggingService } from '../../services/loggingService';
 import { validateBarcode } from '../../utils/validation';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from '../../utils/safeArea';
 
 const SCAN_AREA_SIZE = Math.min(Dimensions.get('window').width * 0.8, 300);
 

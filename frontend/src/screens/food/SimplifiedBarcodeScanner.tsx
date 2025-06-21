@@ -5,7 +5,9 @@ import { ActivityIndicator, Text, useTheme, Button, Portal, Dialog } from 'react
 import { foodService } from '../../services/foodService';
 import { loggingService } from '../../services/loggingService';
 import { validateBarcode } from '../../utils/validation';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from '../../utils/safeArea';
+import { TouchableOpacity, Alert } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const SCAN_AREA_SIZE = Math.min(Dimensions.get('window').width * 0.8, 300);
 
@@ -22,12 +24,15 @@ export default function SimplifiedBarcodeScanner() {
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
   const [scannerStarted, setScannerStarted] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
+  const [barcode, setBarcode] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const codeReaderRef = useRef<any>(null);
   const navigation = useNavigation();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const inputRef = useRef<TextInput>(null);
 
   // Load ZXing script dynamically
   useEffect(() => {
@@ -363,10 +368,103 @@ export default function SimplifiedBarcodeScanner() {
     );
   }, []);
 
+  useEffect(() => {
+    // Focus the input when component mounts
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 500);
+  }, []);
+
+  const handleScan = async () => {
+    if (!barcode.trim()) {
+      Alert.alert('Error', 'Please enter a barcode');
+      return;
+    }
+
+    setIsScanning(true);
+
+    try {
+      // Log the scan attempt
+      loggingService.info('Manual barcode scan attempted', {
+        barcode: barcode.trim(),
+        scanner: 'simplified',
+        platform: Platform.OS
+      });
+
+      // Navigate back with the barcode result
+      navigation.goBack();
+
+      // You might want to pass the barcode back to the previous screen
+      // This would require setting up a callback or using navigation params
+
+    } catch (error) {
+      console.error('Error scanning barcode:', error);
+      loggingService.error('Error in simplified barcode scanner', { error });
+      Alert.alert('Error', 'Failed to process barcode');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleKeyPress = (event: any) => {
+    if (event.nativeEvent.key === 'Enter') {
+      handleScan();
+    }
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerText}>Scan Barcode</Text>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={24} color={theme.colors.primary} />
+        </TouchableOpacity>
+        <Text style={[styles.title, { color: theme.colors.primary }]}>
+          Manual Barcode Entry
+        </Text>
+      </View>
+
+      <View style={styles.content}>
+        <View style={styles.iconContainer}>
+          <MaterialCommunityIcons
+            name="barcode-scan"
+            size={80}
+            color={theme.colors.primary}
+          />
+        </View>
+
+        <Text style={[styles.instruction, { color: theme.colors.onSurface }]}>
+          Enter the barcode number manually
+        </Text>
+
+        <TextInput
+          ref={inputRef}
+          style={[styles.input, { backgroundColor: theme.colors.surface }]}
+          value={barcode}
+          onChangeText={setBarcode}
+          placeholder="Enter barcode number..."
+          keyboardType="numeric"
+          autoFocus={true}
+          onSubmitEditing={handleScan}
+          onKeyPress={handleKeyPress}
+          maxLength={20}
+        />
+
+        <Button
+          mode="contained"
+          onPress={handleScan}
+          loading={isScanning}
+          disabled={!barcode.trim() || isScanning}
+          style={styles.scanButton}
+        >
+          {isScanning ? 'Processing...' : 'Scan Barcode'}
+        </Button>
+
+        <Text style={[styles.note, { color: theme.colors.onSurfaceVariant }]}>
+          This method works on all devices and browsers
+        </Text>
       </View>
 
       {!hasInitialized && (
@@ -464,16 +562,56 @@ export default function SimplifiedBarcodeScanner() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#f5f5f5',
   },
   header: {
-    paddingVertical: 16,
+    flexDirection: 'row',
     alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
-  headerText: {
-    color: '#fff',
+  backButton: {
+    marginRight: 16,
+  },
+  title: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  content: {
+    flex: 1,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconContainer: {
+    marginBottom: 32,
+  },
+  instruction: {
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 24,
+    fontWeight: '500',
+  },
+  input: {
+    width: '100%',
+    height: 56,
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 24,
+    borderRadius: 8,
+  },
+  scanButton: {
+    width: '100%',
+    height: 56,
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  note: {
+    fontSize: 14,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   scannerContainer: {
     flex: 1,

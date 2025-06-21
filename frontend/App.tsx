@@ -1,6 +1,6 @@
 import React from 'react';
 import { Platform, StatusBar } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from './src/utils/safeArea';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { NavigationContainer } from '@react-navigation/native';
 import { enGB, registerTranslation } from 'react-native-paper-dates';

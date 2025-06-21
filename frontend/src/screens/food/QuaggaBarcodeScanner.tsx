@@ -5,7 +5,7 @@ import { ActivityIndicator, Text, useTheme, Button, Portal, Dialog } from 'react
 import { foodService } from '../../services/foodService';
 import { loggingService } from '../../services/loggingService';
 import { validateBarcode } from '../../utils/validation';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from '../../utils/safeArea';
 
 const SCAN_AREA_SIZE = Math.min(Dimensions.get('window').width * 0.8, 300);
 const SCAN_AREA_BORDER_WIDTH = 2;
